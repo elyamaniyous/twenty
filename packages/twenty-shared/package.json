@@ -85,6 +85,11 @@
       "import": "./dist/database-events.mjs",
       "require": "./dist/database-events.cjs"
     },
+    "./erp-maroc": {
+      "types": "./dist/erp-maroc/index.d.ts",
+      "import": "./dist/erp-maroc.mjs",
+      "require": "./dist/erp-maroc.cjs"
+    },
     "./i18n": {
       "types": "./dist/i18n/index.d.ts",
       "import": "./dist/i18n.mjs",
@@ -142,6 +147,7 @@
     "application",
     "constants",
     "database-events",
+    "erp-maroc",
     "i18n",
     "logic-function",
     "metadata",
@@ -166,6 +172,9 @@
       ],
       "database-events": [
         "dist/database-events/index.d.ts"
+      ],
+      "erp-maroc": [
+        "dist/erp-maroc/index.d.ts"
       ],
       "i18n": [
         "dist/i18n/index.d.ts"

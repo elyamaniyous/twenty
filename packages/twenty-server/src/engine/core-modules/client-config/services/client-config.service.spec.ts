@@ -103,6 +103,8 @@ describe('ClientConfigService', () => {
             CLOUDFLARE_ZONE_ID: undefined,
             ALLOW_REQUESTS_TO_TWENTY_ICONS: false,
             CLICKHOUSE_URL: undefined,
+            WORKSPACE_SCHEMA_DDL_LOCKED: false,
+            ERP_MAROC_ENABLED: true,
           };
 
           return mockValues[key];
@@ -176,7 +178,11 @@ describe('ClientConfigService', () => {
         calendarBookingPageId: 'team/twenty/talk-to-us',
         isCloudflareIntegrationEnabled: false,
         isClickHouseConfigured: false,
+        isWorkspaceSchemaDDLLocked: false,
+        erpMarocEnabled: true,
       });
+      expect(result).not.toHaveProperty('erpApiUrl');
+      expect(result).not.toHaveProperty('erpInternalApiKey');
     });
 
     it('should handle production environment correctly', async () => {

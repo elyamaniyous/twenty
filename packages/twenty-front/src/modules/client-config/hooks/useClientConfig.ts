@@ -16,6 +16,7 @@ import { isDDLLockedState } from '@/client-config/states/isDDLLockedState';
 import { isEmailGroupEnabledState } from '@/client-config/states/isEmailGroupEnabledState';
 import { isEmailingDomainsEnabledState } from '@/client-config/states/isEmailingDomainsEnabledState';
 import { isEmailVerificationRequiredState } from '@/client-config/states/isEmailVerificationRequiredState';
+import { isErpMarocEnabledState } from '@/client-config/states/isErpMarocEnabledState';
 import { isGoogleCalendarEnabledState } from '@/client-config/states/isGoogleCalendarEnabledState';
 import { isGoogleMessagingEnabledState } from '@/client-config/states/isGoogleMessagingEnabledState';
 import { isImapSmtpCaldavEnabledState } from '@/client-config/states/isImapSmtpCaldavEnabledState';
@@ -58,6 +59,8 @@ export const useClientConfig = (): UseClientConfigResult => {
   const setIsEmailVerificationRequired = useSetAtomState(
     isEmailVerificationRequiredState,
   );
+
+  const setIsErpMarocEnabled = useSetAtomState(isErpMarocEnabledState);
 
   const setBilling = useSetAtomState(billingState);
   const setSupportChat = useSetAtomState(supportChatState);
@@ -163,6 +166,7 @@ export const useClientConfig = (): UseClientConfigResult => {
       setIsDeveloperDefaultSignInPrefilled(clientConfig.signInPrefilled);
       setIsMultiWorkspaceEnabled(clientConfig.isMultiWorkspaceEnabled);
       setIsEmailVerificationRequired(clientConfig.isEmailVerificationRequired);
+      setIsErpMarocEnabled(clientConfig.erpMarocEnabled ?? false);
       setBilling(clientConfig.billing);
       setSupportChat(clientConfig.support);
 
@@ -237,6 +241,7 @@ export const useClientConfig = (): UseClientConfigResult => {
     setIsConfigVariablesInDbEnabled,
     setIsDeveloperDefaultSignInPrefilled,
     setIsEmailVerificationRequired,
+    setIsErpMarocEnabled,
     setIsImapSmtpCaldavEnabled,
     setIsEmailGroupEnabled,
     setIsMultiWorkspaceEnabled,

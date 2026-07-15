@@ -3,8 +3,10 @@ import { type LogLevel, Logger } from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
 import {
   IsDefined,
+  IsNotEmpty,
   IsOptional,
   IsUrl,
+  Matches,
   ValidateIf,
   type ValidationError,
   validateSync,
@@ -94,6 +96,38 @@ export class ConfigVariables {
   })
   @IsOptional()
   WORKSPACE_SCHEMA_DDL_LOCKED = false;
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.ADVANCED_SETTINGS,
+    description: 'Enable the ERP Maroc integration',
+    isEnvOnly: true,
+    type: ConfigVariableType.BOOLEAN,
+  })
+  @IsOptional()
+  ERP_MAROC_ENABLED = false;
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.ADVANCED_SETTINGS,
+    description: 'Base URL of the ERP Maroc API',
+    isEnvOnly: true,
+    type: ConfigVariableType.STRING,
+  })
+  @IsUrl({ require_tld: false, require_protocol: true })
+  @ValidateIf((env) => env.ERP_MAROC_ENABLED)
+  ERP_API_URL = '';
+
+  @ConfigVariablesMetadata({
+    group: ConfigVariablesGroup.ADVANCED_SETTINGS,
+    description: 'Internal API key used to authenticate with ERP Maroc',
+    isEnvOnly: true,
+    isSensitive: true,
+    type: ConfigVariableType.STRING,
+  })
+  @IsDefined()
+  @IsNotEmpty()
+  @Matches(/\S/)
+  @ValidateIf((env) => env.ERP_MAROC_ENABLED)
+  ERP_INTERNAL_API_KEY = '';
 
   @ConfigVariablesMetadata({
     group: ConfigVariablesGroup.TOKENS_DURATION,

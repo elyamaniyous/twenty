@@ -20,6 +20,8 @@
         "{projectRoot}/constants/dist",
         "{projectRoot}/database-events/package.json",
         "{projectRoot}/database-events/dist",
+        "{projectRoot}/erp-maroc/package.json",
+        "{projectRoot}/erp-maroc/dist",
         "{projectRoot}/i18n/package.json",
         "{projectRoot}/i18n/dist",
         "{projectRoot}/logic-function/package.json",

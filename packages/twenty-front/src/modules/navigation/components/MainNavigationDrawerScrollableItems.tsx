@@ -2,6 +2,8 @@ import { NavigationDrawerOpenedSection } from '@/navigation-menu-item/display/se
 import { NavigationDrawerWorkspaceSectionSkeletonLoader } from '@/object-metadata/components/NavigationDrawerWorkspaceSectionSkeletonLoader';
 
 import { isLayoutCustomizationModeEnabledState } from '@/layout-customization/states/isLayoutCustomizationModeEnabledState';
+import { isErpMarocEnabledState } from '@/client-config/states/isErpMarocEnabledState';
+import { NavigationDrawerErpMarocSection } from '@/erp-maroc/navigation/NavigationDrawerErpMarocSection';
 import { NavigationDrawerOtherSection } from '@/navigation/components/NavigationDrawerOtherSection';
 import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 import { styled } from '@linaria/react';
@@ -32,6 +34,7 @@ const StyledScrollableItemsContainer = styled.div`
 `;
 
 export const MainNavigationDrawerScrollableItems = () => {
+  const isErpMarocEnabled = useAtomStateValue(isErpMarocEnabledState);
   const isLayoutCustomizationModeEnabled = useAtomStateValue(
     isLayoutCustomizationModeEnabledState,
   );
@@ -43,6 +46,7 @@ export const MainNavigationDrawerScrollableItems = () => {
         <FavoritesSectionDispatcher />
         <WorkspaceSectionDispatcher />
       </Suspense>
+      {isErpMarocEnabled && <NavigationDrawerErpMarocSection />}
       {!isLayoutCustomizationModeEnabled && <NavigationDrawerOtherSection />}
     </StyledScrollableItemsContainer>
   );

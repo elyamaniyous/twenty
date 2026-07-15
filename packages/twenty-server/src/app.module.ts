@@ -32,6 +32,7 @@ import { GlobalWorkspaceDataSourceModule } from 'src/engine/twenty-orm/global-wo
 import { TwentyORMModule } from 'src/engine/twenty-orm/twenty-orm.module';
 import { WorkspaceCacheStorageModule } from 'src/engine/workspace-cache-storage/workspace-cache-storage.module';
 import { ModulesModule } from 'src/modules/modules.module';
+import { ErpMarocModule } from 'src/modules/erp-maroc/erp-maroc.module';
 
 import { ClickHouseModule } from './database/clickHouse/clickHouse.module';
 import { CoreEngineModule } from './engine/core-modules/core-engine.module';
@@ -68,6 +69,7 @@ const MIGRATED_REST_METHODS = [
     MetadataGraphQLApiModule,
     AdminPanelGraphQLApiModule,
     RestApiModule,
+    ErpMarocModule,
     McpModule,
     MiddlewareModule,
     WorkspaceMetadataVersionModule,

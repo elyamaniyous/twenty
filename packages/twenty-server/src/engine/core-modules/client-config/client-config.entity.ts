@@ -327,6 +327,9 @@ export class ClientConfig {
   @Field(() => Boolean)
   isWorkspaceSchemaDDLLocked: boolean;
 
+  @Field(() => Boolean)
+  erpMarocEnabled: boolean;
+
   @Field(() => ClientConfigMaintenanceMode, { nullable: true })
   maintenance?: ClientConfigMaintenanceMode;
 }

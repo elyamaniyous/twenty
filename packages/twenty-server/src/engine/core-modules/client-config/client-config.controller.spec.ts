@@ -101,6 +101,7 @@ describe('ClientConfigController', () => {
         isCloudflareIntegrationEnabled: false,
         isClickHouseConfigured: false,
         isWorkspaceSchemaDDLLocked: false,
+        erpMarocEnabled: false,
       };
 
       jest

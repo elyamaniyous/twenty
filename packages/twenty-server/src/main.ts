@@ -16,6 +16,7 @@ import { getSessionStorageOptions } from 'src/engine/core-modules/session-storag
 import { TwentyConfigService } from 'src/engine/core-modules/twenty-config/twenty-config.service';
 import { configTransformers } from 'src/engine/core-modules/twenty-config/utils/config-transformers.util';
 import { UnhandledExceptionFilter } from 'src/filters/unhandled-exception.filter';
+import { createErpMarocPreBodyParser } from 'src/modules/erp-maroc/erp-maroc-pre-body-parser';
 
 import { AppModule } from './app.module';
 import './instrument';
@@ -52,6 +53,8 @@ const bootstrap = async () => {
     : (configTransformers.boolean(trustProxyRaw) ?? trustProxyRaw);
 
   app.set('trust proxy', trustProxy);
+
+  app.use(createErpMarocPreBodyParser(twentyConfigService));
 
   app.use(session(getSessionStorageOptions(twentyConfigService)));
 

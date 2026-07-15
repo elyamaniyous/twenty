@@ -36,6 +36,7 @@ export type ClientConfig = {
   isCloudflareIntegrationEnabled: boolean;
   isClickHouseConfigured: boolean;
   isWorkspaceSchemaDDLLocked: boolean;
+  erpMarocEnabled?: boolean;
   publicFeatureFlags: Array<PublicFeatureFlag>;
   sentry: Sentry;
   signInPrefilled: boolean;

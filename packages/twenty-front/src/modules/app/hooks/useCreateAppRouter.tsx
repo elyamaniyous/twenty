@@ -2,11 +2,16 @@ import { AppRouterProviders } from '@/app/components/AppRouterProviders';
 import { LazyRoute } from '@/app/components/LazyRoute';
 import { SettingsRoutes } from '@/app/components/SettingsRoutes';
 import { VerifyLoginTokenEffect } from '@/auth/components/VerifyLoginTokenEffect';
+import { isErpMarocEnabledState } from '@/client-config/states/isErpMarocEnabledState';
+import { ErpMarocContextProvider } from '@/erp-maroc/context/ErpMarocContextProvider';
+import { ErpMarocRouteBoundary } from '@/erp-maroc/navigation/ErpMarocRouteBoundary';
+import { erpMarocPaths } from '@/erp-maroc/navigation/erpMarocPaths';
 
 import { VerifyEmailEffect } from '@/auth/components/VerifyEmailEffect';
 import indexAppPath from '@/navigation/utils/indexAppPath';
 import { BlankLayout } from '@/ui/layout/page/components/BlankLayout';
 import { DefaultLayout } from '@/ui/layout/page/components/DefaultLayout';
+import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 import { AppPath } from 'twenty-shared/types';
 
 import { lazy } from 'react';
@@ -14,7 +19,140 @@ import {
   createBrowserRouter,
   createRoutesFromElements,
   Route,
+  useParams,
 } from 'react-router-dom';
+
+const ErpMarocCockpitPage = lazy(() =>
+  import('~/pages/erp-maroc/ErpMarocCockpitPage').then((module) => ({
+    default: module.ErpMarocCockpitPage,
+  })),
+);
+
+const ErpMarocProductsPage = lazy(() =>
+  import('~/pages/erp-maroc/products/ErpProductsPage').then((module) => ({
+    default: module.ErpProductsPage,
+  })),
+);
+
+const ErpMarocTiersPage = lazy(() =>
+  import('~/pages/erp-maroc/tiers/ErpTiersPage').then((module) => ({
+    default: module.ErpTiersPage,
+  })),
+);
+
+const ErpMarocQuotesPage = lazy(() =>
+  import('~/pages/erp-maroc/quotes/ErpQuotesPage').then((module) => ({
+    default: module.ErpQuotesPage,
+  })),
+);
+
+const ErpMarocQuoteEditorPage = lazy(() =>
+  import('~/pages/erp-maroc/quotes/ErpQuoteEditorPage').then((module) => ({
+    default: module.ErpQuoteEditorPage,
+  })),
+);
+
+const ErpMarocQuoteDetailPage = lazy(() =>
+  import('~/pages/erp-maroc/quotes/ErpQuoteDetailPage').then((module) => ({
+    default: module.ErpQuoteDetailPage,
+  })),
+);
+
+const ErpMarocInvoicesPage = lazy(() =>
+  import('~/pages/erp-maroc/invoices/ErpInvoicesPage').then((module) => ({
+    default: module.ErpInvoicesPage,
+  })),
+);
+
+const ErpInvoiceEditorPage = lazy(() =>
+  import('~/pages/erp-maroc/invoices/ErpInvoiceEditorPage').then((module) => ({
+    default: module.ErpInvoiceEditorPage,
+  })),
+);
+
+const ErpInvoiceDetailPage = lazy(() =>
+  import('~/pages/erp-maroc/invoices/ErpInvoiceDetailPage').then((module) => ({
+    default: module.ErpInvoiceDetailPage,
+  })),
+);
+
+const ErpInvoiceEditorRoute = () => {
+  const { id: invoiceId } = useParams<{ id: string }>();
+
+  return <ErpInvoiceEditorPage invoiceId={invoiceId} />;
+};
+
+const ErpPaymentsPage = lazy(() =>
+  import('~/pages/erp-maroc/payments/ErpPaymentsPage').then((module) => ({
+    default: module.ErpPaymentsPage,
+  })),
+);
+
+const ErpPaymentEditorPage = lazy(() =>
+  import('~/pages/erp-maroc/payments/ErpPaymentEditorPage').then((module) => ({
+    default: module.ErpPaymentEditorPage,
+  })),
+);
+
+const ErpPaymentDetailPage = lazy(() =>
+  import('~/pages/erp-maroc/payments/ErpPaymentDetailPage').then((module) => ({
+    default: module.ErpPaymentDetailPage,
+  })),
+);
+
+const ErpCreditNotesPage = lazy(() =>
+  import('~/pages/erp-maroc/credit-notes/ErpCreditNotesPage').then(
+    (module) => ({ default: module.ErpCreditNotesPage }),
+  ),
+);
+
+const ErpCreditNoteEditorPage = lazy(() =>
+  import('~/pages/erp-maroc/credit-notes/ErpCreditNoteEditorPage').then(
+    (module) => ({ default: module.ErpCreditNoteEditorPage }),
+  ),
+);
+
+const ErpCreditNoteDetailPage = lazy(() =>
+  import('~/pages/erp-maroc/credit-notes/ErpCreditNoteDetailPage').then(
+    (module) => ({ default: module.ErpCreditNoteDetailPage }),
+  ),
+);
+
+const ErpMarocRemindersPage = lazy(() =>
+  import('~/pages/erp-maroc/reminders/ErpRemindersPage').then((module) => ({
+    default: module.ErpRemindersPage,
+  })),
+);
+
+const ErpEntriesPage = lazy(() =>
+  import('~/pages/erp-maroc/accounting/ErpEntriesPage').then((module) => ({
+    default: module.ErpEntriesPage,
+  })),
+);
+
+const ErpEntryDetailPage = lazy(() =>
+  import('~/pages/erp-maroc/accounting/ErpEntryDetailPage').then((module) => ({
+    default: module.ErpEntryDetailPage,
+  })),
+);
+
+const ErpGrandLivrePage = lazy(() =>
+  import('~/pages/erp-maroc/accounting/ErpGrandLivrePage').then((module) => ({
+    default: module.ErpGrandLivrePage,
+  })),
+);
+
+const ErpBalancePage = lazy(() =>
+  import('~/pages/erp-maroc/accounting/ErpBalancePage').then((module) => ({
+    default: module.ErpBalancePage,
+  })),
+);
+
+const ErpLettragePage = lazy(() =>
+  import('~/pages/erp-maroc/accounting/ErpLettragePage').then((module) => ({
+    default: module.ErpLettragePage,
+  })),
+);
 
 const RecordIndexPage = lazy(() =>
   import('~/pages/object-record/RecordIndexPage').then((module) => ({
@@ -109,8 +247,10 @@ const NotFound = lazy(() =>
 export const useCreateAppRouter = (
   isFunctionSettingsEnabled?: boolean,
   isAdminPageEnabled?: boolean,
-) =>
-  createBrowserRouter(
+) => {
+  const isErpMarocEnabled = useAtomStateValue(isErpMarocEnabledState);
+
+  return createBrowserRouter(
     createRoutesFromElements(
       <Route
         element={<AppRouterProviders />}
@@ -234,6 +374,208 @@ export const useCreateAppRouter = (
               </LazyRoute>
             }
           />
+          {isErpMarocEnabled && (
+            <Route
+              element={
+                <ErpMarocContextProvider>
+                  <ErpMarocRouteBoundary />
+                </ErpMarocContextProvider>
+              }
+            >
+              <Route
+                path={erpMarocPaths.cockpit}
+                element={
+                  <LazyRoute>
+                    <ErpMarocCockpitPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.products}
+                element={
+                  <LazyRoute>
+                    <ErpMarocProductsPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.tiers}
+                element={
+                  <LazyRoute>
+                    <ErpMarocTiersPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.quotes}
+                element={
+                  <LazyRoute>
+                    <ErpMarocQuotesPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.quoteNew}
+                element={
+                  <LazyRoute>
+                    <ErpMarocQuoteEditorPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.quoteEdit}
+                element={
+                  <LazyRoute>
+                    <ErpMarocQuoteEditorPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.quoteDetail}
+                element={
+                  <LazyRoute>
+                    <ErpMarocQuoteDetailPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.invoices}
+                element={
+                  <LazyRoute>
+                    <ErpMarocInvoicesPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.invoiceNew}
+                element={
+                  <LazyRoute>
+                    <ErpInvoiceEditorPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.invoiceEdit}
+                element={
+                  <LazyRoute>
+                    <ErpInvoiceEditorRoute />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.invoiceDetail}
+                element={
+                  <LazyRoute>
+                    <ErpInvoiceDetailPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.payments}
+                element={
+                  <LazyRoute>
+                    <ErpPaymentsPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.paymentNew}
+                element={
+                  <LazyRoute>
+                    <ErpPaymentEditorPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.paymentDetail}
+                element={
+                  <LazyRoute>
+                    <ErpPaymentDetailPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.creditNotes}
+                element={
+                  <LazyRoute>
+                    <ErpCreditNotesPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.creditNoteNew}
+                element={
+                  <LazyRoute>
+                    <ErpCreditNoteEditorPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.creditNoteEdit}
+                element={
+                  <LazyRoute>
+                    <ErpCreditNoteEditorPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.creditNoteDetail}
+                element={
+                  <LazyRoute>
+                    <ErpCreditNoteDetailPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.reminders}
+                element={
+                  <LazyRoute>
+                    <ErpMarocRemindersPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.accountingEntries}
+                element={
+                  <LazyRoute>
+                    <ErpEntriesPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.accountingEntryDetail}
+                element={
+                  <LazyRoute>
+                    <ErpEntryDetailPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.accountingGrandLivre}
+                element={
+                  <LazyRoute>
+                    <ErpGrandLivrePage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.accountingBalance}
+                element={
+                  <LazyRoute>
+                    <ErpBalancePage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.accountingLettrage}
+                element={
+                  <LazyRoute>
+                    <ErpLettragePage />
+                  </LazyRoute>
+                }
+              />
+            </Route>
+          )}
           <Route
             path={AppPath.SettingsCatchAll}
             element={
@@ -265,3 +607,4 @@ export const useCreateAppRouter = (
       </Route>,
     ),
   );
+};

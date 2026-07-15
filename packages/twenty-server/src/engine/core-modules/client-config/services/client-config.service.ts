@@ -250,6 +250,7 @@ export class ClientConfigService {
       isWorkspaceSchemaDDLLocked: this.twentyConfigService.get(
         'WORKSPACE_SCHEMA_DDL_LOCKED',
       ),
+      erpMarocEnabled: this.twentyConfigService.get('ERP_MAROC_ENABLED'),
     };
 
     const maintenanceMode =
