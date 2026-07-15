@@ -58,6 +58,22 @@ export class CleanOnboardingWorkspacesCommand extends MigrationCommandRunner {
     return onboardingWorkspaces.map((workspace) => workspace.id);
   }
 
+  async fetchStaleCreatedWorkspaceIds(): Promise<string[]> {
+    const sevenDaysAgo = new Date();
+
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const staleCreatedWorkspaces = await this.workspaceRepository.find({
+      select: ['id'],
+      where: {
+        activationStatus: WorkspaceActivationStatus.CREATED,
+        createdAt: LessThan(sevenDaysAgo),
+      },
+    });
+
+    return staleCreatedWorkspaces.map((workspace) => workspace.id);
+  }
+
   override async runMigrationCommand(
     _passedParams: string[],
     options: MigrationCommandOptions,
@@ -75,6 +91,20 @@ export class CleanOnboardingWorkspacesCommand extends MigrationCommandRunner {
 
     await this.cleanerWorkspaceService.batchCleanOnboardingWorkspaces(
       onboardingWorkspaceIds,
+      dryRun,
+    );
+
+    const staleCreatedWorkspaceIds =
+      this.workspaceIds.length > 0
+        ? this.workspaceIds
+        : await this.fetchStaleCreatedWorkspaceIds();
+
+    this.logger.log(
+      `${dryRun ? 'DRY RUN - ' : ''}Suspending ${staleCreatedWorkspaceIds.length} stale created workspaces`,
+    );
+
+    await this.cleanerWorkspaceService.batchSuspendStaleOnboardingWorkspaces(
+      staleCreatedWorkspaceIds,
       dryRun,
     );
   }

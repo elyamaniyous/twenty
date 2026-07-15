@@ -286,6 +286,33 @@ export class CleanerWorkspaceService {
     );
   }
 
+  async batchSuspendStaleOnboardingWorkspaces(
+    workspaceIds: string[],
+    dryRun = false,
+  ): Promise<void> {
+    this.logger.log(
+      `${dryRun ? 'DRY RUN - ' : ''}batchSuspendStaleOnboardingWorkspaces running...`,
+    );
+
+    const workspaces = await this.workspaceRepository.find({
+      select: ['id', 'displayName'],
+      where: {
+        id: In(workspaceIds),
+        activationStatus: WorkspaceActivationStatus.CREATED,
+      },
+    });
+
+    for (const workspace of workspaces) {
+      this.logger.log(
+        `${dryRun ? 'DRY RUN - ' : ''}Suspending stale onboarding workspace ${workspace.id} ${workspace.displayName}`,
+      );
+
+      if (!dryRun) {
+        await this.workspaceService.suspendWorkspace(workspace.id);
+      }
+    }
+  }
+
   async batchCleanOnboardingWorkspaces(
     workspaceIds: string[],
     dryRun = false,

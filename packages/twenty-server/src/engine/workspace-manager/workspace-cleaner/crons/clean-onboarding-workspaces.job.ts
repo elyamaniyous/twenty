@@ -44,5 +44,17 @@ export class CleanOnboardingWorkspacesJob {
     await this.cleanerWorkspaceService.batchCleanOnboardingWorkspaces(
       onboardingWorkspaces.map((workspace) => workspace.id),
     );
+
+    const staleCreatedWorkspaces = await this.workspaceRepository.find({
+      select: ['id'],
+      where: {
+        activationStatus: WorkspaceActivationStatus.CREATED,
+        createdAt: LessThan(sevenDaysAgo),
+      },
+    });
+
+    await this.cleanerWorkspaceService.batchSuspendStaleOnboardingWorkspaces(
+      staleCreatedWorkspaces.map((workspace) => workspace.id),
+    );
   }
 }
