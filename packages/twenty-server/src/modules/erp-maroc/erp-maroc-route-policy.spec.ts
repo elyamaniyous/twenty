@@ -2,6 +2,9 @@ import {
   erpAccountingEntryPageSchema,
   erpAccountingEntrySchema,
   erpBalanceReportSchema,
+  erpBankStatementDetailSchema,
+  erpBankStatementListSchema,
+  erpBankStatementSchema,
   erpCreditNotePageSchema,
   erpCreditNoteSchema,
   erpContextSchema,
@@ -62,6 +65,8 @@ const requiredIdempotencyRoutes = new Set([
   `POST /supplier-invoices/${id}/payment-preparations`,
   `POST /supplier-payment-preparations/${id}/cancel`,
   `POST /supplier-payment-preparations/${id}/execute`,
+  'POST /bank-statements',
+  `POST /bank-statements/${id}/confirm`,
 ]);
 
 const approvedRoutes = [
@@ -301,6 +306,30 @@ const approvedRoutes = [
     '/accounting/lettrage/unmatch',
     'accounting.lettrage.unmatch',
     erpLettrageMatchSchema,
+  ],
+  [
+    'GET',
+    '/bank-statements',
+    'bank-statements.collection',
+    erpBankStatementListSchema,
+  ],
+  [
+    'POST',
+    '/bank-statements',
+    'bank-statements.collection',
+    erpBankStatementSchema,
+  ],
+  [
+    'GET',
+    `/bank-statements/${id}`,
+    'bank-statements.detail',
+    erpBankStatementDetailSchema,
+  ],
+  [
+    'POST',
+    `/bank-statements/${id}/confirm`,
+    'bank-statements.confirm',
+    erpBankStatementDetailSchema,
   ],
 ] as const;
 

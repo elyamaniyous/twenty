@@ -14,6 +14,7 @@ const identity = {
 
 const contextPayload = {
   societeId: '11111111-1111-4111-8111-111111111111',
+  twentyUserId: 'user-1',
   timezone: 'Africa/Casablanca',
   role: 'OWNER',
   capabilities: {

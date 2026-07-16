@@ -7,6 +7,7 @@ import { matchPath, useLocation } from 'react-router-dom';
 import {
   IconBell,
   IconBook,
+  IconBuildingSkyscraper,
   IconBox,
   IconChartBar,
   IconCreditCard,
@@ -135,6 +136,12 @@ export const NavigationDrawerErpMarocSection = () => {
       path: erpMarocPaths.accountingLettrage,
       activePaths: [erpMarocPaths.accountingLettrage],
       Icon: IconLink,
+    },
+    {
+      label: t`Banque`,
+      path: erpMarocPaths.bankStatements,
+      activePaths: [erpMarocPaths.bankStatements],
+      Icon: IconBuildingSkyscraper,
     },
   ];
 

@@ -68,6 +68,16 @@ describe('ERP Maroc pre-body parser', () => {
       .expect(413);
   });
 
+  it('accepts a bank statement upload over the standard 1 MiB limit', async () => {
+    const contentBase64 = 'A'.repeat(2 * MiB);
+
+    await request(createApp())
+      .post('/erp-maroc-api/bank-statements')
+      .send({ filename: 'releve.pdf', contentBase64 })
+      .expect(200)
+      .expect({ body: { filename: 'releve.pdf', contentBase64 } });
+  });
+
   it('parses an enabled body within the limit and the global parser skips it', async () => {
     await request(createApp())
       .post('/erp-maroc-api/products')

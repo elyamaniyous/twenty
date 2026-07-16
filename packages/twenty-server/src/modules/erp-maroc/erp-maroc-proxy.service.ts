@@ -14,6 +14,7 @@ import {
 } from './erp-maroc-route-policy';
 
 const JSON_LIMIT_BYTES = 1024 * 1024;
+const BANK_STATEMENT_JSON_LIMIT_BYTES = 21 * 1024 * 1024;
 const ERROR_LIMIT_BYTES = 64 * 1024;
 const PDF_LIMIT_BYTES = 20 * 1024 * 1024;
 const JSON_TIMEOUT_MS = 15_000;
@@ -144,6 +145,7 @@ const assertMutationMetadata = (
   contentType: string | undefined,
   contentLength: string | undefined,
   transferEncoding: string | readonly string[] | undefined,
+  maximumBytes = JSON_LIMIT_BYTES,
 ): void => {
   if (
     transferEncoding !== undefined ||
@@ -157,15 +159,15 @@ const assertMutationMetadata = (
     throw validationError();
   }
   const declaredLength = Number(contentLength);
-  if (
-    !Number.isSafeInteger(declaredLength) ||
-    declaredLength > JSON_LIMIT_BYTES
-  ) {
+  if (!Number.isSafeInteger(declaredLength) || declaredLength > maximumBytes) {
     throw validationError();
   }
 };
 
-const serializeBody = (body: unknown): string | undefined => {
+const serializeBody = (
+  body: unknown,
+  maximumBytes = JSON_LIMIT_BYTES,
+): string | undefined => {
   if (body === undefined) return undefined;
   let serialized: string;
   try {
@@ -175,7 +177,7 @@ const serializeBody = (body: unknown): string | undefined => {
   }
   if (
     serialized === undefined ||
-    Buffer.byteLength(serialized, 'utf8') > JSON_LIMIT_BYTES
+    Buffer.byteLength(serialized, 'utf8') > maximumBytes
   ) {
     throw validationError();
   }
@@ -520,6 +522,10 @@ export class ErpMarocProxyService {
       route.idempotency === 'required'
         ? normalizeIdempotencyKey(input.idempotencyKey)
         : undefined;
+    const bodyLimit =
+      route.routeId === 'bank-statements.collection' && input.method === 'POST'
+        ? BANK_STATEMENT_JSON_LIMIT_BYTES
+        : JSON_LIMIT_BYTES;
     if (input.method === 'GET') {
       if (input.body !== undefined) throw validationError();
     } else {
@@ -527,9 +533,10 @@ export class ErpMarocProxyService {
         input.contentType,
         input.contentLength,
         input.transferEncoding,
+        bodyLimit,
       );
     }
-    const serializedBody = serializeBody(input.body);
+    const serializedBody = serializeBody(input.body, bodyLimit);
     const identity = input.identity;
     const headers: Record<string, string> = {
       accept: route.kind === 'pdf' ? 'application/pdf' : 'application/json',

@@ -1385,6 +1385,53 @@ export const erpLettrageSuggestionsSchema = z
     });
   });
 
+export const erpBankStatementStatusSchema = z.enum([
+  'PENDING_OCR',
+  'PROCESSING',
+  'READY_FOR_REVIEW',
+  'CONFIRMED',
+  'FAILED',
+]);
+
+export const erpBankStatementLineSchema = z.object({
+  id: uuidSchema,
+  position: nonNegativeIntegerSchema,
+  pageNumber: positiveIntegerSchema,
+  transactionDate: civilDateSchema,
+  valueDate: nullableCivilDateSchema,
+  description: nonBlankStringSchema,
+  reference: nullableStringSchema,
+  debitCents: centsSchema,
+  creditCents: centsSchema,
+  balanceCents: signedCentsSchema.nullable(),
+  confidenceBasisPoints: nonNegativeIntegerSchema.max(10_000),
+  needsReview: z.boolean(),
+  sourceText: z.string(),
+  boundingBox: z.array(z.number().finite()).length(4).nullable(),
+});
+
+export const erpBankStatementSchema = z.object({
+  id: uuidSchema,
+  originalFilename: nonBlankStringSchema,
+  contentSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  status: erpBankStatementStatusSchema,
+  ocrEngine: nullableStringSchema,
+  pageCount: positiveIntegerSchema.nullable(),
+  lineCount: nonNegativeIntegerSchema,
+  openingBalanceCents: signedCentsSchema.nullable(),
+  closingBalanceCents: signedCentsSchema.nullable(),
+  balanceCheckPassed: z.boolean().nullable(),
+  lastError: nullableStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  confirmedAt: nullableInstantSchema,
+});
+
+export const erpBankStatementListSchema = z.array(erpBankStatementSchema);
+export const erpBankStatementDetailSchema = erpBankStatementSchema.extend({
+  lines: z.array(erpBankStatementLineSchema),
+});
+
 const encodeRouteId = (id: string): string => {
   return encodeURIComponent(uuidSchema.parse(id));
 };
@@ -1445,6 +1492,9 @@ export const erpMarocRouteIds = {
   accountingLettrageSuggestions: 'accounting.lettrage.suggestions',
   accountingLettrageMatch: 'accounting.lettrage.match',
   accountingLettrageUnmatch: 'accounting.lettrage.unmatch',
+  bankStatementsCollection: 'bank-statements.collection',
+  bankStatementDetail: 'bank-statements.detail',
+  bankStatementConfirm: 'bank-statements.confirm',
 } as const;
 
 export const erpMarocUpstreamRoutes = {
@@ -1533,6 +1583,11 @@ export const erpMarocUpstreamRoutes = {
     lettrageMatch: '/accounting/lettrage/match',
     lettrageUnmatch: '/accounting/lettrage/unmatch',
   },
+  bankStatements: {
+    collection: '/bank-statements',
+    detail: (id: string) => `/bank-statements/${encodeRouteId(id)}`,
+    confirm: (id: string) => `/bank-statements/${encodeRouteId(id)}/confirm`,
+  },
 } as const;
 
 export type ErpRole = z.infer<typeof erpRoleSchema>;
@@ -1606,6 +1661,14 @@ export type ErpLettrageMatch = z.infer<typeof erpLettrageMatchSchema>;
 export type ErpLettrageSuggestion = z.infer<typeof erpLettrageSuggestionSchema>;
 export type ErpLettrageSuggestions = z.infer<
   typeof erpLettrageSuggestionsSchema
+>;
+export type ErpBankStatementStatus = z.infer<
+  typeof erpBankStatementStatusSchema
+>;
+export type ErpBankStatementLine = z.infer<typeof erpBankStatementLineSchema>;
+export type ErpBankStatement = z.infer<typeof erpBankStatementSchema>;
+export type ErpBankStatementDetail = z.infer<
+  typeof erpBankStatementDetailSchema
 >;
 export type ErpMarocRouteId =
   (typeof erpMarocRouteIds)[keyof typeof erpMarocRouteIds];
