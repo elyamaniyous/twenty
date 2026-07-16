@@ -126,6 +126,12 @@ const StyledAlert = styled.div`
   grid-column: 1 / -1;
 `;
 
+const StyledActions = styled.div`
+  display: flex;
+  gap: ${themeCssVariables.spacing[1]};
+  justify-content: flex-end;
+`;
+
 const todayInCasablanca = () =>
   new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Casablanca' });
 
@@ -140,6 +146,7 @@ const methods = [
 
 const statusAppearance = {
   READY: { label: 'Prêt', tone: 'warning' },
+  EXECUTED: { label: 'Payé', tone: 'success' },
   CANCELLED: { label: 'Annulé', tone: 'neutral' },
 } as const;
 
@@ -157,6 +164,7 @@ export const ErpSupplierPaymentPreparationPanel = ({
   const [state, setState] = useState<ErpOperationalTableState>('loading');
   const [generation, setGeneration] = useState(0);
   const [readyAmountCents, setReadyAmountCents] = useState(0);
+  const [executedAmountCents, setExecutedAmountCents] = useState(0);
   const [cancelledAmountCents, setCancelledAmountCents] = useState(0);
   const [remainingAmountCents, setRemainingAmountCents] = useState(0);
   const [amount, setAmount] = useState('');
@@ -168,6 +176,9 @@ export const ErpSupplierPaymentPreparationPanel = ({
   const [notes, setNotes] = useState('');
   const [cancellationId, setCancellationId] = useState<string | null>(null);
   const [cancellationReason, setCancellationReason] = useState('');
+  const [executionId, setExecutionId] = useState<string | null>(null);
+  const [executionDate, setExecutionDate] = useState(todayInCasablanca);
+  const [executionAccountCode, setExecutionAccountCode] = useState('5141');
   const [isMutating, setIsMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -185,6 +196,7 @@ export const ErpSupplierPaymentPreparationPanel = ({
         if (abortController.signal.aborted) return;
         setItems(result.items);
         setReadyAmountCents(result.readyAmountCents);
+        setExecutedAmountCents(result.executedAmountCents);
         setCancelledAmountCents(result.cancelledAmountCents);
         setRemainingAmountCents(result.remainingToPrepareCents);
         setState(result.items.length === 0 ? 'empty' : 'ready');
@@ -201,9 +213,10 @@ export const ErpSupplierPaymentPreparationPanel = ({
     () => [
       {
         key: 'date',
-        header: 'Date prévue',
+        header: 'Date',
         width: '120px',
-        render: (item) => formatPurchaseOrderDate(item.plannedPaymentDate),
+        render: (item) =>
+          formatPurchaseOrderDate(item.paymentDate ?? item.plannedPaymentDate),
       },
       {
         key: 'method',
@@ -237,22 +250,47 @@ export const ErpSupplierPaymentPreparationPanel = ({
         },
       },
       {
+        key: 'entry',
+        header: 'Écriture',
+        width: '120px',
+        render: (item) =>
+          item.accountingEntry === null || item.accountingEntry === undefined
+            ? '—'
+            : `${item.accountingEntry.journal.code} · ${item.accountingEntry.status}`,
+      },
+      {
         key: 'action',
         header: '',
-        width: '100px',
+        width: '190px',
         align: 'right',
         render: (item) =>
           item.status === 'READY' && canManage ? (
-            <Button
-              title="Annuler"
-              ariaLabel="Annuler la préparation de paiement"
-              variant="secondary"
-              accent="danger"
-              onClick={() => {
-                setCancellationId(item.id);
-                setCancellationReason('');
-              }}
-            />
+            <StyledActions>
+              <Button
+                title="Exécuter"
+                ariaLabel="Exécuter le paiement fournisseur"
+                accent="blue"
+                onClick={() => {
+                  setExecutionId(item.id);
+                  setExecutionDate(todayInCasablanca());
+                  setExecutionAccountCode(
+                    item.method === 'CASH' ? '5161' : '5141',
+                  );
+                  setCancellationId(null);
+                }}
+              />
+              <Button
+                title="Annuler"
+                ariaLabel="Annuler la préparation de paiement"
+                variant="secondary"
+                accent="danger"
+                onClick={() => {
+                  setCancellationId(item.id);
+                  setCancellationReason('');
+                  setExecutionId(null);
+                }}
+              />
+            </StyledActions>
           ) : null,
       },
     ],
@@ -344,6 +382,46 @@ export const ErpSupplierPaymentPreparationPanel = ({
     }
   };
 
+  const executePreparation = async () => {
+    if (executionId === null || isMutating) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(executionDate)) {
+      setError('La date de paiement est invalide.');
+      return;
+    }
+    if (!/^[A-Za-z0-9][A-Za-z0-9.-]{0,31}$/.test(executionAccountCode)) {
+      setError('Le compte de trésorerie est invalide.');
+      return;
+    }
+    setIsMutating(true);
+    setError(null);
+    try {
+      const intent = client.createMutationIntent(
+        {
+          method: 'POST',
+          path: `/supplier-payment-preparations/${executionId}/execute`,
+          schema: erpSupplierPaymentPreparationSchema,
+          body: {
+            paymentDate: executionDate,
+            treasuryAccountCode: executionAccountCode,
+          },
+        },
+        { idempotency: 'required' },
+      );
+      await intent.execute();
+      setExecutionId(null);
+      setGeneration((value) => value + 1);
+      onChanged();
+    } catch (caught) {
+      setError(
+        caught instanceof ErpMarocError && caught.statusCode === 409
+          ? "Le paiement a déjà été traité ou l'état a changé."
+          : "Le paiement fournisseur n'a pas pu être exécuté.",
+      );
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
   return (
     <StyledPanel>
       <StyledHeader>
@@ -352,6 +430,10 @@ export const ErpSupplierPaymentPreparationPanel = ({
           <div>
             <dt>Prêt</dt>
             <dd>{formatMadCents(readyAmountCents)}</dd>
+          </div>
+          <div>
+            <dt>Payé</dt>
+            <dd>{formatMadCents(executedAmountCents)}</dd>
           </div>
           <div>
             <dt>Annulé</dt>
@@ -468,6 +550,51 @@ export const ErpSupplierPaymentPreparationPanel = ({
               title="Confirmer l'annulation"
               ariaLabel="Confirmer l'annulation de la préparation"
               accent="danger"
+              disabled={isMutating}
+              isLoading={isMutating}
+            />
+          </StyledFooter>
+        </StyledForm>
+      )}
+      {executionId === null ? null : (
+        <StyledForm
+          onSubmit={(event) => {
+            event.preventDefault();
+            void executePreparation();
+          }}
+        >
+          {error === null ? null : (
+            <StyledAlert role="alert">{error}</StyledAlert>
+          )}
+          <TextInput
+            label="Date réelle du paiement"
+            type="date"
+            value={executionDate}
+            disabled={isMutating}
+            fullWidth
+            onChange={setExecutionDate}
+          />
+          <TextInput
+            label="Compte de trésorerie"
+            value={executionAccountCode}
+            disabled={isMutating}
+            fullWidth
+            onChange={setExecutionAccountCode}
+          />
+          <StyledFooter>
+            <Button
+              type="button"
+              title="Fermer"
+              ariaLabel="Fermer l'exécution du paiement"
+              variant="secondary"
+              disabled={isMutating}
+              onClick={() => setExecutionId(null)}
+            />
+            <Button
+              type="submit"
+              title="Confirmer le paiement"
+              ariaLabel="Confirmer le paiement fournisseur"
+              accent="blue"
               disabled={isMutating}
               isLoading={isMutating}
             />

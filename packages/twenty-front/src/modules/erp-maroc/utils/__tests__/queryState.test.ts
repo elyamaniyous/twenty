@@ -170,6 +170,12 @@ describe('ERP Maroc query state utilities', () => {
         'sourceType=SUPPLIER_INVOICE',
       ).toString(),
     ).toBe('sourceType=SUPPLIER_INVOICE');
+    expect(
+      canonicalizeErpQueryState(
+        'accountingEntries',
+        'sourceType=SUPPLIER_PAYMENT',
+      ).toString(),
+    ).toBe('sourceType=SUPPLIER_PAYMENT');
   });
 
   it('clears the credit-note cursor for filter changes and preserves it for semantic no-ops', () => {

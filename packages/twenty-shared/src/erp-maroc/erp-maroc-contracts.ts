@@ -718,6 +718,7 @@ export const erpPaymentMethodSchema = z.enum([
 
 export const erpSupplierPaymentPreparationStatusSchema = z.enum([
   'READY',
+  'EXECUTED',
   'CANCELLED',
 ]);
 
@@ -734,16 +735,34 @@ export const erpSupplierPaymentPreparationSchema = z.object({
   notes: nullableStringSchema,
   status: erpSupplierPaymentPreparationStatusSchema,
   createdByTwentyUserId: nonBlankStringSchema,
+  executedAt: nullableInstantSchema,
+  executedByTwentyUserId: nullableStringSchema,
+  paymentDate: nullableCivilDateHttpSchema,
+  treasuryAccountCode: nullableStringSchema,
   cancelledAt: nullableInstantSchema,
   cancelledByTwentyUserId: nullableStringSchema,
   cancellationReason: nullableStringSchema,
   createdAt: instantSchema,
   updatedAt: instantSchema,
+  accountingEntry: z
+    .object({
+      id: uuidSchema,
+      status: z.enum(['DRAFT', 'VALIDATED', 'REJECTED']),
+      entryDate: civilDateHttpSchema,
+      label: nonBlankStringSchema,
+      journal: z.object({
+        code: nonBlankStringSchema,
+        libelle: nonBlankStringSchema,
+      }),
+    })
+    .nullable()
+    .optional(),
 });
 
 export const erpSupplierPaymentPreparationListSchema = z.object({
   items: z.array(erpSupplierPaymentPreparationSchema),
   readyAmountCents: centsSchema,
+  executedAmountCents: centsSchema,
   cancelledAmountCents: centsSchema,
   remainingToPrepareCents: centsSchema,
 });
@@ -773,6 +792,7 @@ export const erpSupplierInvoiceDetailSchema = erpSupplierInvoiceSchema.extend({
   accountingEntry: erpSupplierInvoiceAccountingSummarySchema.nullable(),
   paymentPreparationSummary: z.object({
     readyAmountCents: centsSchema,
+    executedAmountCents: centsSchema,
     cancelledAmountCents: centsSchema,
     remainingToPrepareCents: centsSchema,
   }),
@@ -1028,6 +1048,7 @@ export const erpAccountingSourceTypeSchema = z.enum([
   'PAYMENT',
   'CREDIT_NOTE',
   'SUPPLIER_INVOICE',
+  'SUPPLIER_PAYMENT',
 ]);
 
 export const erpAccountingEntryLineSchema = z
@@ -1392,6 +1413,7 @@ export const erpMarocRouteIds = {
   supplierInvoiceCancel: 'supplier-invoices.cancel',
   supplierInvoicePaymentPreparations: 'supplier-invoices.paymentPreparations',
   supplierPaymentPreparationCancel: 'supplier-payment-preparations.cancel',
+  supplierPaymentPreparationExecute: 'supplier-payment-preparations.execute',
   invoicesCollection: 'invoices.collection',
   invoiceFromQuote: 'invoices.fromQuote',
   invoiceDetail: 'invoices.detail',
@@ -1463,6 +1485,8 @@ export const erpMarocUpstreamRoutes = {
   supplierPaymentPreparations: {
     cancel: (id: string) =>
       `/supplier-payment-preparations/${encodeRouteId(id)}/cancel`,
+    execute: (id: string) =>
+      `/supplier-payment-preparations/${encodeRouteId(id)}/execute`,
   },
   invoices: {
     collection: '/invoices',

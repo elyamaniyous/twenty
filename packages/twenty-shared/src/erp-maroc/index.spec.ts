@@ -951,6 +951,7 @@ describe('ERP Maroc response contracts', () => {
       accountingEntry: null,
       paymentPreparationSummary: {
         readyAmountCents: 50000,
+        executedAmountCents: 0,
         cancelledAmountCents: 0,
         remainingToPrepareCents: 100000,
       },
@@ -969,6 +970,10 @@ describe('ERP Maroc response contracts', () => {
       notes: 'Acompte',
       status: 'READY',
       createdByTwentyUserId: 'twenty-user-42',
+      executedAt: null,
+      executedByTwentyUserId: null,
+      paymentDate: null,
+      treasuryAccountCode: null,
       cancelledAt: null,
       cancelledByTwentyUserId: null,
       cancellationReason: null,
@@ -985,6 +990,7 @@ describe('ERP Maroc response contracts', () => {
       erpSupplierPaymentPreparationListSchema.parse({
         items: [preparationJson],
         readyAmountCents: 50000,
+        executedAmountCents: 0,
         cancelledAmountCents: 0,
         remainingToPrepareCents: 100000,
       }).items,
@@ -1814,6 +1820,11 @@ describe('ERP Maroc upstream routes', () => {
       expectedPath: `/supplier-payment-preparations/${ids.supplierPaymentPreparation}/cancel`,
     },
     {
+      helper: erpMarocUpstreamRoutes.supplierPaymentPreparations.execute,
+      validId: ids.supplierPaymentPreparation,
+      expectedPath: `/supplier-payment-preparations/${ids.supplierPaymentPreparation}/execute`,
+    },
+    {
       helper: erpMarocUpstreamRoutes.invoices.fromQuote,
       validId: ids.quote,
       expectedPath: `/invoices/from-quote/${ids.quote}`,
@@ -1942,6 +1953,8 @@ describe('ERP Maroc upstream routes', () => {
       supplierInvoicePaymentPreparations:
         'supplier-invoices.paymentPreparations',
       supplierPaymentPreparationCancel: 'supplier-payment-preparations.cancel',
+      supplierPaymentPreparationExecute:
+        'supplier-payment-preparations.execute',
       invoicesCollection: 'invoices.collection',
       invoiceFromQuote: 'invoices.fromQuote',
       invoiceDetail: 'invoices.detail',

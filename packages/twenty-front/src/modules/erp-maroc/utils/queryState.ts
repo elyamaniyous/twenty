@@ -227,6 +227,7 @@ const queryRules: Record<
           'PAYMENT',
           'CREDIT_NOTE',
           'SUPPLIER_INVOICE',
+          'SUPPLIER_PAYMENT',
         ]),
       },
     ],

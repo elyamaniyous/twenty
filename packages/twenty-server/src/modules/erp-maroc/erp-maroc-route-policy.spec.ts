@@ -61,6 +61,7 @@ const requiredIdempotencyRoutes = new Set([
   'POST /accounting/lettrage/unmatch',
   `POST /supplier-invoices/${id}/payment-preparations`,
   `POST /supplier-payment-preparations/${id}/cancel`,
+  `POST /supplier-payment-preparations/${id}/execute`,
 ]);
 
 const approvedRoutes = [
@@ -187,6 +188,12 @@ const approvedRoutes = [
     'POST',
     `/supplier-payment-preparations/${id}/cancel`,
     'supplier-payment-preparations.cancel',
+    erpSupplierPaymentPreparationSchema,
+  ],
+  [
+    'POST',
+    `/supplier-payment-preparations/${id}/execute`,
+    'supplier-payment-preparations.execute',
     erpSupplierPaymentPreparationSchema,
   ],
   ['GET', '/invoices', 'invoices.collection', erpInvoicePageSchema],

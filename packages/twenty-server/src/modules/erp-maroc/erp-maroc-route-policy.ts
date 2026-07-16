@@ -452,6 +452,18 @@ const routes: ErpMarocRoute[] = [
     idempotency: 'required',
   }),
   defineRoute({
+    routeId: erpMarocRouteIds.supplierPaymentPreparationExecute,
+    method: 'POST',
+    pattern: action('supplier-payment-preparations', 'execute'),
+    build: idBuilder(
+      erpMarocUpstreamRoutes.supplierPaymentPreparations.execute,
+    ),
+    queryKeys: noQuery,
+    responseSchema: erpSupplierPaymentPreparationSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
     routeId: erpMarocRouteIds.purchaseOrderSupplierInvoices,
     method: 'GET',
     pattern: action('purchase-orders', 'supplier-invoices'),
