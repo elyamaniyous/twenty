@@ -37,6 +37,10 @@ import {
   erpPurchaseOrderStatusSchema,
   erpPurchaseReceiptListSchema,
   erpPurchaseReceiptSchema,
+  erpSupplierInvoiceListSchema,
+  erpSupplierInvoiceMatchStatusSchema,
+  erpSupplierInvoiceSchema,
+  erpSupplierInvoiceStatusSchema,
   erpQuoteListSchema,
   erpQuoteSchema,
   erpQuoteStatusSchema,
@@ -63,6 +67,8 @@ const ids = {
   purchaseOrder: '44444444-4444-4444-9444-444444444445',
   purchaseReceipt: '44444444-4444-4444-9444-444444444446',
   purchaseReceiptLine: '44444444-4444-4444-9444-444444444447',
+  supplierInvoice: '44444444-4444-4444-9444-444444444448',
+  supplierInvoiceLine: '44444444-4444-4444-9444-444444444449',
   invoice: '55555555-5555-4555-8555-555555555555',
   payment: '66666666-6666-4666-8666-666666666666',
   reminder: '77777777-7777-4777-8777-777777777777',
@@ -238,6 +244,57 @@ const purchaseReceiptJson = {
         description: 'Matériel de bureau',
         unit: 'UNITE',
         quantity: 2.5,
+      },
+    },
+  ],
+};
+
+const supplierInvoiceJson = {
+  id: ids.supplierInvoice,
+  organisationId: 'internal-organisation-id',
+  societeId: ids.societe,
+  purchaseOrderId: ids.purchaseOrder,
+  supplierId: ids.tier,
+  externalReference: 'FACT-F-2026-0042',
+  currency: 'MAD',
+  status: 'PENDING_REVIEW',
+  matchStatus: 'DISCREPANCY',
+  issueDate: '2026-07-16T00:00:00.000Z',
+  dueDate: '2026-08-15T00:00:00.000Z',
+  notes: 'Prix fournisseur à contrôler',
+  totalHtCents: 125000,
+  totalTvaCents: 25000,
+  totalTtcCents: 150000,
+  createdAt: instant,
+  updatedAt: laterInstant,
+  lines: [
+    {
+      id: ids.supplierInvoiceLine,
+      supplierInvoiceId: ids.supplierInvoice,
+      purchaseOrderLineId: ids.line,
+      quantity: 1,
+      unitPriceHtCents: 125000,
+      tvaRate: 20,
+      totalHtCents: 125000,
+      totalTvaCents: 25000,
+      totalTtcCents: 150000,
+      matchStatus: 'DISCREPANCY',
+      receivedQuantitySnapshot: 1,
+      previouslyInvoicedQuantitySnapshot: 0,
+      quantityVariance: 0,
+      unitPriceVarianceCents: 5000,
+      tvaRateVariance: 0,
+      position: 0,
+      createdAt: instant,
+      updatedAt: laterInstant,
+      purchaseOrderLine: {
+        id: ids.line,
+        description: 'Matériel de bureau',
+        unit: 'UNITE',
+        quantity: 2.5,
+        quantityReceived: 1,
+        unitPriceHtCents: 120000,
+        tvaRate: 20,
       },
     },
   ],
@@ -846,6 +903,23 @@ describe('ERP Maroc response contracts', () => {
     expect(erpPurchaseReceiptListSchema.parse([purchaseReceiptJson])).toEqual([
       receipt,
     ]);
+  });
+
+  it('parses supplier invoice matching results and lifecycle statuses', () => {
+    const invoice = erpSupplierInvoiceSchema.parse(supplierInvoiceJson);
+
+    expect(invoice.issueDate).toBe('2026-07-16');
+    expect(invoice.dueDate).toBe('2026-08-15');
+    expect(invoice).not.toHaveProperty('organisationId');
+    expect(erpSupplierInvoiceListSchema.parse([supplierInvoiceJson])).toEqual([
+      invoice,
+    ]);
+    for (const status of ['PENDING_REVIEW', 'APPROVED', 'CANCELLED']) {
+      expect(erpSupplierInvoiceStatusSchema.parse(status)).toBe(status);
+    }
+    for (const status of ['MATCHED', 'DISCREPANCY', 'BLOCKED']) {
+      expect(erpSupplierInvoiceMatchStatusSchema.parse(status)).toBe(status);
+    }
   });
 
   it('parses invoice aggregates/pages with only the safe email delivery projection', () => {
@@ -1762,6 +1836,7 @@ describe('ERP Maroc upstream routes', () => {
       purchaseOrderConfirm: 'purchase-orders.confirm',
       purchaseOrderCancel: 'purchase-orders.cancel',
       purchaseOrderReceipts: 'purchase-orders.receipts',
+      purchaseOrderSupplierInvoices: 'purchase-orders.supplierInvoices',
       invoicesCollection: 'invoices.collection',
       invoiceFromQuote: 'invoices.fromQuote',
       invoiceDetail: 'invoices.detail',

@@ -401,6 +401,72 @@ export const erpPurchaseReceiptSchema = z.object({
 
 export const erpPurchaseReceiptListSchema = z.array(erpPurchaseReceiptSchema);
 
+export const erpSupplierInvoiceStatusSchema = z.enum([
+  'PENDING_REVIEW',
+  'APPROVED',
+  'CANCELLED',
+]);
+
+export const erpSupplierInvoiceMatchStatusSchema = z.enum([
+  'MATCHED',
+  'DISCREPANCY',
+  'BLOCKED',
+]);
+
+export const erpSupplierInvoiceOrderLineSchema = z.object({
+  id: uuidSchema,
+  description: z.string(),
+  unit: nullableStringSchema,
+  quantity: z.number().finite().positive(),
+  quantityReceived: z.number().finite().nonnegative(),
+  unitPriceHtCents: centsSchema,
+  tvaRate: nonNegativeIntegerSchema,
+});
+
+export const erpSupplierInvoiceLineSchema = z.object({
+  id: uuidSchema,
+  supplierInvoiceId: uuidSchema,
+  purchaseOrderLineId: uuidSchema,
+  quantity: z.number().finite().positive(),
+  unitPriceHtCents: centsSchema,
+  tvaRate: nonNegativeIntegerSchema,
+  totalHtCents: centsSchema,
+  totalTvaCents: centsSchema,
+  totalTtcCents: centsSchema,
+  matchStatus: erpSupplierInvoiceMatchStatusSchema,
+  receivedQuantitySnapshot: z.number().finite().nonnegative(),
+  previouslyInvoicedQuantitySnapshot: z.number().finite().nonnegative(),
+  quantityVariance: z.number().finite().nonnegative(),
+  unitPriceVarianceCents: signedCentsSchema,
+  tvaRateVariance: safeIntegerSchema,
+  position: nonNegativeIntegerSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  purchaseOrderLine: erpSupplierInvoiceOrderLineSchema,
+});
+
+export const erpSupplierInvoiceSchema = z.object({
+  id: uuidSchema,
+  societeId: uuidSchema,
+  purchaseOrderId: uuidSchema,
+  supplierId: uuidSchema,
+  externalReference: nonBlankStringSchema,
+  currency: z.literal('MAD'),
+  status: erpSupplierInvoiceStatusSchema,
+  matchStatus: erpSupplierInvoiceMatchStatusSchema,
+  issueDate: civilDateHttpSchema,
+  dueDate: civilDateHttpSchema,
+  notes: nullableStringSchema,
+  totalHtCents: centsSchema,
+  totalTvaCents: centsSchema,
+  totalTtcCents: centsSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  lines: z.array(erpSupplierInvoiceLineSchema).min(1),
+});
+
+export const erpSupplierInvoiceListSchema = z.array(erpSupplierInvoiceSchema);
+
 export const erpInvoiceStatusSchema = z.enum([
   'DRAFT',
   'VALIDATED',
@@ -1249,6 +1315,7 @@ export const erpMarocRouteIds = {
   purchaseOrderConfirm: 'purchase-orders.confirm',
   purchaseOrderCancel: 'purchase-orders.cancel',
   purchaseOrderReceipts: 'purchase-orders.receipts',
+  purchaseOrderSupplierInvoices: 'purchase-orders.supplierInvoices',
   invoicesCollection: 'invoices.collection',
   invoiceFromQuote: 'invoices.fromQuote',
   invoiceDetail: 'invoices.detail',
@@ -1307,6 +1374,8 @@ export const erpMarocUpstreamRoutes = {
     confirm: (id: string) => `/purchase-orders/${encodeRouteId(id)}/confirm`,
     cancel: (id: string) => `/purchase-orders/${encodeRouteId(id)}/cancel`,
     receipts: (id: string) => `/purchase-orders/${encodeRouteId(id)}/receipts`,
+    supplierInvoices: (id: string) =>
+      `/purchase-orders/${encodeRouteId(id)}/supplier-invoices`,
   },
   invoices: {
     collection: '/invoices',
@@ -1375,6 +1444,13 @@ export type ErpPurchaseReceiptLine = z.infer<
 export type ErpPurchaseReceipt = z.infer<typeof erpPurchaseReceiptSchema>;
 export type ErpPurchaseReceiptList = z.infer<
   typeof erpPurchaseReceiptListSchema
+>;
+export type ErpSupplierInvoiceLine = z.infer<
+  typeof erpSupplierInvoiceLineSchema
+>;
+export type ErpSupplierInvoice = z.infer<typeof erpSupplierInvoiceSchema>;
+export type ErpSupplierInvoiceList = z.infer<
+  typeof erpSupplierInvoiceListSchema
 >;
 export type ErpInvoiceLine = z.infer<typeof erpInvoiceLineSchema>;
 export type ErpInvoice = z.infer<typeof erpInvoiceSchema>;

@@ -12,6 +12,7 @@ import {
   purchaseOrderStatusAppearance,
 } from '@/erp-maroc/purchase-orders/purchaseOrderUi';
 import { ErpPurchaseReceiptPanel } from '@/erp-maroc/purchase-orders/ErpPurchaseReceiptPanel';
+import { ErpSupplierInvoicePanel } from '@/erp-maroc/purchase-orders/ErpSupplierInvoicePanel';
 import { formatMadCents } from '@/erp-maroc/utils/money';
 import { styled } from '@linaria/react';
 import { useEffect, useMemo, useState } from 'react';
@@ -113,6 +114,7 @@ export const ErpPurchaseOrderDetailPage = () => {
   const [action, setAction] = useState<PurchaseOrderAction | null>(null);
   const [isMutating, setIsMutating] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [isSupplierInvoiceOpen, setIsSupplierInvoiceOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const canManage = context?.capabilities.manageSalesDocuments === true;
 
@@ -246,6 +248,11 @@ export const ErpPurchaseOrderDetailPage = () => {
   const canReceive =
     canManage &&
     (order.status === 'CONFIRMED' || order.status === 'PARTIALLY_RECEIVED');
+  const canInvoiceSupplier =
+    canManage &&
+    (order.status === 'CONFIRMED' ||
+      order.status === 'PARTIALLY_RECEIVED' ||
+      order.status === 'RECEIVED');
   const copy = action === null ? null : actionCopy[action];
 
   return (
@@ -279,7 +286,21 @@ export const ErpPurchaseOrderDetailPage = () => {
               title="Réceptionner"
               ariaLabel="Enregistrer une réception fournisseur"
               accent="blue"
-              onClick={() => setIsReceiptOpen(true)}
+              onClick={() => {
+                setIsSupplierInvoiceOpen(false);
+                setIsReceiptOpen(true);
+              }}
+            />
+          ) : null}
+          {canInvoiceSupplier ? (
+            <Button
+              title="Saisir facture"
+              ariaLabel="Saisir une facture fournisseur"
+              accent="blue"
+              onClick={() => {
+                setIsReceiptOpen(false);
+                setIsSupplierInvoiceOpen(true);
+              }}
             />
           ) : null}
         </StyledActions>
@@ -336,6 +357,15 @@ export const ErpPurchaseOrderDetailPage = () => {
           isOpen={isReceiptOpen}
           disabled={!canReceive}
           onClose={() => setIsReceiptOpen(false)}
+          onSaved={() => {
+            setGeneration((value) => value + 1);
+          }}
+        />
+        <ErpSupplierInvoicePanel
+          order={order}
+          isOpen={isSupplierInvoiceOpen}
+          disabled={!canInvoiceSupplier}
+          onClose={() => setIsSupplierInvoiceOpen(false)}
           onSaved={() => {
             setGeneration((value) => value + 1);
           }}
