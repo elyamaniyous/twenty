@@ -1,4 +1,5 @@
 import { ErpMarocError } from '@/erp-maroc/api/erpMarocError';
+import { ErpConfirmDialog } from '@/erp-maroc/components/ErpConfirmDialog';
 import {
   ErpOperationalTable,
   type ErpOperationalTableColumn,
@@ -8,19 +9,28 @@ import { ErpStatusBadge } from '@/erp-maroc/components/ErpStatusBadge';
 import { useErpMarocContext } from '@/erp-maroc/context/useErpMarocContext';
 import { formatPurchaseOrderDate } from '@/erp-maroc/purchase-orders/purchaseOrderUi';
 import {
+  findSupplierPaymentLettering,
+  findSupplierPaymentLinePair,
+} from '@/erp-maroc/purchase-orders/supplierPaymentLettering';
+import {
   formatMadCents,
   parseMadDecimalToCents,
 } from '@/erp-maroc/utils/money';
 import { TextArea } from '@/ui/input/components/TextArea';
 import { TextInput } from '@/ui/input/components/TextInput';
 import { styled } from '@linaria/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  erpAccountingEntrySchema,
+  erpLettrageMatchSchema,
+  erpLettrageSuggestionsSchema,
   erpSupplierPaymentPreparationListSchema,
   erpSupplierPaymentPreparationSchema,
+  type ErpLettrageSuggestions,
   type ErpSupplierInvoiceDetail,
   type ErpSupplierPaymentPreparation,
 } from 'twenty-shared/erp-maroc';
+import { IconCheck, IconLink } from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
@@ -179,6 +189,10 @@ export const ErpSupplierPaymentPreparationPanel = ({
   const [executionId, setExecutionId] = useState<string | null>(null);
   const [executionDate, setExecutionDate] = useState(todayInCasablanca);
   const [executionAccountCode, setExecutionAccountCode] = useState('5141');
+  const [entryValidationId, setEntryValidationId] = useState<string | null>(
+    null,
+  );
+  const [lettrage, setLettrage] = useState<ErpLettrageSuggestions | null>(null);
   const [isMutating, setIsMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -206,6 +220,90 @@ export const ErpSupplierPaymentPreparationPanel = ({
       });
     return () => abortController.abort();
   }, [client, generation, invoice.id]);
+
+  useEffect(() => {
+    if (invoice.accountingEntry === null) {
+      setLettrage(null);
+      return;
+    }
+    const abortController = new AbortController();
+    client
+      .request({
+        method: 'GET',
+        path: '/accounting/lettrage/suggestions',
+        query: { accountCode: invoice.supplier.compteCollectifCode },
+        schema: erpLettrageSuggestionsSchema,
+        signal: abortController.signal,
+      })
+      .then((result) => {
+        if (!abortController.signal.aborted) setLettrage(result);
+      })
+      .catch(() => {
+        if (!abortController.signal.aborted) setLettrage(null);
+      });
+    return () => abortController.abort();
+  }, [client, generation, invoice.accountingEntry, invoice.supplier]);
+
+  const matchPayment = useCallback(
+    async (paymentPreparationId: string) => {
+      if (isMutating) return;
+      const payment = items.find((item) => item.id === paymentPreparationId);
+      if (
+        invoice.accountingEntry?.status !== 'VALIDATED' ||
+        payment?.accountingEntry?.status !== 'VALIDATED'
+      ) {
+        return;
+      }
+      setIsMutating(true);
+      setError(null);
+      try {
+        const [invoiceEntry, paymentEntry] = await Promise.all([
+          client.request({
+            method: 'GET',
+            path: `/accounting/entries/${invoice.accountingEntry.id}`,
+            schema: erpAccountingEntrySchema,
+          }),
+          client.request({
+            method: 'GET',
+            path: `/accounting/entries/${payment.accountingEntry.id}`,
+            schema: erpAccountingEntrySchema,
+          }),
+        ]);
+        const linePair = findSupplierPaymentLinePair(
+          invoiceEntry,
+          paymentEntry,
+          invoice.supplier.compteCollectifCode,
+        );
+        if (linePair === null) {
+          setError(
+            'Le lettrage automatique exige un paiement égal au solde complet de la facture.',
+          );
+          return;
+        }
+        const intent = client.createMutationIntent(
+          {
+            method: 'POST',
+            path: '/accounting/lettrage/match',
+            schema: erpLettrageMatchSchema,
+            body: {
+              accountCode: invoice.supplier.compteCollectifCode,
+              debitLineId: linePair.debitLineId,
+              creditLineId: linePair.creditLineId,
+            },
+          },
+          { idempotency: 'required' },
+        );
+        await intent.execute();
+        setGeneration((value) => value + 1);
+        onChanged();
+      } catch {
+        setError("Le paiement n'a pas pu être lettré avec la facture.");
+      } finally {
+        setIsMutating(false);
+      }
+    },
+    [client, invoice, isMutating, items, onChanged],
+  );
 
   const columns = useMemo<
     ErpOperationalTableColumn<ErpSupplierPaymentPreparation>[]
@@ -252,49 +350,120 @@ export const ErpSupplierPaymentPreparationPanel = ({
       {
         key: 'entry',
         header: 'Écriture',
-        width: '120px',
-        render: (item) =>
-          item.accountingEntry === null || item.accountingEntry === undefined
-            ? '—'
-            : `${item.accountingEntry.journal.code} · ${item.accountingEntry.status}`,
+        width: '170px',
+        render: (item) => {
+          if (
+            item.accountingEntry === null ||
+            item.accountingEntry === undefined
+          )
+            return '—';
+          const lettering = findSupplierPaymentLettering(
+            lettrage?.activeMatches ?? [],
+            invoice.id,
+            item.id,
+          );
+          return `${item.accountingEntry.journal.code} · ${item.accountingEntry.status}${
+            lettering === null ? '' : ` · Lettré ${lettering.reference}`
+          }`;
+        },
       },
       {
         key: 'action',
         header: '',
-        width: '190px',
+        width: '210px',
         align: 'right',
-        render: (item) =>
-          item.status === 'READY' && canManage ? (
-            <StyledActions>
+        render: (item) => {
+          if (!canManage) return null;
+          if (item.status === 'READY') {
+            return (
+              <StyledActions>
+                <Button
+                  title="Exécuter"
+                  ariaLabel="Exécuter le paiement fournisseur"
+                  accent="blue"
+                  onClick={() => {
+                    setExecutionId(item.id);
+                    setExecutionDate(todayInCasablanca());
+                    setExecutionAccountCode(
+                      item.method === 'CASH' ? '5161' : '5141',
+                    );
+                    setCancellationId(null);
+                  }}
+                />
+                <Button
+                  title="Annuler"
+                  ariaLabel="Annuler la préparation de paiement"
+                  variant="secondary"
+                  accent="danger"
+                  onClick={() => {
+                    setCancellationId(item.id);
+                    setCancellationReason('');
+                    setExecutionId(null);
+                  }}
+                />
+              </StyledActions>
+            );
+          }
+          if (
+            item.status !== 'EXECUTED' ||
+            item.accountingEntry === null ||
+            item.accountingEntry === undefined
+          ) {
+            return null;
+          }
+          if (item.accountingEntry.status === 'DRAFT') {
+            return (
               <Button
-                title="Exécuter"
-                ariaLabel="Exécuter le paiement fournisseur"
+                title="Valider BQ"
+                ariaLabel="Valider l'écriture du paiement fournisseur"
+                Icon={IconCheck}
                 accent="blue"
-                onClick={() => {
-                  setExecutionId(item.id);
-                  setExecutionDate(todayInCasablanca());
-                  setExecutionAccountCode(
-                    item.method === 'CASH' ? '5161' : '5141',
-                  );
-                  setCancellationId(null);
-                }}
+                disabled={isMutating}
+                isLoading={
+                  isMutating && entryValidationId === item.accountingEntry.id
+                }
+                onClick={() =>
+                  setEntryValidationId(item.accountingEntry?.id ?? null)
+                }
               />
+            );
+          }
+          const activeLettering = findSupplierPaymentLettering(
+            lettrage?.activeMatches ?? [],
+            invoice.id,
+            item.id,
+          );
+          if (
+            activeLettering === null &&
+            invoice.accountingEntry?.status === 'VALIDATED' &&
+            item.amountCents === invoice.totalTtcCents
+          ) {
+            return (
               <Button
-                title="Annuler"
-                ariaLabel="Annuler la préparation de paiement"
+                title="Lettrer"
+                ariaLabel="Lettrer le paiement avec la facture fournisseur"
+                Icon={IconLink}
                 variant="secondary"
-                accent="danger"
-                onClick={() => {
-                  setCancellationId(item.id);
-                  setCancellationReason('');
-                  setExecutionId(null);
-                }}
+                disabled={isMutating}
+                isLoading={isMutating}
+                onClick={() => void matchPayment(item.id)}
               />
-            </StyledActions>
-          ) : null,
+            );
+          }
+          return null;
+        },
       },
     ],
-    [canManage],
+    [
+      canManage,
+      entryValidationId,
+      invoice.accountingEntry?.status,
+      invoice.id,
+      invoice.totalTtcCents,
+      isMutating,
+      lettrage,
+      matchPayment,
+    ],
   );
 
   const createPreparation = async () => {
@@ -417,6 +586,31 @@ export const ErpSupplierPaymentPreparationPanel = ({
           ? "Le paiement a déjà été traité ou l'état a changé."
           : "Le paiement fournisseur n'a pas pu être exécuté.",
       );
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const validateAccountingEntry = async () => {
+    if (entryValidationId === null || isMutating) return;
+    setIsMutating(true);
+    setError(null);
+    try {
+      const intent = client.createMutationIntent(
+        {
+          method: 'POST',
+          path: `/accounting/entries/${entryValidationId}/validate`,
+          schema: erpAccountingEntrySchema,
+          body: {},
+        },
+        { idempotency: 'required' },
+      );
+      await intent.execute();
+      setEntryValidationId(null);
+      setGeneration((value) => value + 1);
+      onChanged();
+    } catch {
+      setError("L'écriture du paiement n'a pas pu être validée.");
     } finally {
       setIsMutating(false);
     }
@@ -615,6 +809,16 @@ export const ErpSupplierPaymentPreparationPanel = ({
           onRetry={() => setGeneration((value) => value + 1)}
         />
       </StyledHistory>
+      <ErpConfirmDialog
+        isOpen={entryValidationId !== null}
+        title="Valider l'écriture de paiement"
+        message="Cette décision rend l'écriture BQ/CA définitive et disponible pour le lettrage fournisseur."
+        confirmLabel="Valider l'écriture"
+        cancelLabel="Annuler"
+        isConfirming={isMutating}
+        onCancel={() => setEntryValidationId(null)}
+        onConfirm={() => void validateAccountingEntry()}
+      />
     </StyledPanel>
   );
 };

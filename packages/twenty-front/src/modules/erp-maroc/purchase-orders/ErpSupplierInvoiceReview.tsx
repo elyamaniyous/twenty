@@ -1,4 +1,5 @@
 import { ErpMarocError } from '@/erp-maroc/api/erpMarocError';
+import { ErpConfirmDialog } from '@/erp-maroc/components/ErpConfirmDialog';
 import { ErpStatusBadge } from '@/erp-maroc/components/ErpStatusBadge';
 import { useErpMarocContext } from '@/erp-maroc/context/useErpMarocContext';
 import { ErpSupplierPaymentPreparationPanel } from '@/erp-maroc/purchase-orders/ErpSupplierPaymentPreparationPanel';
@@ -10,9 +11,11 @@ import { TextInput } from '@/ui/input/components/TextInput';
 import { styled } from '@linaria/react';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  erpAccountingEntrySchema,
   erpSupplierInvoiceDetailSchema,
   type ErpSupplierInvoiceDetail,
 } from 'twenty-shared/erp-maroc';
+import { IconCheck } from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
@@ -192,6 +195,7 @@ export const ErpSupplierInvoiceReview = ({
   const [lines, setLines] = useState<Record<string, LineForm>>({});
   const [overrideReason, setOverrideReason] = useState('');
   const [cancellationReason, setCancellationReason] = useState('');
+  const [validateEntryOpen, setValidateEntryOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canManage = context?.capabilities.manageSupplierAccounting === true;
 
@@ -377,6 +381,36 @@ export const ErpSupplierInvoiceReview = ({
     }
   };
 
+  const validateAccountingEntry = async () => {
+    if (
+      invoice?.accountingEntry?.status !== 'DRAFT' ||
+      !canManage ||
+      isMutating
+    ) {
+      return;
+    }
+    setIsMutating(true);
+    setError(null);
+    try {
+      const intent = client.createMutationIntent(
+        {
+          method: 'POST',
+          path: `/accounting/entries/${invoice.accountingEntry.id}/validate`,
+          schema: erpAccountingEntrySchema,
+          body: {},
+        },
+        { idempotency: 'required' },
+      );
+      await intent.execute();
+      setValidateEntryOpen(false);
+      refresh();
+    } catch {
+      setError("L'écriture d'achat n'a pas pu être validée.");
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
   if (state === 'loading') {
     return <StyledMessage>Chargement de la facture fournisseur</StyledMessage>;
   }
@@ -404,6 +438,16 @@ export const ErpSupplierInvoiceReview = ({
         <StyledActions>
           <ErpStatusBadge label={status.label} tone={status.tone} />
           <ErpStatusBadge label={match.label} tone={match.tone} />
+          {canManage && invoice.accountingEntry?.status === 'DRAFT' ? (
+            <Button
+              title="Valider AC"
+              ariaLabel="Valider l'écriture comptable d'achat"
+              Icon={IconCheck}
+              accent="blue"
+              disabled={isMutating}
+              onClick={() => setValidateEntryOpen(true)}
+            />
+          ) : null}
           {actions.canCorrect ? (
             <Button
               title="Corriger"
@@ -671,6 +715,16 @@ export const ErpSupplierInvoiceReview = ({
           }}
         />
       ) : null}
+      <ErpConfirmDialog
+        isOpen={validateEntryOpen}
+        title="Valider l'écriture d'achat"
+        message="Cette décision rend l'écriture AC définitive et disponible pour le lettrage fournisseur."
+        confirmLabel="Valider l'écriture"
+        cancelLabel="Annuler"
+        isConfirming={isMutating}
+        onCancel={() => setValidateEntryOpen(false)}
+        onConfirm={() => void validateAccountingEntry()}
+      />
     </StyledSection>
   );
 };
