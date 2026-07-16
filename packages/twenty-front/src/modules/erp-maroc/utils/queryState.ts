@@ -222,7 +222,12 @@ const queryRules: Record<
       'sourceType',
       {
         defaultValue: 'all',
-        validate: oneOf(['INVOICE', 'PAYMENT', 'CREDIT_NOTE']),
+        validate: oneOf([
+          'INVOICE',
+          'PAYMENT',
+          'CREDIT_NOTE',
+          'SUPPLIER_INVOICE',
+        ]),
       },
     ],
     ['from', { validate: validCivilDate }],

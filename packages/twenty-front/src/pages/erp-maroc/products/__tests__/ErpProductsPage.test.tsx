@@ -75,6 +75,7 @@ const product = {
   defaultPriceHt: 1200.5,
   tvaRate: 20,
   incomeAccountCode: '7124',
+  expenseAccountCode: '6111',
   isActive: true,
   createdAt: '2026-07-11T08:00:00Z',
   updatedAt: '2026-07-11T08:00:00Z',
@@ -169,6 +170,10 @@ const fillProductForm = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.type(
     screen.getByRole('textbox', { name: 'Compte de produit' }),
     '7124',
+  );
+  await user.type(
+    screen.getByRole('textbox', { name: 'Compte de charge achat' }),
+    '6111',
   );
 };
 
@@ -522,6 +527,7 @@ describe('ErpProductsPage', () => {
         defaultPriceHt: 99.95,
         tvaRate: 20,
         incomeAccountCode: '7124',
+        expenseAccountCode: '6111',
         isActive: true,
       },
     });
@@ -652,6 +658,7 @@ describe('ErpProductsPage', () => {
       [/^Type/, 'PRODUIT'],
       [/^Unité/, 'boîte'],
       ['Compte de produit', '7111'],
+      ['Compte de charge achat', '6122'],
     ] as const;
     for (const [name, value] of textChanges) {
       const input = screen.getByRole('textbox', { name });
@@ -685,6 +692,7 @@ describe('ErpProductsPage', () => {
         defaultPriceHt: 1999.99,
         tvaRate: 7,
         incomeAccountCode: '7111',
+        expenseAccountCode: '6122',
         isActive: false,
       },
     });
@@ -717,6 +725,9 @@ describe('ErpProductsPage', () => {
     expect(
       screen.getByRole('textbox', { name: 'Compte de produit' }),
     ).toHaveValue('7111');
+    expect(
+      screen.getByRole('textbox', { name: 'Compte de charge achat' }),
+    ).toHaveValue('6122');
     expect(screen.getByRole('checkbox', { name: 'Actif' })).not.toBeChecked();
   });
 

@@ -43,6 +43,7 @@ const ERP_CONTEXT = {
     manageReminders: true,
     manageCreditNotes: true,
     allocateCustomerCredit: true,
+    manageSupplierAccounting: true,
   },
   features: {
     salesUi: true,

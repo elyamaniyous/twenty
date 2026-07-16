@@ -9,6 +9,7 @@ export type ProductFormValues = {
   defaultPriceHt: string;
   tvaRate: string;
   incomeAccountCode: string;
+  expenseAccountCode: string;
   isActive: boolean;
 };
 
@@ -31,6 +32,7 @@ export const EMPTY_PRODUCT_FORM: ProductFormValues = {
   defaultPriceHt: '',
   tvaRate: '20',
   incomeAccountCode: '',
+  expenseAccountCode: '',
   isActive: true,
 };
 
@@ -54,5 +56,6 @@ export const productToFormValues = (
   defaultPriceHt: String(product.defaultPriceHt),
   tvaRate: String(product.tvaRate),
   incomeAccountCode: product.incomeAccountCode ?? '',
+  expenseAccountCode: product.expenseAccountCode ?? '',
   isActive: product.isActive,
 });

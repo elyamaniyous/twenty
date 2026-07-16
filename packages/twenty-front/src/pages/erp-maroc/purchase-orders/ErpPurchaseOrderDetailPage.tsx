@@ -13,6 +13,7 @@ import {
 } from '@/erp-maroc/purchase-orders/purchaseOrderUi';
 import { ErpPurchaseReceiptPanel } from '@/erp-maroc/purchase-orders/ErpPurchaseReceiptPanel';
 import { ErpSupplierInvoicePanel } from '@/erp-maroc/purchase-orders/ErpSupplierInvoicePanel';
+import { ErpSupplierInvoiceReview } from '@/erp-maroc/purchase-orders/ErpSupplierInvoiceReview';
 import { formatMadCents } from '@/erp-maroc/utils/money';
 import { styled } from '@linaria/react';
 import { useEffect, useMemo, useState } from 'react';
@@ -115,6 +116,9 @@ export const ErpPurchaseOrderDetailPage = () => {
   const [isMutating, setIsMutating] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [isSupplierInvoiceOpen, setIsSupplierInvoiceOpen] = useState(false);
+  const [selectedSupplierInvoiceId, setSelectedSupplierInvoiceId] = useState<
+    string | null
+  >(null);
   const [message, setMessage] = useState<string | null>(null);
   const canManage = context?.capabilities.manageSalesDocuments === true;
 
@@ -288,6 +292,7 @@ export const ErpPurchaseOrderDetailPage = () => {
               accent="blue"
               onClick={() => {
                 setIsSupplierInvoiceOpen(false);
+                setSelectedSupplierInvoiceId(null);
                 setIsReceiptOpen(true);
               }}
             />
@@ -299,6 +304,7 @@ export const ErpPurchaseOrderDetailPage = () => {
               accent="blue"
               onClick={() => {
                 setIsReceiptOpen(false);
+                setSelectedSupplierInvoiceId(null);
                 setIsSupplierInvoiceOpen(true);
               }}
             />
@@ -361,6 +367,13 @@ export const ErpPurchaseOrderDetailPage = () => {
             setGeneration((value) => value + 1);
           }}
         />
+        {selectedSupplierInvoiceId === null ? null : (
+          <ErpSupplierInvoiceReview
+            invoiceId={selectedSupplierInvoiceId}
+            onClose={() => setSelectedSupplierInvoiceId(null)}
+            onChanged={() => setGeneration((value) => value + 1)}
+          />
+        )}
         <ErpSupplierInvoicePanel
           order={order}
           isOpen={isSupplierInvoiceOpen}
@@ -368,6 +381,11 @@ export const ErpPurchaseOrderDetailPage = () => {
           onClose={() => setIsSupplierInvoiceOpen(false)}
           onSaved={() => {
             setGeneration((value) => value + 1);
+          }}
+          onReview={(invoiceId) => {
+            setIsReceiptOpen(false);
+            setIsSupplierInvoiceOpen(false);
+            setSelectedSupplierInvoiceId(invoiceId);
           }}
         />
       </StyledBody>

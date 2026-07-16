@@ -254,6 +254,7 @@ export const ErpProductsPage = () => {
       defaultPriceHt,
       tvaRate,
       incomeAccountCode: values.incomeAccountCode.trim() || null,
+      expenseAccountCode: values.expenseAccountCode.trim() || null,
       isActive: values.isActive,
     };
 

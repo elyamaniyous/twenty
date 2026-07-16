@@ -160,12 +160,14 @@ export const ErpSupplierInvoicePanel = ({
   disabled,
   onClose,
   onSaved,
+  onReview,
 }: {
   order: ErpPurchaseOrder;
   isOpen: boolean;
   disabled: boolean;
   onClose: () => void;
   onSaved: () => void;
+  onReview: (invoiceId: string) => void;
 }) => {
   const { client } = useErpMarocContext();
   const [invoices, setInvoices] = useState<ErpSupplierInvoice[]>([]);
@@ -269,6 +271,17 @@ export const ErpSupplierInvoicePanel = ({
         },
       },
       {
+        key: 'status',
+        header: 'Statut',
+        width: '120px',
+        render: (invoice) =>
+          invoice.status === 'APPROVED'
+            ? 'Validée'
+            : invoice.status === 'CANCELLED'
+              ? 'Annulée'
+              : 'À contrôler',
+      },
+      {
         key: 'total',
         header: 'Total TTC',
         width: '140px',
@@ -298,8 +311,22 @@ export const ErpSupplierInvoicePanel = ({
             })
             .join(' · ') || 'Aucun écart',
       },
+      {
+        key: 'review',
+        header: '',
+        width: '100px',
+        align: 'right',
+        render: (invoice) => (
+          <Button
+            title="Ouvrir"
+            ariaLabel={`Ouvrir la facture ${invoice.externalReference}`}
+            variant="secondary"
+            onClick={() => onReview(invoice.id)}
+          />
+        ),
+      },
     ],
-    [],
+    [onReview],
   );
 
   const submitInvoice = async () => {

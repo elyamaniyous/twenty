@@ -163,6 +163,15 @@ describe('ERP Maroc query state utilities', () => {
     ).toBe('accountCode=3421');
   });
 
+  it('preserves the supplier invoice accounting source filter', () => {
+    expect(
+      canonicalizeErpQueryState(
+        'accountingEntries',
+        'sourceType=SUPPLIER_INVOICE',
+      ).toString(),
+    ).toBe('sourceType=SUPPLIER_INVOICE');
+  });
+
   it('clears the credit-note cursor for filter changes and preserves it for semantic no-ops', () => {
     const current = `status=DRAFT&tierId=${tierId}&cursor=${cursor}`;
 

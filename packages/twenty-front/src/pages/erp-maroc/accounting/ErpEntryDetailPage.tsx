@@ -35,6 +35,7 @@ const SOURCE: Record<ErpAccountingEntry['sourceType'], string> = {
   INVOICE: 'Facture',
   PAYMENT: 'Règlement',
   CREDIT_NOTE: 'Avoir',
+  SUPPLIER_INVOICE: 'Facture fournisseur',
 };
 
 const sourcePath = (entry: ErpAccountingEntry) => {
@@ -44,7 +45,10 @@ const sourcePath = (entry: ErpAccountingEntry) => {
   if (entry.sourceType === 'PAYMENT') {
     return `/erp-maroc/payments/${entry.sourceId}`;
   }
-  return `/erp-maroc/credit-notes/${entry.sourceId}`;
+  if (entry.sourceType === 'CREDIT_NOTE') {
+    return `/erp-maroc/credit-notes/${entry.sourceId}`;
+  }
+  return null;
 };
 
 const lineColumns: ErpOperationalTableColumn<ErpAccountingEntryLine>[] = [
@@ -314,7 +318,13 @@ export const ErpEntryDetailPage = () => {
           <div>
             <dt>Pièce source</dt>
             <dd>
-              <Link to={sourcePath(entry)}>{SOURCE[entry.sourceType]}</Link>
+              {sourcePath(entry) === null ? (
+                SOURCE[entry.sourceType]
+              ) : (
+                <Link to={sourcePath(entry) ?? ''}>
+                  {SOURCE[entry.sourceType]}
+                </Link>
+              )}
             </dd>
           </div>
           <div>

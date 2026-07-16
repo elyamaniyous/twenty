@@ -186,13 +186,16 @@ export const ErpProductFormDrawer = ({
           type="number"
           required
         />
-        <StyledFullWidth>
-          <FormTextField
-            control={form.control}
-            name="incomeAccountCode"
-            label="Compte de produit"
-          />
-        </StyledFullWidth>
+        <FormTextField
+          control={form.control}
+          name="incomeAccountCode"
+          label="Compte de produit"
+        />
+        <FormTextField
+          control={form.control}
+          name="expenseAccountCode"
+          label="Compte de charge achat"
+        />
         <Controller
           control={form.control}
           name="isActive"
