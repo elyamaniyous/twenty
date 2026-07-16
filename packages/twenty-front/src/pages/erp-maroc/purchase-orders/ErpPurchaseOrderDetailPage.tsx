@@ -11,6 +11,7 @@ import {
   formatPurchaseOrderDate,
   purchaseOrderStatusAppearance,
 } from '@/erp-maroc/purchase-orders/purchaseOrderUi';
+import { ErpPurchaseReceiptPanel } from '@/erp-maroc/purchase-orders/ErpPurchaseReceiptPanel';
 import { formatMadCents } from '@/erp-maroc/utils/money';
 import { styled } from '@linaria/react';
 import { useEffect, useMemo, useState } from 'react';
@@ -111,6 +112,7 @@ export const ErpPurchaseOrderDetailPage = () => {
   const [generation, setGeneration] = useState(0);
   const [action, setAction] = useState<PurchaseOrderAction | null>(null);
   const [isMutating, setIsMutating] = useState(false);
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const canManage = context?.capabilities.manageSalesDocuments === true;
 
@@ -241,6 +243,9 @@ export const ErpPurchaseOrderDetailPage = () => {
   const canConfirm = canManage && order.status === 'DRAFT';
   const canCancel =
     canManage && (order.status === 'DRAFT' || order.status === 'CONFIRMED');
+  const canReceive =
+    canManage &&
+    (order.status === 'CONFIRMED' || order.status === 'PARTIALLY_RECEIVED');
   const copy = action === null ? null : actionCopy[action];
 
   return (
@@ -267,6 +272,14 @@ export const ErpPurchaseOrderDetailPage = () => {
               variant="secondary"
               accent="danger"
               onClick={() => setAction('cancel')}
+            />
+          ) : null}
+          {canReceive ? (
+            <Button
+              title="Réceptionner"
+              ariaLabel="Enregistrer une réception fournisseur"
+              accent="blue"
+              onClick={() => setIsReceiptOpen(true)}
             />
           ) : null}
         </StyledActions>
@@ -317,6 +330,15 @@ export const ErpPurchaseOrderDetailPage = () => {
           rows={order.lines}
           getRowKey={(line) => line.id}
           emptyLabel="Aucune ligne"
+        />
+        <ErpPurchaseReceiptPanel
+          order={order}
+          isOpen={isReceiptOpen}
+          disabled={!canReceive}
+          onClose={() => setIsReceiptOpen(false)}
+          onSaved={() => {
+            setGeneration((value) => value + 1);
+          }}
         />
       </StyledBody>
       <ErpConfirmDialog

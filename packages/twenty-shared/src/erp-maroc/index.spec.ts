@@ -35,6 +35,8 @@ import {
   erpPurchaseOrderListSchema,
   erpPurchaseOrderSchema,
   erpPurchaseOrderStatusSchema,
+  erpPurchaseReceiptListSchema,
+  erpPurchaseReceiptSchema,
   erpQuoteListSchema,
   erpQuoteSchema,
   erpQuoteStatusSchema,
@@ -59,6 +61,8 @@ const ids = {
   product: '33333333-3333-4333-8333-333333333333',
   quote: '44444444-4444-4444-8444-444444444444',
   purchaseOrder: '44444444-4444-4444-9444-444444444445',
+  purchaseReceipt: '44444444-4444-4444-9444-444444444446',
+  purchaseReceiptLine: '44444444-4444-4444-9444-444444444447',
   invoice: '55555555-5555-4555-8555-555555555555',
   payment: '66666666-6666-4666-8666-666666666666',
   reminder: '77777777-7777-4777-8777-777777777777',
@@ -205,6 +209,36 @@ const purchaseOrderJson = {
       position: 0,
       createdAt: instant,
       updatedAt: laterInstant,
+    },
+  ],
+};
+
+const purchaseReceiptJson = {
+  id: ids.purchaseReceipt,
+  organisationId: 'internal-organisation-id',
+  societeId: ids.societe,
+  purchaseOrderId: ids.purchaseOrder,
+  number: 'BRF-2026-00001',
+  year: 2026,
+  receiptDate: '2026-07-16T00:00:00.000Z',
+  notes: 'Livraison partielle',
+  createdAt: instant,
+  updatedAt: laterInstant,
+  lines: [
+    {
+      id: ids.purchaseReceiptLine,
+      purchaseReceiptId: ids.purchaseReceipt,
+      purchaseOrderLineId: ids.line,
+      quantity: 1,
+      position: 0,
+      createdAt: instant,
+      updatedAt: laterInstant,
+      purchaseOrderLine: {
+        id: ids.line,
+        description: 'Matériel de bureau',
+        unit: 'UNITE',
+        quantity: 2.5,
+      },
     },
   ],
 };
@@ -802,6 +836,16 @@ describe('ERP Maroc response contracts', () => {
         ],
       }).success,
     ).toBe(false);
+  });
+
+  it('parses supplier receipt aggregates and normalizes the receipt date', () => {
+    const receipt = erpPurchaseReceiptSchema.parse(purchaseReceiptJson);
+
+    expect(receipt.receiptDate).toBe('2026-07-16');
+    expect(receipt).not.toHaveProperty('organisationId');
+    expect(erpPurchaseReceiptListSchema.parse([purchaseReceiptJson])).toEqual([
+      receipt,
+    ]);
   });
 
   it('parses invoice aggregates/pages with only the safe email delivery projection', () => {
@@ -1592,6 +1636,11 @@ describe('ERP Maroc upstream routes', () => {
       expectedPath: `/purchase-orders/${ids.purchaseOrder}/cancel`,
     },
     {
+      helper: erpMarocUpstreamRoutes.purchaseOrders.receipts,
+      validId: ids.purchaseOrder,
+      expectedPath: `/purchase-orders/${ids.purchaseOrder}/receipts`,
+    },
+    {
       helper: erpMarocUpstreamRoutes.invoices.fromQuote,
       validId: ids.quote,
       expectedPath: `/invoices/from-quote/${ids.quote}`,
@@ -1712,6 +1761,7 @@ describe('ERP Maroc upstream routes', () => {
       purchaseOrderDetail: 'purchase-orders.detail',
       purchaseOrderConfirm: 'purchase-orders.confirm',
       purchaseOrderCancel: 'purchase-orders.cancel',
+      purchaseOrderReceipts: 'purchase-orders.receipts',
       invoicesCollection: 'invoices.collection',
       invoiceFromQuote: 'invoices.fromQuote',
       invoiceDetail: 'invoices.detail',

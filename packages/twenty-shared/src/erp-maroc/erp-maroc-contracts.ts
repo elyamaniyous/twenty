@@ -368,6 +368,39 @@ export const erpPurchaseOrderSchema = z.object({
 
 export const erpPurchaseOrderListSchema = z.array(erpPurchaseOrderSchema);
 
+export const erpPurchaseReceiptOrderLineSchema = z.object({
+  id: uuidSchema,
+  description: z.string(),
+  unit: nullableStringSchema,
+  quantity: z.number().finite().positive(),
+});
+
+export const erpPurchaseReceiptLineSchema = z.object({
+  id: uuidSchema,
+  purchaseReceiptId: uuidSchema,
+  purchaseOrderLineId: uuidSchema,
+  quantity: z.number().finite().positive(),
+  position: nonNegativeIntegerSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  purchaseOrderLine: erpPurchaseReceiptOrderLineSchema,
+});
+
+export const erpPurchaseReceiptSchema = z.object({
+  id: uuidSchema,
+  societeId: uuidSchema,
+  purchaseOrderId: uuidSchema,
+  number: z.string(),
+  year: nonNegativeIntegerSchema,
+  receiptDate: civilDateHttpSchema,
+  notes: nullableStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  lines: z.array(erpPurchaseReceiptLineSchema),
+});
+
+export const erpPurchaseReceiptListSchema = z.array(erpPurchaseReceiptSchema);
+
 export const erpInvoiceStatusSchema = z.enum([
   'DRAFT',
   'VALIDATED',
@@ -1215,6 +1248,7 @@ export const erpMarocRouteIds = {
   purchaseOrderDetail: 'purchase-orders.detail',
   purchaseOrderConfirm: 'purchase-orders.confirm',
   purchaseOrderCancel: 'purchase-orders.cancel',
+  purchaseOrderReceipts: 'purchase-orders.receipts',
   invoicesCollection: 'invoices.collection',
   invoiceFromQuote: 'invoices.fromQuote',
   invoiceDetail: 'invoices.detail',
@@ -1272,6 +1306,7 @@ export const erpMarocUpstreamRoutes = {
     detail: (id: string) => `/purchase-orders/${encodeRouteId(id)}`,
     confirm: (id: string) => `/purchase-orders/${encodeRouteId(id)}/confirm`,
     cancel: (id: string) => `/purchase-orders/${encodeRouteId(id)}/cancel`,
+    receipts: (id: string) => `/purchase-orders/${encodeRouteId(id)}/receipts`,
   },
   invoices: {
     collection: '/invoices',
@@ -1334,6 +1369,13 @@ export type ErpQuoteList = z.infer<typeof erpQuoteListSchema>;
 export type ErpPurchaseOrderLine = z.infer<typeof erpPurchaseOrderLineSchema>;
 export type ErpPurchaseOrder = z.infer<typeof erpPurchaseOrderSchema>;
 export type ErpPurchaseOrderList = z.infer<typeof erpPurchaseOrderListSchema>;
+export type ErpPurchaseReceiptLine = z.infer<
+  typeof erpPurchaseReceiptLineSchema
+>;
+export type ErpPurchaseReceipt = z.infer<typeof erpPurchaseReceiptSchema>;
+export type ErpPurchaseReceiptList = z.infer<
+  typeof erpPurchaseReceiptListSchema
+>;
 export type ErpInvoiceLine = z.infer<typeof erpInvoiceLineSchema>;
 export type ErpInvoice = z.infer<typeof erpInvoiceSchema>;
 export type ErpInvoiceRead = z.infer<typeof erpInvoiceReadSchema>;
