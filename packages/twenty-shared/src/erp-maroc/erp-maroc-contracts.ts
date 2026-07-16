@@ -193,6 +193,7 @@ export const erpContextSchema = z.object({
     manageReminders: z.boolean(),
     manageCreditNotes: z.boolean(),
     allocateCustomerCredit: z.boolean(),
+    manageSupplierAccounting: z.boolean(),
   }),
   features: z.object({
     salesUi: z.boolean(),
@@ -216,6 +217,7 @@ export const erpProductSchema = z.object({
   defaultPriceHt: madTransportNumberSchema,
   tvaRate: nonNegativeIntegerSchema,
   incomeAccountCode: nullableStringSchema,
+  expenseAccountCode: nullableStringSchema,
   isActive: z.boolean(),
   createdAt: instantSchema,
   updatedAt: instantSchema,
@@ -460,6 +462,12 @@ export const erpSupplierInvoiceSchema = z.object({
   totalHtCents: centsSchema,
   totalTvaCents: centsSchema,
   totalTtcCents: centsSchema,
+  approvedAt: nullableInstantSchema,
+  approvedByTwentyUserId: nullableStringSchema,
+  overrideReason: nullableStringSchema,
+  cancelledAt: nullableInstantSchema,
+  cancelledByTwentyUserId: nullableStringSchema,
+  cancellationReason: nullableStringSchema,
   createdAt: instantSchema,
   updatedAt: instantSchema,
   lines: z.array(erpSupplierInvoiceLineSchema).min(1),
@@ -707,6 +715,68 @@ export const erpPaymentMethodSchema = z.enum([
   'DIRECT_DEBIT',
   'OTHER',
 ]);
+
+export const erpSupplierPaymentPreparationStatusSchema = z.enum([
+  'READY',
+  'CANCELLED',
+]);
+
+export const erpSupplierPaymentPreparationSchema = z.object({
+  id: uuidSchema,
+  societeId: uuidSchema,
+  supplierId: uuidSchema,
+  supplierInvoiceId: uuidSchema,
+  amountCents: positiveIntegerSchema,
+  currency: z.literal('MAD'),
+  plannedPaymentDate: civilDateHttpSchema,
+  method: erpPaymentMethodSchema,
+  reference: nullableStringSchema,
+  notes: nullableStringSchema,
+  status: erpSupplierPaymentPreparationStatusSchema,
+  createdByTwentyUserId: nonBlankStringSchema,
+  cancelledAt: nullableInstantSchema,
+  cancelledByTwentyUserId: nullableStringSchema,
+  cancellationReason: nullableStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+
+export const erpSupplierPaymentPreparationListSchema = z.object({
+  items: z.array(erpSupplierPaymentPreparationSchema),
+  readyAmountCents: centsSchema,
+  cancelledAmountCents: centsSchema,
+  remainingToPrepareCents: centsSchema,
+});
+
+export const erpSupplierInvoiceAccountingSummarySchema = z.object({
+  id: uuidSchema,
+  status: z.enum(['DRAFT', 'VALIDATED', 'REJECTED']),
+  entryDate: civilDateHttpSchema,
+  label: nonBlankStringSchema,
+  journal: z.object({
+    code: nonBlankStringSchema,
+    libelle: nonBlankStringSchema,
+  }),
+});
+
+export const erpSupplierInvoiceDetailSchema = erpSupplierInvoiceSchema.extend({
+  supplier: z.object({
+    id: uuidSchema,
+    name: nonBlankStringSchema,
+    compteCollectifCode: nonBlankStringSchema,
+  }),
+  purchaseOrder: z.object({
+    id: uuidSchema,
+    number: nonBlankStringSchema,
+    issueDate: civilDateHttpSchema,
+  }),
+  accountingEntry: erpSupplierInvoiceAccountingSummarySchema.nullable(),
+  paymentPreparationSummary: z.object({
+    readyAmountCents: centsSchema,
+    cancelledAmountCents: centsSchema,
+    remainingToPrepareCents: centsSchema,
+  }),
+});
 
 export const erpPaymentAllocationSchema = z.object({
   id: uuidSchema,
@@ -957,6 +1027,7 @@ export const erpAccountingSourceTypeSchema = z.enum([
   'INVOICE',
   'PAYMENT',
   'CREDIT_NOTE',
+  'SUPPLIER_INVOICE',
 ]);
 
 export const erpAccountingEntryLineSchema = z
@@ -1316,6 +1387,11 @@ export const erpMarocRouteIds = {
   purchaseOrderCancel: 'purchase-orders.cancel',
   purchaseOrderReceipts: 'purchase-orders.receipts',
   purchaseOrderSupplierInvoices: 'purchase-orders.supplierInvoices',
+  supplierInvoiceDetail: 'supplier-invoices.detail',
+  supplierInvoiceApprove: 'supplier-invoices.approve',
+  supplierInvoiceCancel: 'supplier-invoices.cancel',
+  supplierInvoicePaymentPreparations: 'supplier-invoices.paymentPreparations',
+  supplierPaymentPreparationCancel: 'supplier-payment-preparations.cancel',
   invoicesCollection: 'invoices.collection',
   invoiceFromQuote: 'invoices.fromQuote',
   invoiceDetail: 'invoices.detail',
@@ -1376,6 +1452,17 @@ export const erpMarocUpstreamRoutes = {
     receipts: (id: string) => `/purchase-orders/${encodeRouteId(id)}/receipts`,
     supplierInvoices: (id: string) =>
       `/purchase-orders/${encodeRouteId(id)}/supplier-invoices`,
+  },
+  supplierInvoices: {
+    detail: (id: string) => `/supplier-invoices/${encodeRouteId(id)}`,
+    approve: (id: string) => `/supplier-invoices/${encodeRouteId(id)}/approve`,
+    cancel: (id: string) => `/supplier-invoices/${encodeRouteId(id)}/cancel`,
+    paymentPreparations: (id: string) =>
+      `/supplier-invoices/${encodeRouteId(id)}/payment-preparations`,
+  },
+  supplierPaymentPreparations: {
+    cancel: (id: string) =>
+      `/supplier-payment-preparations/${encodeRouteId(id)}/cancel`,
   },
   invoices: {
     collection: '/invoices',
@@ -1451,6 +1538,15 @@ export type ErpSupplierInvoiceLine = z.infer<
 export type ErpSupplierInvoice = z.infer<typeof erpSupplierInvoiceSchema>;
 export type ErpSupplierInvoiceList = z.infer<
   typeof erpSupplierInvoiceListSchema
+>;
+export type ErpSupplierInvoiceDetail = z.infer<
+  typeof erpSupplierInvoiceDetailSchema
+>;
+export type ErpSupplierPaymentPreparation = z.infer<
+  typeof erpSupplierPaymentPreparationSchema
+>;
+export type ErpSupplierPaymentPreparationList = z.infer<
+  typeof erpSupplierPaymentPreparationListSchema
 >;
 export type ErpInvoiceLine = z.infer<typeof erpInvoiceLineSchema>;
 export type ErpInvoice = z.infer<typeof erpInvoiceSchema>;

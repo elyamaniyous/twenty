@@ -25,6 +25,9 @@ const contextPayload = {
     terminateOwnPendingPayment: true,
     terminateAnyPayment: true,
     manageReminders: true,
+    manageCreditNotes: true,
+    allocateCustomerCredit: true,
+    manageSupplierAccounting: true,
   },
   features: {
     salesUi: true,
@@ -48,6 +51,7 @@ const productPayload = {
   defaultPriceHt: 1000,
   tvaRate: 20,
   incomeAccountCode: null,
+  expenseAccountCode: null,
   isActive: true,
   createdAt: '2026-07-11T10:00:00Z',
   updatedAt: '2026-07-11T10:00:00Z',

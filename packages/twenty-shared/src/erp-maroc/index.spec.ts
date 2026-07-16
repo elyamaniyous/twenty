@@ -41,6 +41,9 @@ import {
   erpSupplierInvoiceMatchStatusSchema,
   erpSupplierInvoiceSchema,
   erpSupplierInvoiceStatusSchema,
+  erpSupplierInvoiceDetailSchema,
+  erpSupplierPaymentPreparationListSchema,
+  erpSupplierPaymentPreparationSchema,
   erpQuoteListSchema,
   erpQuoteSchema,
   erpQuoteStatusSchema,
@@ -69,6 +72,7 @@ const ids = {
   purchaseReceiptLine: '44444444-4444-4444-9444-444444444447',
   supplierInvoice: '44444444-4444-4444-9444-444444444448',
   supplierInvoiceLine: '44444444-4444-4444-9444-444444444449',
+  supplierPaymentPreparation: '44444444-4444-4444-9444-444444444450',
   invoice: '55555555-5555-4555-8555-555555555555',
   payment: '66666666-6666-4666-8666-666666666666',
   reminder: '77777777-7777-4777-8777-777777777777',
@@ -104,6 +108,7 @@ const productJson = {
   defaultPriceHt: '1200.00',
   tvaRate: 20,
   incomeAccountCode: '7124',
+  expenseAccountCode: '6111',
   isActive: true,
   createdAt: instant,
   updatedAt: laterInstant,
@@ -265,6 +270,12 @@ const supplierInvoiceJson = {
   totalHtCents: 125000,
   totalTvaCents: 25000,
   totalTtcCents: 150000,
+  approvedAt: null,
+  approvedByTwentyUserId: null,
+  overrideReason: null,
+  cancelledAt: null,
+  cancelledByTwentyUserId: null,
+  cancellationReason: null,
   createdAt: instant,
   updatedAt: laterInstant,
   lines: [
@@ -706,6 +717,7 @@ describe('ERP Maroc response contracts', () => {
         manageReminders: true,
         manageCreditNotes: false,
         allocateCustomerCredit: false,
+        manageSupplierAccounting: false,
         internalGrant: true,
       },
       features: {
@@ -738,6 +750,7 @@ describe('ERP Maroc response contracts', () => {
         manageReminders: true,
         manageCreditNotes: false,
         allocateCustomerCredit: false,
+        manageSupplierAccounting: false,
       },
       features: {
         salesUi: true,
@@ -920,6 +933,62 @@ describe('ERP Maroc response contracts', () => {
     for (const status of ['MATCHED', 'DISCREPANCY', 'BLOCKED']) {
       expect(erpSupplierInvoiceMatchStatusSchema.parse(status)).toBe(status);
     }
+  });
+
+  it('parses supplier invoice review detail and payment preparations', () => {
+    const detail = erpSupplierInvoiceDetailSchema.parse({
+      ...supplierInvoiceJson,
+      supplier: {
+        id: ids.tier,
+        name: 'Fournisseur Atlas',
+        compteCollectifCode: '4411',
+      },
+      purchaseOrder: {
+        id: ids.purchaseOrder,
+        number: 'BC-2026-0042',
+        issueDate: '2026-07-10T00:00:00.000Z',
+      },
+      accountingEntry: null,
+      paymentPreparationSummary: {
+        readyAmountCents: 50000,
+        cancelledAmountCents: 0,
+        remainingToPrepareCents: 100000,
+      },
+    });
+    const preparationJson = {
+      id: ids.supplierPaymentPreparation,
+      organisationId: 'must-not-leak',
+      societeId: ids.societe,
+      supplierId: ids.tier,
+      supplierInvoiceId: ids.supplierInvoice,
+      amountCents: 50000,
+      currency: 'MAD',
+      plannedPaymentDate: '2026-07-31T00:00:00.000Z',
+      method: 'BANK_TRANSFER',
+      reference: 'VIR-2026-0042',
+      notes: 'Acompte',
+      status: 'READY',
+      createdByTwentyUserId: 'twenty-user-42',
+      cancelledAt: null,
+      cancelledByTwentyUserId: null,
+      cancellationReason: null,
+      createdAt: instant,
+      updatedAt: laterInstant,
+    };
+    const preparation =
+      erpSupplierPaymentPreparationSchema.parse(preparationJson);
+
+    expect(detail.purchaseOrder.issueDate).toBe('2026-07-10');
+    expect(preparation.plannedPaymentDate).toBe('2026-07-31');
+    expect(preparation).not.toHaveProperty('organisationId');
+    expect(
+      erpSupplierPaymentPreparationListSchema.parse({
+        items: [preparationJson],
+        readyAmountCents: 50000,
+        cancelledAmountCents: 0,
+        remainingToPrepareCents: 100000,
+      }).items,
+    ).toEqual([preparation]);
   });
 
   it('parses invoice aggregates/pages with only the safe email delivery projection', () => {
@@ -1715,6 +1784,36 @@ describe('ERP Maroc upstream routes', () => {
       expectedPath: `/purchase-orders/${ids.purchaseOrder}/receipts`,
     },
     {
+      helper: erpMarocUpstreamRoutes.purchaseOrders.supplierInvoices,
+      validId: ids.purchaseOrder,
+      expectedPath: `/purchase-orders/${ids.purchaseOrder}/supplier-invoices`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.supplierInvoices.detail,
+      validId: ids.supplierInvoice,
+      expectedPath: `/supplier-invoices/${ids.supplierInvoice}`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.supplierInvoices.approve,
+      validId: ids.supplierInvoice,
+      expectedPath: `/supplier-invoices/${ids.supplierInvoice}/approve`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.supplierInvoices.cancel,
+      validId: ids.supplierInvoice,
+      expectedPath: `/supplier-invoices/${ids.supplierInvoice}/cancel`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.supplierInvoices.paymentPreparations,
+      validId: ids.supplierInvoice,
+      expectedPath: `/supplier-invoices/${ids.supplierInvoice}/payment-preparations`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.supplierPaymentPreparations.cancel,
+      validId: ids.supplierPaymentPreparation,
+      expectedPath: `/supplier-payment-preparations/${ids.supplierPaymentPreparation}/cancel`,
+    },
+    {
       helper: erpMarocUpstreamRoutes.invoices.fromQuote,
       validId: ids.quote,
       expectedPath: `/invoices/from-quote/${ids.quote}`,
@@ -1837,6 +1936,12 @@ describe('ERP Maroc upstream routes', () => {
       purchaseOrderCancel: 'purchase-orders.cancel',
       purchaseOrderReceipts: 'purchase-orders.receipts',
       purchaseOrderSupplierInvoices: 'purchase-orders.supplierInvoices',
+      supplierInvoiceDetail: 'supplier-invoices.detail',
+      supplierInvoiceApprove: 'supplier-invoices.approve',
+      supplierInvoiceCancel: 'supplier-invoices.cancel',
+      supplierInvoicePaymentPreparations:
+        'supplier-invoices.paymentPreparations',
+      supplierPaymentPreparationCancel: 'supplier-payment-preparations.cancel',
       invoicesCollection: 'invoices.collection',
       invoiceFromQuote: 'invoices.fromQuote',
       invoiceDetail: 'invoices.detail',

@@ -22,6 +22,9 @@ import {
   erpPurchaseReceiptSchema,
   erpSupplierInvoiceListSchema,
   erpSupplierInvoiceSchema,
+  erpSupplierInvoiceDetailSchema,
+  erpSupplierPaymentPreparationListSchema,
+  erpSupplierPaymentPreparationSchema,
   erpQuoteListSchema,
   erpQuoteSchema,
   erpReminderPageSchema,
@@ -56,6 +59,8 @@ const requiredIdempotencyRoutes = new Set([
   `POST /accounting/entries/${id}/reject`,
   'POST /accounting/lettrage/match',
   'POST /accounting/lettrage/unmatch',
+  `POST /supplier-invoices/${id}/payment-preparations`,
+  `POST /supplier-payment-preparations/${id}/cancel`,
 ]);
 
 const approvedRoutes = [
@@ -141,6 +146,48 @@ const approvedRoutes = [
     `/purchase-orders/${id}/supplier-invoices`,
     'purchase-orders.supplierInvoices',
     erpSupplierInvoiceSchema,
+  ],
+  [
+    'GET',
+    `/supplier-invoices/${id}`,
+    'supplier-invoices.detail',
+    erpSupplierInvoiceDetailSchema,
+  ],
+  [
+    'PATCH',
+    `/supplier-invoices/${id}`,
+    'supplier-invoices.detail',
+    erpSupplierInvoiceDetailSchema,
+  ],
+  [
+    'POST',
+    `/supplier-invoices/${id}/approve`,
+    'supplier-invoices.approve',
+    erpSupplierInvoiceDetailSchema,
+  ],
+  [
+    'POST',
+    `/supplier-invoices/${id}/cancel`,
+    'supplier-invoices.cancel',
+    erpSupplierInvoiceDetailSchema,
+  ],
+  [
+    'GET',
+    `/supplier-invoices/${id}/payment-preparations`,
+    'supplier-invoices.paymentPreparations',
+    erpSupplierPaymentPreparationListSchema,
+  ],
+  [
+    'POST',
+    `/supplier-invoices/${id}/payment-preparations`,
+    'supplier-invoices.paymentPreparations',
+    erpSupplierPaymentPreparationSchema,
+  ],
+  [
+    'POST',
+    `/supplier-payment-preparations/${id}/cancel`,
+    'supplier-payment-preparations.cancel',
+    erpSupplierPaymentPreparationSchema,
   ],
   ['GET', '/invoices', 'invoices.collection', erpInvoicePageSchema],
   ['POST', '/invoices', 'invoices.collection', erpInvoiceSchema],
