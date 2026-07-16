@@ -65,6 +65,24 @@ jest.mock('~/pages/erp-maroc/quotes/ErpQuoteDetailPage', () => ({
   ErpQuoteDetailPage: () => <div>Task 13 quote detail</div>,
 }));
 
+jest.mock('~/pages/erp-maroc/purchase-orders/ErpPurchaseOrdersPage', () => ({
+  ErpPurchaseOrdersPage: () => <div>Phase 3 purchases list</div>,
+}));
+
+jest.mock(
+  '~/pages/erp-maroc/purchase-orders/ErpPurchaseOrderEditorPage',
+  () => ({
+    ErpPurchaseOrderEditorPage: () => <div>Phase 3 purchase editor</div>,
+  }),
+);
+
+jest.mock(
+  '~/pages/erp-maroc/purchase-orders/ErpPurchaseOrderDetailPage',
+  () => ({
+    ErpPurchaseOrderDetailPage: () => <div>Phase 3 purchase detail</div>,
+  }),
+);
+
 jest.mock('~/pages/erp-maroc/invoices/ErpInvoiceDetailPage', () => ({
   ErpInvoiceDetailPage: () => <div>Task 14-C2 invoice detail</div>,
 }));
@@ -206,6 +224,22 @@ describe('useCreateAppRouter ERP Maroc registration', () => {
     expect(erpMarocPaths.paymentDetail).toBe('/erp-maroc/payments/:id');
     expect(paymentNewIndex).toBeGreaterThanOrEqual(0);
     expect(paymentDetailIndex).toBeGreaterThan(paymentNewIndex);
+
+    result.current.dispose();
+  });
+
+  it('registers purchase creation before the dynamic purchase detail route', () => {
+    const { result } = renderHook(() => useCreateAppRouter(), {
+      wrapper: getWrapper(true),
+    });
+    const paths = flattenPaths(result.current.routes);
+
+    expect(
+      paths.indexOf(erpMarocPaths.purchaseOrderNew),
+    ).toBeGreaterThanOrEqual(0);
+    expect(paths.indexOf(erpMarocPaths.purchaseOrderDetail)).toBeGreaterThan(
+      paths.indexOf(erpMarocPaths.purchaseOrderNew),
+    );
 
     result.current.dispose();
   });
@@ -358,6 +392,31 @@ describe('useCreateAppRouter ERP Maroc registration', () => {
       'Task 14-C2 invoice detail',
     ],
   ])('resolves %s to its intended Task 14 page module', async (path, text) => {
+    const { router, view } = renderEnabledErpRoute(
+      {
+        status: 'ready',
+        context: {} as ErpContext,
+        error: null,
+        refetch,
+        client,
+      },
+      path,
+    );
+
+    expect(await screen.findByText(text)).toBeInTheDocument();
+
+    view.unmount();
+    router.dispose();
+  });
+
+  it.each([
+    [erpMarocPaths.purchaseOrders, 'Phase 3 purchases list'],
+    [erpMarocPaths.purchaseOrderNew, 'Phase 3 purchase editor'],
+    [
+      '/erp-maroc/purchase-orders/ac4fab7d-0ea2-4102-839e-50be33a1d2aa',
+      'Phase 3 purchase detail',
+    ],
+  ])('resolves %s to its Phase 3 purchase page', async (path, text) => {
     const { router, view } = renderEnabledErpRoute(
       {
         status: 'ready',

@@ -302,6 +302,72 @@ export const erpQuoteSchema = z.object({
 
 export const erpQuoteListSchema = z.array(erpQuoteSchema);
 
+export const erpPurchaseOrderStatusSchema = z.enum([
+  'DRAFT',
+  'CONFIRMED',
+  'PARTIALLY_RECEIVED',
+  'RECEIVED',
+  'INVOICED',
+  'CANCELLED',
+]);
+
+export const erpPurchaseOrderLineSchema = z
+  .object({
+    id: uuidSchema,
+    purchaseOrderId: uuidSchema,
+    productId: nullableUuidSchema,
+    description: z.string(),
+    unit: nullableStringSchema,
+    quantity: z.number().finite().positive(),
+    quantityReceived: z.number().finite().nonnegative(),
+    unitPriceHtCents: centsSchema,
+    tvaRate: nonNegativeIntegerSchema,
+    totalHtCents: centsSchema,
+    totalTvaCents: centsSchema,
+    totalTtcCents: centsSchema,
+    position: nonNegativeIntegerSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .superRefine((line, context) => {
+    if (line.quantityReceived > line.quantity) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Received quantity cannot exceed ordered quantity',
+        path: ['quantityReceived'],
+      });
+    }
+  });
+
+export const erpPurchaseOrderSupplierSchema = z.object({
+  id: uuidSchema,
+  name: z.string(),
+  type: erpTierTypeSchema,
+  ice: nullableStringSchema,
+});
+
+export const erpPurchaseOrderSchema = z.object({
+  id: uuidSchema,
+  societeId: uuidSchema,
+  supplierId: uuidSchema,
+  number: z.string(),
+  year: nonNegativeIntegerSchema,
+  currency: z.literal('MAD'),
+  status: erpPurchaseOrderStatusSchema,
+  issueDate: civilDateHttpSchema,
+  expectedDeliveryDate: nullableCivilDateHttpSchema,
+  notes: nullableStringSchema,
+  totalHtCents: centsSchema,
+  totalTvaCents: centsSchema,
+  totalTtcCents: centsSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  supplier: erpPurchaseOrderSupplierSchema,
+  lines: z.array(erpPurchaseOrderLineSchema),
+});
+
+export const erpPurchaseOrderListSchema = z.array(erpPurchaseOrderSchema);
+
 export const erpInvoiceStatusSchema = z.enum([
   'DRAFT',
   'VALIDATED',
@@ -1145,6 +1211,10 @@ export const erpMarocRouteIds = {
   quoteSend: 'quotes.send',
   quoteAccept: 'quotes.accept',
   quoteReject: 'quotes.reject',
+  purchaseOrdersCollection: 'purchase-orders.collection',
+  purchaseOrderDetail: 'purchase-orders.detail',
+  purchaseOrderConfirm: 'purchase-orders.confirm',
+  purchaseOrderCancel: 'purchase-orders.cancel',
   invoicesCollection: 'invoices.collection',
   invoiceFromQuote: 'invoices.fromQuote',
   invoiceDetail: 'invoices.detail',
@@ -1196,6 +1266,12 @@ export const erpMarocUpstreamRoutes = {
     send: (id: string) => `/quotes/${encodeRouteId(id)}/send`,
     accept: (id: string) => `/quotes/${encodeRouteId(id)}/accept`,
     reject: (id: string) => `/quotes/${encodeRouteId(id)}/reject`,
+  },
+  purchaseOrders: {
+    collection: '/purchase-orders',
+    detail: (id: string) => `/purchase-orders/${encodeRouteId(id)}`,
+    confirm: (id: string) => `/purchase-orders/${encodeRouteId(id)}/confirm`,
+    cancel: (id: string) => `/purchase-orders/${encodeRouteId(id)}/cancel`,
   },
   invoices: {
     collection: '/invoices',
@@ -1255,6 +1331,9 @@ export type ErpTierList = z.infer<typeof erpTierListSchema>;
 export type ErpQuoteLine = z.infer<typeof erpQuoteLineSchema>;
 export type ErpQuote = z.infer<typeof erpQuoteSchema>;
 export type ErpQuoteList = z.infer<typeof erpQuoteListSchema>;
+export type ErpPurchaseOrderLine = z.infer<typeof erpPurchaseOrderLineSchema>;
+export type ErpPurchaseOrder = z.infer<typeof erpPurchaseOrderSchema>;
+export type ErpPurchaseOrderList = z.infer<typeof erpPurchaseOrderListSchema>;
 export type ErpInvoiceLine = z.infer<typeof erpInvoiceLineSchema>;
 export type ErpInvoice = z.infer<typeof erpInvoiceSchema>;
 export type ErpInvoiceRead = z.infer<typeof erpInvoiceReadSchema>;

@@ -32,6 +32,9 @@ import {
   erpPaymentStatusSchema,
   erpProductListSchema,
   erpProductSchema,
+  erpPurchaseOrderListSchema,
+  erpPurchaseOrderSchema,
+  erpPurchaseOrderStatusSchema,
   erpQuoteListSchema,
   erpQuoteSchema,
   erpQuoteStatusSchema,
@@ -55,6 +58,7 @@ const ids = {
   tier: '22222222-2222-4222-8222-222222222222',
   product: '33333333-3333-4333-8333-333333333333',
   quote: '44444444-4444-4444-8444-444444444444',
+  purchaseOrder: '44444444-4444-4444-9444-444444444445',
   invoice: '55555555-5555-4555-8555-555555555555',
   payment: '66666666-6666-4666-8666-666666666666',
   reminder: '77777777-7777-4777-8777-777777777777',
@@ -159,6 +163,50 @@ const quoteJson = {
   createdAt: instant,
   updatedAt: laterInstant,
   lines: [quoteLineJson],
+};
+
+const purchaseOrderJson = {
+  id: ids.purchaseOrder,
+  organisationId: 'internal-organisation-id',
+  societeId: ids.societe,
+  supplierId: ids.tier,
+  number: 'BCF-2026-00001',
+  year: 2026,
+  currency: 'MAD',
+  status: 'CONFIRMED',
+  issueDate: '2026-07-10T00:00:00.000Z',
+  expectedDeliveryDate: '2026-07-20T00:00:00.000Z',
+  notes: null,
+  totalHtCents: 300000,
+  totalTvaCents: 60000,
+  totalTtcCents: 360000,
+  createdAt: instant,
+  updatedAt: laterInstant,
+  supplier: {
+    id: ids.tier,
+    name: 'Fournisseur Atlas',
+    type: 'FOURNISSEUR',
+    ice: '001122334455667',
+  },
+  lines: [
+    {
+      id: ids.line,
+      purchaseOrderId: ids.purchaseOrder,
+      productId: ids.product,
+      description: 'Matériel de bureau',
+      unit: 'UNITE',
+      quantity: 2.5,
+      quantityReceived: 1,
+      unitPriceHtCents: 120000,
+      tvaRate: 20,
+      totalHtCents: 300000,
+      totalTvaCents: 60000,
+      totalTtcCents: 360000,
+      position: 0,
+      createdAt: instant,
+      updatedAt: laterInstant,
+    },
+  ],
 };
 
 const invoiceLineJson = {
@@ -723,6 +771,37 @@ describe('ERP Maroc response contracts', () => {
     ]) {
       expect(erpQuoteStatusSchema.parse(status)).toBe(status);
     }
+  });
+
+  it('parses purchase order aggregates/lists and every lifecycle status', () => {
+    const purchaseOrder = erpPurchaseOrderSchema.parse(purchaseOrderJson);
+    expect(purchaseOrder.issueDate).toBe('2026-07-10');
+    expect(purchaseOrder.expectedDeliveryDate).toBe('2026-07-20');
+    expect(purchaseOrder).not.toHaveProperty('organisationId');
+    expect(erpPurchaseOrderListSchema.parse([purchaseOrderJson])).toEqual([
+      purchaseOrder,
+    ]);
+    for (const status of [
+      'DRAFT',
+      'CONFIRMED',
+      'PARTIALLY_RECEIVED',
+      'RECEIVED',
+      'INVOICED',
+      'CANCELLED',
+    ]) {
+      expect(erpPurchaseOrderStatusSchema.parse(status)).toBe(status);
+    }
+    expect(
+      erpPurchaseOrderSchema.safeParse({
+        ...purchaseOrderJson,
+        lines: [
+          {
+            ...purchaseOrderJson.lines[0],
+            quantityReceived: 3,
+          },
+        ],
+      }).success,
+    ).toBe(false);
   });
 
   it('parses invoice aggregates/pages with only the safe email delivery projection', () => {
@@ -1498,6 +1577,21 @@ describe('ERP Maroc upstream routes', () => {
       expectedPath: `/quotes/${ids.quote}/reject`,
     },
     {
+      helper: erpMarocUpstreamRoutes.purchaseOrders.detail,
+      validId: ids.purchaseOrder,
+      expectedPath: `/purchase-orders/${ids.purchaseOrder}`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.purchaseOrders.confirm,
+      validId: ids.purchaseOrder,
+      expectedPath: `/purchase-orders/${ids.purchaseOrder}/confirm`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.purchaseOrders.cancel,
+      validId: ids.purchaseOrder,
+      expectedPath: `/purchase-orders/${ids.purchaseOrder}/cancel`,
+    },
+    {
       helper: erpMarocUpstreamRoutes.invoices.fromQuote,
       validId: ids.quote,
       expectedPath: `/invoices/from-quote/${ids.quote}`,
@@ -1614,6 +1708,10 @@ describe('ERP Maroc upstream routes', () => {
       quoteSend: 'quotes.send',
       quoteAccept: 'quotes.accept',
       quoteReject: 'quotes.reject',
+      purchaseOrdersCollection: 'purchase-orders.collection',
+      purchaseOrderDetail: 'purchase-orders.detail',
+      purchaseOrderConfirm: 'purchase-orders.confirm',
+      purchaseOrderCancel: 'purchase-orders.cancel',
       invoicesCollection: 'invoices.collection',
       invoiceFromQuote: 'invoices.fromQuote',
       invoiceDetail: 'invoices.detail',
@@ -1658,6 +1756,9 @@ describe('ERP Maroc upstream routes', () => {
     expect(erpMarocUpstreamRoutes.quotes.collection).toBe('/quotes');
     expect(erpMarocUpstreamRoutes.quotes.fromOpportunity).toBe(
       '/quotes/from-opportunity',
+    );
+    expect(erpMarocUpstreamRoutes.purchaseOrders.collection).toBe(
+      '/purchase-orders',
     );
     expect(erpMarocUpstreamRoutes.invoices.collection).toBe('/invoices');
     expect(erpMarocUpstreamRoutes.payments.collection).toBe('/payments');

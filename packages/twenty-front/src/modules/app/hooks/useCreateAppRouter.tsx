@@ -58,6 +58,24 @@ const ErpMarocQuoteDetailPage = lazy(() =>
   })),
 );
 
+const ErpPurchaseOrdersPage = lazy(() =>
+  import('~/pages/erp-maroc/purchase-orders/ErpPurchaseOrdersPage').then(
+    (module) => ({ default: module.ErpPurchaseOrdersPage }),
+  ),
+);
+
+const ErpPurchaseOrderEditorPage = lazy(() =>
+  import('~/pages/erp-maroc/purchase-orders/ErpPurchaseOrderEditorPage').then(
+    (module) => ({ default: module.ErpPurchaseOrderEditorPage }),
+  ),
+);
+
+const ErpPurchaseOrderDetailPage = lazy(() =>
+  import('~/pages/erp-maroc/purchase-orders/ErpPurchaseOrderDetailPage').then(
+    (module) => ({ default: module.ErpPurchaseOrderDetailPage }),
+  ),
+);
+
 const ErpMarocInvoicesPage = lazy(() =>
   import('~/pages/erp-maroc/invoices/ErpInvoicesPage').then((module) => ({
     default: module.ErpInvoicesPage,
@@ -443,6 +461,30 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpMarocInvoicesPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.purchaseOrders}
+                element={
+                  <LazyRoute>
+                    <ErpPurchaseOrdersPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.purchaseOrderNew}
+                element={
+                  <LazyRoute>
+                    <ErpPurchaseOrderEditorPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.purchaseOrderDetail}
+                element={
+                  <LazyRoute>
+                    <ErpPurchaseOrderDetailPage />
                   </LazyRoute>
                 }
               />

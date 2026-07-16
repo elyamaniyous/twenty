@@ -73,6 +73,16 @@ export const NavigationDrawerErpMarocSection = () => {
       Icon: IconFileText,
     },
     {
+      label: t`Achats`,
+      path: erpMarocPaths.purchaseOrders,
+      activePaths: [
+        erpMarocPaths.purchaseOrders,
+        erpMarocPaths.purchaseOrderNew,
+        erpMarocPaths.purchaseOrderDetail,
+      ],
+      Icon: IconBox,
+    },
+    {
       label: t`Paiements`,
       path: erpMarocPaths.payments,
       activePaths: [
