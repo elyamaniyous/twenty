@@ -35,6 +35,11 @@ import {
   erpStockLevelListSchema,
   erpStockMovementListSchema,
   erpStockMovementSchema,
+  erpInventoryCountListSchema,
+  erpInventoryCountSchema,
+  erpInventoryThresholdListSchema,
+  erpInventoryThresholdSchema,
+  erpReplenishmentSuggestionListSchema,
   erpWarehouseListSchema,
   erpWarehouseSchema,
   erpQuoteListSchema,
@@ -89,6 +94,10 @@ const requiredIdempotencyRoutes = new Set([
   'POST /warehouses',
   'POST /inventory/adjustments',
   'POST /inventory/transfers',
+  'POST /inventory/counts',
+  `POST /inventory/counts/${id}/validate`,
+  `POST /inventory/counts/${id}/cancel`,
+  'POST /inventory/thresholds',
 ]);
 
 const approvedRoutes = [
@@ -440,6 +449,38 @@ const approvedRoutes = [
     '/inventory/transfers',
     'inventory.transfers',
     erpStockMovementListSchema,
+  ],
+  ['GET', '/inventory/counts', 'inventory.counts', erpInventoryCountListSchema],
+  ['POST', '/inventory/counts', 'inventory.counts', erpInventoryCountSchema],
+  [
+    'POST',
+    `/inventory/counts/${id}/validate`,
+    'inventory.count.validate',
+    erpInventoryCountSchema,
+  ],
+  [
+    'POST',
+    `/inventory/counts/${id}/cancel`,
+    'inventory.count.cancel',
+    erpInventoryCountSchema,
+  ],
+  [
+    'GET',
+    '/inventory/thresholds',
+    'inventory.thresholds',
+    erpInventoryThresholdListSchema,
+  ],
+  [
+    'POST',
+    '/inventory/thresholds',
+    'inventory.thresholds',
+    erpInventoryThresholdSchema,
+  ],
+  [
+    'GET',
+    '/inventory/replenishment-suggestions',
+    'inventory.replenishmentSuggestions',
+    erpReplenishmentSuggestionListSchema,
   ],
 ] as const;
 

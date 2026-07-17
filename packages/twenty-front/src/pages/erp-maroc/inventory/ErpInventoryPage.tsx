@@ -21,11 +21,16 @@ import {
 } from 'twenty-shared/erp-maroc';
 import {
   IconAdjustments,
+  IconBox,
   IconBuildingSkyscraper,
   IconLink,
+  IconListCheck,
+  IconRefreshAlert,
 } from 'twenty-ui/display';
-import { Button } from 'twenty-ui/input';
+import { Button, TabButton } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
+import { ErpInventoryCountsPanel } from './ErpInventoryCountsPanel';
+import { ErpReplenishmentPanel } from './ErpReplenishmentPanel';
 
 type DrawerMode = 'warehouse' | 'adjustment' | 'transfer' | null;
 
@@ -35,6 +40,8 @@ const movementLabels: Record<ErpStockMovement['type'], string> = {
   ADJUSTMENT_OUT: 'Ajustement sortie',
   TRANSFER_IN: 'Transfert entrant',
   TRANSFER_OUT: 'Transfert sortant',
+  INVENTORY_CORRECTION_IN: 'Correction inventaire entrée',
+  INVENTORY_CORRECTION_OUT: 'Correction inventaire sortie',
 };
 
 const today = () =>
@@ -43,6 +50,16 @@ const today = () =>
 const StyledActions = styled.div`
   display: flex;
   gap: ${themeCssVariables.spacing[1]};
+`;
+
+const StyledTabs = styled.div`
+  align-items: stretch;
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
+  display: flex;
+  flex: 0 0 auto;
+  gap: ${themeCssVariables.spacing[1]};
+  height: 40px;
+  padding: 0 ${themeCssVariables.spacing[3]};
 `;
 
 const StyledContent = styled.div`
@@ -117,6 +134,9 @@ export const ErpInventoryPage = () => {
   const [drawer, setDrawer] = useState<DrawerMode>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'stock' | 'counts' | 'replenishment'>(
+    'stock',
+  );
 
   const [warehouseCode, setWarehouseCode] = useState('');
   const [warehouseName, setWarehouseName] = useState('');
@@ -411,7 +431,7 @@ export const ErpInventoryPage = () => {
       title="Stock"
       description="Niveaux, dépôts et mouvements de marchandises"
       actions={
-        canManage ? (
+        canManage && view === 'stock' ? (
           <StyledActions>
             <Button
               title="Nouveau dépôt"
@@ -441,40 +461,69 @@ export const ErpInventoryPage = () => {
         ) : null
       }
     >
-      <StyledContent>
-        <StyledSection>
-          <StyledSectionTitle>Stock disponible</StyledSectionTitle>
-          <ErpOperationalTable
-            ariaLabel="Niveaux de stock"
-            columns={levelColumns}
-            rows={levels}
-            getRowKey={(level) => `${level.warehouse.id}:${level.product.id}`}
-            state={state}
-            loadingLabel="Chargement du stock"
-            emptyLabel="Aucun produit stockable"
-            errorLabel="Impossible de charger le stock"
-            retryLabel="Réessayer"
-            onRetry={() => setGeneration((value) => value + 1)}
-          />
-        </StyledSection>
-        <StyledSection>
-          <StyledSectionTitle>Derniers mouvements</StyledSectionTitle>
-          <ErpOperationalTable
-            ariaLabel="Mouvements de stock"
-            columns={movementColumns}
-            rows={movements}
-            getRowKey={(movement) => movement.id}
-            state={
-              state === 'ready' && movements.length === 0 ? 'empty' : state
-            }
-            loadingLabel="Chargement des mouvements"
-            emptyLabel="Aucun mouvement de stock"
-            errorLabel="Impossible de charger les mouvements"
-            retryLabel="Réessayer"
-            onRetry={() => setGeneration((value) => value + 1)}
-          />
-        </StyledSection>
-      </StyledContent>
+      <StyledTabs role="tablist" aria-label="Gestion du stock">
+        <TabButton
+          id="inventory-stock"
+          title="Stock"
+          LeftIcon={IconBox}
+          active={view === 'stock'}
+          onClick={() => setView('stock')}
+        />
+        <TabButton
+          id="inventory-counts"
+          title="Inventaires"
+          LeftIcon={IconListCheck}
+          active={view === 'counts'}
+          onClick={() => setView('counts')}
+        />
+        <TabButton
+          id="inventory-replenishment"
+          title="Réapprovisionnement"
+          LeftIcon={IconRefreshAlert}
+          active={view === 'replenishment'}
+          onClick={() => setView('replenishment')}
+        />
+      </StyledTabs>
+      {view === 'stock' ? (
+        <StyledContent>
+          <StyledSection>
+            <StyledSectionTitle>Stock disponible</StyledSectionTitle>
+            <ErpOperationalTable
+              ariaLabel="Niveaux de stock"
+              columns={levelColumns}
+              rows={levels}
+              getRowKey={(level) => `${level.warehouse.id}:${level.product.id}`}
+              state={state}
+              loadingLabel="Chargement du stock"
+              emptyLabel="Aucun produit stockable"
+              errorLabel="Impossible de charger le stock"
+              retryLabel="Réessayer"
+              onRetry={() => setGeneration((value) => value + 1)}
+            />
+          </StyledSection>
+          <StyledSection>
+            <StyledSectionTitle>Derniers mouvements</StyledSectionTitle>
+            <ErpOperationalTable
+              ariaLabel="Mouvements de stock"
+              columns={movementColumns}
+              rows={movements}
+              getRowKey={(movement) => movement.id}
+              state={
+                state === 'ready' && movements.length === 0 ? 'empty' : state
+              }
+              loadingLabel="Chargement des mouvements"
+              emptyLabel="Aucun mouvement de stock"
+              errorLabel="Impossible de charger les mouvements"
+              retryLabel="Réessayer"
+              onRetry={() => setGeneration((value) => value + 1)}
+            />
+          </StyledSection>
+        </StyledContent>
+      ) : view === 'counts' ? (
+        <ErpInventoryCountsPanel />
+      ) : (
+        <ErpReplenishmentPanel />
+      )}
 
       <ErpFormDrawer
         isOpen={drawer !== null}

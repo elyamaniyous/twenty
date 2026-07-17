@@ -1587,6 +1587,8 @@ export const erpStockMovementTypeSchema = z.enum([
   'ADJUSTMENT_OUT',
   'TRANSFER_IN',
   'TRANSFER_OUT',
+  'INVENTORY_CORRECTION_IN',
+  'INVENTORY_CORRECTION_OUT',
 ]);
 
 export const erpStockMovementSchema = z.object({
@@ -1600,6 +1602,7 @@ export const erpStockMovementSchema = z.object({
   notes: nullableStringSchema,
   transferGroupId: nullableUuidSchema,
   purchaseReceiptLineId: nullableUuidSchema,
+  inventoryCountLineId: nullableUuidSchema,
   occurredAt: civilDateHttpSchema,
   createdByTwentyUserId: nonBlankStringSchema,
   createdAt: instantSchema,
@@ -1607,6 +1610,69 @@ export const erpStockMovementSchema = z.object({
   product: erpStockProductSchema,
 });
 export const erpStockMovementListSchema = z.array(erpStockMovementSchema);
+
+export const erpInventoryCountStatusSchema = z.enum([
+  'DRAFT',
+  'VALIDATED',
+  'CANCELLED',
+]);
+
+export const erpInventoryCountLineSchema = z.object({
+  id: uuidSchema,
+  productId: uuidSchema,
+  expectedQuantity: z.number().finite().nonnegative(),
+  countedQuantity: z.number().finite().nonnegative(),
+  quantityBeforeValidation: z.number().finite().nonnegative().nullable(),
+  varianceQuantity: z.number().finite().nullable(),
+  position: z.number().int().nonnegative(),
+  product: erpStockProductSchema,
+  stockMovement: z.object({ id: uuidSchema }).nullable(),
+});
+
+export const erpInventoryCountSchema = z.object({
+  id: uuidSchema,
+  warehouseId: uuidSchema,
+  number: z.string(),
+  year: z.number().int(),
+  status: erpInventoryCountStatusSchema,
+  countedAt: civilDateHttpSchema,
+  notes: nullableStringSchema,
+  validatedAt: nullableInstantSchema,
+  cancelledAt: nullableInstantSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  warehouse: erpWarehouseSummarySchema,
+  lines: z.array(erpInventoryCountLineSchema),
+});
+export const erpInventoryCountListSchema = z.array(erpInventoryCountSchema);
+
+export const erpInventoryThresholdSchema = z.object({
+  id: uuidSchema,
+  warehouseId: uuidSchema,
+  productId: uuidSchema,
+  minimumQuantity: z.number().finite().nonnegative(),
+  targetQuantity: z.number().finite().nonnegative(),
+  reorderEnabled: z.boolean(),
+  updatedAt: instantSchema,
+  warehouse: erpWarehouseSummarySchema,
+  product: erpStockProductSchema,
+});
+export const erpInventoryThresholdListSchema = z.array(
+  erpInventoryThresholdSchema,
+);
+
+export const erpReplenishmentSuggestionSchema = z.object({
+  thresholdId: uuidSchema,
+  warehouse: erpWarehouseSummarySchema,
+  product: erpStockProductSchema,
+  currentQuantity: z.number().finite().nonnegative(),
+  minimumQuantity: z.number().finite().nonnegative(),
+  targetQuantity: z.number().finite().nonnegative(),
+  suggestedQuantity: z.number().finite().positive(),
+});
+export const erpReplenishmentSuggestionListSchema = z.array(
+  erpReplenishmentSuggestionSchema,
+);
 
 const encodeRouteId = (id: string): string => {
   return encodeURIComponent(uuidSchema.parse(id));
@@ -1692,6 +1758,11 @@ export const erpMarocRouteIds = {
   inventoryMovements: 'inventory.movements',
   inventoryAdjustments: 'inventory.adjustments',
   inventoryTransfers: 'inventory.transfers',
+  inventoryCounts: 'inventory.counts',
+  inventoryCountValidate: 'inventory.count.validate',
+  inventoryCountCancel: 'inventory.count.cancel',
+  inventoryThresholds: 'inventory.thresholds',
+  inventoryReplenishmentSuggestions: 'inventory.replenishmentSuggestions',
 } as const;
 
 export const erpMarocUpstreamRoutes = {
@@ -1815,6 +1886,13 @@ export const erpMarocUpstreamRoutes = {
     movements: '/inventory/movements',
     adjustments: '/inventory/adjustments',
     transfers: '/inventory/transfers',
+    counts: '/inventory/counts',
+    countValidate: (id: string) =>
+      `/inventory/counts/${encodeRouteId(id)}/validate`,
+    countCancel: (id: string) =>
+      `/inventory/counts/${encodeRouteId(id)}/cancel`,
+    thresholds: '/inventory/thresholds',
+    replenishmentSuggestions: '/inventory/replenishment-suggestions',
   },
 } as const;
 
@@ -1913,5 +1991,17 @@ export type ErpStockLevel = z.infer<typeof erpStockLevelSchema>;
 export type ErpStockLevelList = z.infer<typeof erpStockLevelListSchema>;
 export type ErpStockMovement = z.infer<typeof erpStockMovementSchema>;
 export type ErpStockMovementList = z.infer<typeof erpStockMovementListSchema>;
+export type ErpInventoryCount = z.infer<typeof erpInventoryCountSchema>;
+export type ErpInventoryCountList = z.infer<typeof erpInventoryCountListSchema>;
+export type ErpInventoryThreshold = z.infer<typeof erpInventoryThresholdSchema>;
+export type ErpInventoryThresholdList = z.infer<
+  typeof erpInventoryThresholdListSchema
+>;
+export type ErpReplenishmentSuggestion = z.infer<
+  typeof erpReplenishmentSuggestionSchema
+>;
+export type ErpReplenishmentSuggestionList = z.infer<
+  typeof erpReplenishmentSuggestionListSchema
+>;
 export type ErpMarocRouteId =
   (typeof erpMarocRouteIds)[keyof typeof erpMarocRouteIds];

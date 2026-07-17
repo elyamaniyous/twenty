@@ -73,6 +73,12 @@ export type {
   ErpStockLevelList,
   ErpStockMovement,
   ErpStockMovementList,
+  ErpInventoryCount,
+  ErpInventoryCountList,
+  ErpInventoryThreshold,
+  ErpInventoryThresholdList,
+  ErpReplenishmentSuggestion,
+  ErpReplenishmentSuggestionList,
   ErpMarocRouteId,
 } from './erp-maroc-contracts';
 export {
@@ -192,6 +198,14 @@ export {
   erpStockMovementTypeSchema,
   erpStockMovementSchema,
   erpStockMovementListSchema,
+  erpInventoryCountStatusSchema,
+  erpInventoryCountLineSchema,
+  erpInventoryCountSchema,
+  erpInventoryCountListSchema,
+  erpInventoryThresholdSchema,
+  erpInventoryThresholdListSchema,
+  erpReplenishmentSuggestionSchema,
+  erpReplenishmentSuggestionListSchema,
   erpMarocRouteIds,
   erpMarocUpstreamRoutes,
 } from './erp-maroc-contracts';

@@ -2058,6 +2058,16 @@ describe('ERP Maroc upstream routes', () => {
       validId: ids.bankStatementLine,
       expectedPath: `/bank-statement-lines/${ids.bankStatementLine}/unreview`,
     },
+    {
+      helper: erpMarocUpstreamRoutes.inventory.countValidate,
+      validId: ids.product,
+      expectedPath: `/inventory/counts/${ids.product}/validate`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.inventory.countCancel,
+      validId: ids.product,
+      expectedPath: `/inventory/counts/${ids.product}/cancel`,
+    },
   ];
 
   it('keeps the browser API base separate and exports stable route IDs', () => {
@@ -2144,6 +2154,11 @@ describe('ERP Maroc upstream routes', () => {
       inventoryMovements: 'inventory.movements',
       inventoryAdjustments: 'inventory.adjustments',
       inventoryTransfers: 'inventory.transfers',
+      inventoryCounts: 'inventory.counts',
+      inventoryCountValidate: 'inventory.count.validate',
+      inventoryCountCancel: 'inventory.count.cancel',
+      inventoryThresholds: 'inventory.thresholds',
+      inventoryReplenishmentSuggestions: 'inventory.replenishmentSuggestions',
     });
   });
 
@@ -2200,6 +2215,13 @@ describe('ERP Maroc upstream routes', () => {
     );
     expect(erpMarocUpstreamRoutes.inventory.transfers).toBe(
       '/inventory/transfers',
+    );
+    expect(erpMarocUpstreamRoutes.inventory.counts).toBe('/inventory/counts');
+    expect(erpMarocUpstreamRoutes.inventory.thresholds).toBe(
+      '/inventory/thresholds',
+    );
+    expect(erpMarocUpstreamRoutes.inventory.replenishmentSuggestions).toBe(
+      '/inventory/replenishment-suggestions',
     );
   });
 
