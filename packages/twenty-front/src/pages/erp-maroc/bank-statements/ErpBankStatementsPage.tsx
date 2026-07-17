@@ -16,15 +16,25 @@ import { formatMadCents } from '@/erp-maroc/utils/money';
 import { styled } from '@linaria/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  erpBankReconciliationCandidatesSchema,
   erpBankStatementDetailSchema,
+  erpBankStatementLineSchema,
   erpBankStatementListSchema,
   erpBankStatementSchema,
+  type ErpBankReconciliationCandidate,
   type ErpBankStatement,
   type ErpBankStatementDetail,
   type ErpBankStatementLine,
   type ErpBankStatementStatus,
 } from 'twenty-shared/erp-maroc';
-import { IconCheck, IconDownload, IconUpload } from 'twenty-ui/display';
+import {
+  IconCheck,
+  IconDownload,
+  IconLink,
+  IconUnlink,
+  IconUpload,
+  IconX,
+} from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
@@ -107,9 +117,69 @@ const StyledScroll = styled.div`
 
 const StyledEditorTable = styled.table`
   border-collapse: collapse;
-  min-width: 1120px;
+  min-width: 1380px;
   table-layout: fixed;
   width: 100%;
+`;
+
+const StyledReconciliationPanel = styled.div`
+  align-items: end;
+  background: ${themeCssVariables.background.secondary};
+  border-bottom: 1px solid ${themeCssVariables.border.color.medium};
+  display: grid;
+  flex: 0 0 auto;
+  gap: ${themeCssVariables.spacing[3]};
+  grid-template-columns: minmax(220px, 1fr) minmax(300px, 2fr) auto;
+  padding: ${themeCssVariables.spacing[3]};
+
+  @media (max-width: 900px) {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+`;
+
+const StyledReconciliationField = styled.label`
+  color: ${themeCssVariables.font.color.secondary};
+  display: flex;
+  flex-direction: column;
+  font-size: ${themeCssVariables.font.size.sm};
+  gap: ${themeCssVariables.spacing[1]};
+  letter-spacing: 0;
+  min-width: 0;
+`;
+
+const StyledSelectInput = styled.select`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: ${themeCssVariables.border.radius.sm};
+  box-sizing: border-box;
+  color: ${themeCssVariables.font.color.primary};
+  font: inherit;
+  height: 32px;
+  min-width: 0;
+  padding: 0 ${themeCssVariables.spacing[2]};
+  width: 100%;
+`;
+
+const StyledReconciliationActions = styled.div`
+  display: flex;
+  gap: ${themeCssVariables.spacing[2]};
+`;
+
+const StyledReconciliationCell = styled.div`
+  align-items: center;
+  display: flex;
+  gap: ${themeCssVariables.spacing[2]};
+  min-width: 0;
+`;
+
+const StyledReconciliationText = styled.span`
+  color: ${themeCssVariables.font.color.secondary};
+  flex: 1 1 auto;
+  font-size: ${themeCssVariables.font.size.sm};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 const StyledHead = styled.th`
@@ -205,6 +275,22 @@ export const ErpBankStatementsPage = () => {
   const [uploading, setUploading] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reconciliationLineId, setReconciliationLineId] = useState<
+    string | null
+  >(null);
+  const [reconciliationCandidates, setReconciliationCandidates] = useState<
+    ErpBankReconciliationCandidate[]
+  >([]);
+  const [selectedCandidateId, setSelectedCandidateId] = useState('');
+  const [reconciliationReason, setReconciliationReason] = useState('');
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
+
+  const reconciliationLine = useMemo(
+    () =>
+      detail?.lines.find((line) => line.id === reconciliationLineId) ?? null,
+    [detail, reconciliationLineId],
+  );
 
   const loadImports = useCallback(async () => {
     const result = await client.request({
@@ -345,6 +431,102 @@ export const ErpBankStatementsPage = () => {
     );
   };
 
+  const replaceLine = (line: ErpBankStatementLine) => {
+    setDetail((current) =>
+      current === null
+        ? null
+        : {
+            ...current,
+            lines: current.lines.map((item) =>
+              item.id === line.id ? line : item,
+            ),
+          },
+    );
+  };
+
+  const closeReconciliation = () => {
+    setReconciliationLineId(null);
+    setReconciliationCandidates([]);
+    setSelectedCandidateId('');
+    setReconciliationReason('');
+  };
+
+  const openReconciliation = async (line: ErpBankStatementLine) => {
+    setReconciliationLineId(line.id);
+    setReconciliationCandidates([]);
+    setSelectedCandidateId('');
+    setReconciliationReason('');
+    setError(null);
+    if (line.reconciliation !== null) return;
+
+    setLoadingCandidates(true);
+    try {
+      const result = await client.request({
+        method: 'GET',
+        path: `/bank-statement-lines/${line.id}/reconciliation-candidates`,
+        schema: erpBankReconciliationCandidatesSchema,
+      });
+      setReconciliationCandidates(result.candidates);
+      setSelectedCandidateId(
+        result.candidates[0]?.supplierPaymentPreparationId ?? '',
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Suggestions de rapprochement indisponibles',
+      );
+    } finally {
+      setLoadingCandidates(false);
+    }
+  };
+
+  const reconcile = async () => {
+    if (!reconciliationLine || !selectedCandidateId) return;
+    setReconciling(true);
+    setError(null);
+    try {
+      const intent = client.createMutationIntent({
+        method: 'POST',
+        path: `/bank-statement-lines/${reconciliationLine.id}/reconcile-supplier-payment`,
+        schema: erpBankStatementLineSchema,
+        body: { supplierPaymentPreparationId: selectedCandidateId },
+      });
+      replaceLine(await intent.execute());
+      closeReconciliation();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : 'Rapprochement impossible',
+      );
+    } finally {
+      setReconciling(false);
+    }
+  };
+
+  const unreconcile = async () => {
+    if (!reconciliationLine || reconciliationReason.trim().length < 10) return;
+    setReconciling(true);
+    setError(null);
+    try {
+      const intent = client.createMutationIntent({
+        method: 'POST',
+        path: `/bank-statement-lines/${reconciliationLine.id}/unreconcile-supplier-payment`,
+        schema: erpBankStatementLineSchema,
+        body: { reason: reconciliationReason.trim() },
+      });
+      replaceLine(await intent.execute());
+      closeReconciliation();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Annulation du rapprochement impossible',
+      );
+    } finally {
+      setReconciling(false);
+    }
+  };
+
   const confirm = async () => {
     if (!detail) return;
     setConfirming(true);
@@ -448,6 +630,96 @@ export const ErpBankStatementsPage = () => {
                   ) : null}
                 </StyledReviewActions>
               </StyledReviewHeader>
+              {reconciliationLine !== null ? (
+                <StyledReconciliationPanel>
+                  <StyledReconciliationField>
+                    <span>Ligne bancaire</span>
+                    <StyledReconciliationText>
+                      {reconciliationLine.transactionDate} ·{' '}
+                      {formatMadCents(reconciliationLine.debitCents)} ·{' '}
+                      {reconciliationLine.description}
+                    </StyledReconciliationText>
+                  </StyledReconciliationField>
+                  {reconciliationLine.reconciliation === null ? (
+                    <StyledReconciliationField>
+                      <span>Paiement fournisseur candidat</span>
+                      <StyledSelectInput
+                        value={selectedCandidateId}
+                        disabled={loadingCandidates || reconciling}
+                        onChange={(event) =>
+                          setSelectedCandidateId(event.target.value)
+                        }
+                      >
+                        {reconciliationCandidates.length === 0 ? (
+                          <option value="">
+                            {loadingCandidates
+                              ? 'Recherche en cours'
+                              : 'Aucun paiement compatible'}
+                          </option>
+                        ) : null}
+                        {reconciliationCandidates.map((candidate) => (
+                          <option
+                            key={candidate.supplierPaymentPreparationId}
+                            value={candidate.supplierPaymentPreparationId}
+                          >
+                            {candidate.score}% · {candidate.supplierName} ·{' '}
+                            {candidate.supplierInvoiceReference} ·{' '}
+                            {candidate.paymentDate} ·{' '}
+                            {formatMadCents(candidate.amountCents)}
+                          </option>
+                        ))}
+                      </StyledSelectInput>
+                    </StyledReconciliationField>
+                  ) : (
+                    <StyledReconciliationField>
+                      <span>Motif d’annulation du rapprochement</span>
+                      <StyledInput
+                        value={reconciliationReason}
+                        minLength={10}
+                        maxLength={500}
+                        placeholder="Ex. paiement sélectionné par erreur"
+                        disabled={reconciling}
+                        onChange={(event) =>
+                          setReconciliationReason(event.target.value)
+                        }
+                      />
+                    </StyledReconciliationField>
+                  )}
+                  <StyledReconciliationActions>
+                    {reconciliationLine.reconciliation === null ? (
+                      <Button
+                        title="Rapprocher"
+                        ariaLabel="Confirmer le rapprochement fournisseur"
+                        Icon={IconLink}
+                        variant="primary"
+                        disabled={!selectedCandidateId || reconciling}
+                        isLoading={reconciling}
+                        onClick={() => void reconcile()}
+                      />
+                    ) : (
+                      <Button
+                        title="Annuler le rapprochement"
+                        ariaLabel="Annuler le rapprochement fournisseur"
+                        Icon={IconUnlink}
+                        accent="danger"
+                        disabled={
+                          reconciliationReason.trim().length < 10 || reconciling
+                        }
+                        isLoading={reconciling}
+                        onClick={() => void unreconcile()}
+                      />
+                    )}
+                    <Button
+                      title="Fermer"
+                      ariaLabel="Fermer le panneau de rapprochement"
+                      Icon={IconX}
+                      variant="secondary"
+                      disabled={reconciling}
+                      onClick={closeReconciliation}
+                    />
+                  </StyledReconciliationActions>
+                </StyledReconciliationPanel>
+              ) : null}
               <StyledScroll>
                 <StyledEditorTable aria-label="Lignes du relevé bancaire">
                   <colgroup>
@@ -459,6 +731,7 @@ export const ErpBankStatementsPage = () => {
                     <col style={{ width: '120px' }} />
                     <col style={{ width: '130px' }} />
                     <col style={{ width: '100px' }} />
+                    <col style={{ width: '260px' }} />
                   </colgroup>
                   <thead>
                     <tr>
@@ -470,6 +743,7 @@ export const ErpBankStatementsPage = () => {
                       <StyledHead>Crédit</StyledHead>
                       <StyledHead>Solde</StyledHead>
                       <StyledHead>Confiance</StyledHead>
+                      <StyledHead>Rapprochement</StyledHead>
                     </tr>
                   </thead>
                   <tbody>
@@ -567,6 +841,38 @@ export const ErpBankStatementsPage = () => {
                             >
                               {(line.confidenceBasisPoints / 100).toFixed(0)} %
                             </StyledConfidence>
+                          </StyledCell>
+                          <StyledCell>
+                            {detail.status !== 'CONFIRMED' ||
+                            line.debitCents === 0 ? (
+                              '—'
+                            ) : line.reconciliation === null ? (
+                              <Button
+                                title="Rapprocher"
+                                ariaLabel={`Rapprocher la ligne ${line.description}`}
+                                Icon={IconLink}
+                                variant="secondary"
+                                disabled={reconciling}
+                                onClick={() => void openReconciliation(line)}
+                              />
+                            ) : (
+                              <StyledReconciliationCell>
+                                <StyledReconciliationText
+                                  title={`${line.reconciliation.supplierName} · ${line.reconciliation.supplierInvoiceReference}`}
+                                >
+                                  {line.reconciliation.supplierName} ·{' '}
+                                  {line.reconciliation.supplierInvoiceReference}
+                                </StyledReconciliationText>
+                                <Button
+                                  title="Annuler"
+                                  ariaLabel={`Annuler le rapprochement ${line.reconciliation.supplierInvoiceReference}`}
+                                  Icon={IconUnlink}
+                                  accent="danger"
+                                  disabled={reconciling}
+                                  onClick={() => void openReconciliation(line)}
+                                />
+                              </StyledReconciliationCell>
+                            )}
                           </StyledCell>
                         </tr>
                       );

@@ -43,6 +43,7 @@ const SOURCE: Record<ErpAccountingEntry['sourceType'], string> = {
   PAYMENT: 'Règlement',
   CREDIT_NOTE: 'Avoir',
   SUPPLIER_INVOICE: 'Facture fournisseur',
+  SUPPLIER_PAYMENT: 'Paiement fournisseur',
 };
 
 const formatDate = (value: string) => value.split('-').reverse().join('/');

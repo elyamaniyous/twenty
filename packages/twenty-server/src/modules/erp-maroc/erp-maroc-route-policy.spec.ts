@@ -2,7 +2,9 @@ import {
   erpAccountingEntryPageSchema,
   erpAccountingEntrySchema,
   erpBalanceReportSchema,
+  erpBankReconciliationCandidatesSchema,
   erpBankStatementDetailSchema,
+  erpBankStatementLineSchema,
   erpBankStatementListSchema,
   erpBankStatementSchema,
   erpCreditNotePageSchema,
@@ -67,6 +69,8 @@ const requiredIdempotencyRoutes = new Set([
   `POST /supplier-payment-preparations/${id}/execute`,
   'POST /bank-statements',
   `POST /bank-statements/${id}/confirm`,
+  `POST /bank-statement-lines/${id}/reconcile-supplier-payment`,
+  `POST /bank-statement-lines/${id}/unreconcile-supplier-payment`,
 ]);
 
 const approvedRoutes = [
@@ -330,6 +334,24 @@ const approvedRoutes = [
     `/bank-statements/${id}/confirm`,
     'bank-statements.confirm',
     erpBankStatementDetailSchema,
+  ],
+  [
+    'GET',
+    `/bank-statement-lines/${id}/reconciliation-candidates`,
+    'bank-statement-lines.reconciliationCandidates',
+    erpBankReconciliationCandidatesSchema,
+  ],
+  [
+    'POST',
+    `/bank-statement-lines/${id}/reconcile-supplier-payment`,
+    'bank-statement-lines.reconcileSupplierPayment',
+    erpBankStatementLineSchema,
+  ],
+  [
+    'POST',
+    `/bank-statement-lines/${id}/unreconcile-supplier-payment`,
+    'bank-statement-lines.unreconcileSupplierPayment',
+    erpBankStatementLineSchema,
   ],
 ] as const;
 

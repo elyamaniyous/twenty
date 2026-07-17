@@ -4,6 +4,8 @@ import {
   civilDateSchema,
   decimalDatabaseNumberSchema,
   erpBalanceReportSchema,
+  erpBankReconciliationCandidatesSchema,
+  erpBankStatementLineSchema,
   erpCreditAllocationKindSchema,
   erpCreditNotePageSchema,
   erpCreditNoteSchema,
@@ -78,6 +80,8 @@ const ids = {
   reminder: '77777777-7777-4777-8777-777777777777',
   accountingEntry: '7aaaaaaa-7777-4777-8777-777777777777',
   accountingAccount: '7bbbbbbb-7777-4777-8777-777777777777',
+  bankStatement: '7ccccccc-7777-4777-8777-777777777777',
+  bankStatementLine: '7ddddddd-7777-4777-8777-777777777777',
   accountingLineTwo: '7ccccccc-7777-4777-8777-777777777777',
   accountingLettering: '7ddddddd-7777-4777-8777-777777777777',
   line: '88888888-8888-4888-8888-888888888888',
@@ -1665,6 +1669,59 @@ describe('ERP Maroc response contracts', () => {
     ).toBe(false);
   });
 
+  it('parses supplier bank reconciliation candidates and confirmed matches', () => {
+    const candidate = {
+      supplierPaymentPreparationId: ids.supplierPaymentPreparation,
+      supplierId: ids.tier,
+      supplierName: 'Atlas Fournitures',
+      supplierInvoiceId: ids.supplierInvoice,
+      supplierInvoiceReference: 'FF-2026-0042',
+      paymentReference: 'VIR-0042',
+      paymentDate: '2026-07-17',
+      amountCents: 125_000,
+      method: 'BANK_TRANSFER',
+      score: 100,
+      dateDistanceDays: 0,
+      reasons: ['AMOUNT_EXACT', 'DATE_EXACT', 'REFERENCE_MATCH'],
+    } as const;
+
+    expect(
+      erpBankReconciliationCandidatesSchema.parse({
+        lineId: ids.bankStatementLine,
+        candidates: [candidate],
+      }),
+    ).toEqual({ lineId: ids.bankStatementLine, candidates: [candidate] });
+
+    expect(
+      erpBankStatementLineSchema.parse({
+        id: ids.bankStatementLine,
+        position: 0,
+        pageNumber: 1,
+        transactionDate: '2026-07-17',
+        valueDate: '2026-07-18',
+        description: 'Virement Atlas Fournitures',
+        reference: 'VIR-0042',
+        debitCents: 125_000,
+        creditCents: 0,
+        balanceCents: 400_000,
+        confidenceBasisPoints: 9_900,
+        needsReview: false,
+        sourceText: 'VIR-0042 Atlas Fournitures',
+        boundingBox: null,
+        reconciliation: {
+          ...candidate,
+          reconciledAt: '2026-07-17T10:00:00.000Z',
+          reconciledByTwentyUserId: 'twenty-user-1',
+        },
+      }),
+    ).toMatchObject({
+      id: ids.bankStatementLine,
+      reconciliation: {
+        supplierPaymentPreparationId: ids.supplierPaymentPreparation,
+      },
+    });
+  });
+
   it('rejects missing required response fields and malformed IDs/dates', () => {
     const { id: _id, ...productWithoutId } = productJson;
     expect(erpProductSchema.safeParse(productWithoutId).success).toBe(false);
@@ -1924,6 +1981,34 @@ describe('ERP Maroc upstream routes', () => {
       validId: ids.accountingEntry,
       expectedPath: `/accounting/entries/${ids.accountingEntry}/reject`,
     },
+    {
+      helper: erpMarocUpstreamRoutes.bankStatements.detail,
+      validId: ids.bankStatement,
+      expectedPath: `/bank-statements/${ids.bankStatement}`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.bankStatements.confirm,
+      validId: ids.bankStatement,
+      expectedPath: `/bank-statements/${ids.bankStatement}/confirm`,
+    },
+    {
+      helper:
+        erpMarocUpstreamRoutes.bankStatementLines.reconciliationCandidates,
+      validId: ids.bankStatementLine,
+      expectedPath: `/bank-statement-lines/${ids.bankStatementLine}/reconciliation-candidates`,
+    },
+    {
+      helper:
+        erpMarocUpstreamRoutes.bankStatementLines.reconcileSupplierPayment,
+      validId: ids.bankStatementLine,
+      expectedPath: `/bank-statement-lines/${ids.bankStatementLine}/reconcile-supplier-payment`,
+    },
+    {
+      helper:
+        erpMarocUpstreamRoutes.bankStatementLines.unreconcileSupplierPayment,
+      validId: ids.bankStatementLine,
+      expectedPath: `/bank-statement-lines/${ids.bankStatementLine}/unreconcile-supplier-payment`,
+    },
   ];
 
   it('keeps the browser API base separate and exports stable route IDs', () => {
@@ -1986,6 +2071,15 @@ describe('ERP Maroc upstream routes', () => {
       accountingLettrageSuggestions: 'accounting.lettrage.suggestions',
       accountingLettrageMatch: 'accounting.lettrage.match',
       accountingLettrageUnmatch: 'accounting.lettrage.unmatch',
+      bankStatementsCollection: 'bank-statements.collection',
+      bankStatementDetail: 'bank-statements.detail',
+      bankStatementConfirm: 'bank-statements.confirm',
+      bankStatementLineReconciliationCandidates:
+        'bank-statement-lines.reconciliationCandidates',
+      bankStatementLineReconcileSupplierPayment:
+        'bank-statement-lines.reconcileSupplierPayment',
+      bankStatementLineUnreconcileSupplierPayment:
+        'bank-statement-lines.unreconcileSupplierPayment',
     });
   });
 
@@ -2025,6 +2119,9 @@ describe('ERP Maroc upstream routes', () => {
     );
     expect(erpMarocUpstreamRoutes.accounting.lettrageUnmatch).toBe(
       '/accounting/lettrage/unmatch',
+    );
+    expect(erpMarocUpstreamRoutes.bankStatements.collection).toBe(
+      '/bank-statements',
     );
   });
 

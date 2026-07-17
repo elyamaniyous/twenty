@@ -1393,6 +1393,47 @@ export const erpBankStatementStatusSchema = z.enum([
   'FAILED',
 ]);
 
+export const erpBankReconciliationSchema = z.object({
+  supplierPaymentPreparationId: uuidSchema,
+  supplierId: uuidSchema,
+  supplierName: nonBlankStringSchema,
+  supplierInvoiceId: uuidSchema,
+  supplierInvoiceReference: nonBlankStringSchema,
+  paymentReference: nullableStringSchema,
+  paymentDate: civilDateSchema,
+  amountCents: positiveIntegerSchema,
+  method: erpPaymentMethodSchema,
+  reconciledAt: instantSchema,
+  reconciledByTwentyUserId: nonBlankStringSchema,
+});
+
+export const erpBankReconciliationReasonSchema = z.enum([
+  'AMOUNT_EXACT',
+  'DATE_EXACT',
+  'DATE_NEAR',
+  'REFERENCE_MATCH',
+]);
+
+export const erpBankReconciliationCandidateSchema = z.object({
+  supplierPaymentPreparationId: uuidSchema,
+  supplierId: uuidSchema,
+  supplierName: nonBlankStringSchema,
+  supplierInvoiceId: uuidSchema,
+  supplierInvoiceReference: nonBlankStringSchema,
+  paymentReference: nullableStringSchema,
+  paymentDate: civilDateSchema,
+  amountCents: positiveIntegerSchema,
+  method: erpPaymentMethodSchema,
+  score: nonNegativeIntegerSchema.max(100),
+  dateDistanceDays: nonNegativeIntegerSchema,
+  reasons: z.array(erpBankReconciliationReasonSchema).min(1),
+});
+
+export const erpBankReconciliationCandidatesSchema = z.object({
+  lineId: uuidSchema,
+  candidates: z.array(erpBankReconciliationCandidateSchema),
+});
+
 export const erpBankStatementLineSchema = z.object({
   id: uuidSchema,
   position: nonNegativeIntegerSchema,
@@ -1408,6 +1449,7 @@ export const erpBankStatementLineSchema = z.object({
   needsReview: z.boolean(),
   sourceText: z.string(),
   boundingBox: z.array(z.number().finite()).length(4).nullable(),
+  reconciliation: erpBankReconciliationSchema.nullable(),
 });
 
 export const erpBankStatementSchema = z.object({
@@ -1495,6 +1537,12 @@ export const erpMarocRouteIds = {
   bankStatementsCollection: 'bank-statements.collection',
   bankStatementDetail: 'bank-statements.detail',
   bankStatementConfirm: 'bank-statements.confirm',
+  bankStatementLineReconciliationCandidates:
+    'bank-statement-lines.reconciliationCandidates',
+  bankStatementLineReconcileSupplierPayment:
+    'bank-statement-lines.reconcileSupplierPayment',
+  bankStatementLineUnreconcileSupplierPayment:
+    'bank-statement-lines.unreconcileSupplierPayment',
 } as const;
 
 export const erpMarocUpstreamRoutes = {
@@ -1588,6 +1636,14 @@ export const erpMarocUpstreamRoutes = {
     detail: (id: string) => `/bank-statements/${encodeRouteId(id)}`,
     confirm: (id: string) => `/bank-statements/${encodeRouteId(id)}/confirm`,
   },
+  bankStatementLines: {
+    reconciliationCandidates: (id: string) =>
+      `/bank-statement-lines/${encodeRouteId(id)}/reconciliation-candidates`,
+    reconcileSupplierPayment: (id: string) =>
+      `/bank-statement-lines/${encodeRouteId(id)}/reconcile-supplier-payment`,
+    unreconcileSupplierPayment: (id: string) =>
+      `/bank-statement-lines/${encodeRouteId(id)}/unreconcile-supplier-payment`,
+  },
 } as const;
 
 export type ErpRole = z.infer<typeof erpRoleSchema>;
@@ -1664,6 +1720,13 @@ export type ErpLettrageSuggestions = z.infer<
 >;
 export type ErpBankStatementStatus = z.infer<
   typeof erpBankStatementStatusSchema
+>;
+export type ErpBankReconciliation = z.infer<typeof erpBankReconciliationSchema>;
+export type ErpBankReconciliationCandidate = z.infer<
+  typeof erpBankReconciliationCandidateSchema
+>;
+export type ErpBankReconciliationCandidates = z.infer<
+  typeof erpBankReconciliationCandidatesSchema
 >;
 export type ErpBankStatementLine = z.infer<typeof erpBankStatementLineSchema>;
 export type ErpBankStatement = z.infer<typeof erpBankStatementSchema>;
