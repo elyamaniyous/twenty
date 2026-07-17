@@ -1,6 +1,6 @@
 import {
   bankStatementLinesToCsv,
-  bankStatementPdfToBase64,
+  bankStatementFileToBase64,
 } from '@/erp-maroc/bank-statements/bankStatementFiles';
 import {
   ErpOperationalTable,
@@ -17,11 +17,14 @@ import { styled } from '@linaria/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   erpBankReconciliationCandidatesSchema,
+  erpBankAccountListSchema,
+  erpBankAccountSchema,
   erpBankStatementDetailSchema,
   erpBankStatementLineSchema,
   erpBankStatementListSchema,
   erpBankStatementSchema,
   type ErpBankReconciliationCandidate,
+  type ErpBankAccount,
   type ErpBankStatement,
   type ErpBankStatementDetail,
   type ErpBankStatementLine,
@@ -31,6 +34,7 @@ import {
   IconCheck,
   IconDownload,
   IconLink,
+  IconPlus,
   IconUnlink,
   IconUpload,
   IconX,
@@ -46,6 +50,7 @@ const STATUS: Record<
   PROCESSING: { label: 'Analyse en cours', tone: 'warning' },
   READY_FOR_REVIEW: { label: 'À valider', tone: 'warning' },
   CONFIRMED: { label: 'Validé', tone: 'success' },
+  CLOSED: { label: 'Clôturé', tone: 'neutral' },
   FAILED: { label: 'Échec OCR', tone: 'danger' },
 };
 
@@ -58,6 +63,23 @@ const StyledContent = styled.div`
   flex: 1 1 auto;
   grid-template-rows: minmax(180px, 2fr) minmax(260px, 3fr);
   min-height: 0;
+`;
+
+const StyledAccountForm = styled.div`
+  align-items: end;
+  background: ${themeCssVariables.background.secondary};
+  border-bottom: 1px solid ${themeCssVariables.border.color.medium};
+  display: grid;
+  gap: ${themeCssVariables.spacing[2]};
+  grid-template-columns:
+    minmax(160px, 1fr) minmax(160px, 1fr) minmax(230px, 1.4fr)
+    minmax(110px, 0.6fr) auto;
+  padding: ${themeCssVariables.spacing[2]} ${themeCssVariables.spacing[3]};
+
+  @media (max-width: 900px) {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
 `;
 
 const StyledImports = styled.section`
@@ -129,7 +151,9 @@ const StyledReconciliationPanel = styled.div`
   display: grid;
   flex: 0 0 auto;
   gap: ${themeCssVariables.spacing[3]};
-  grid-template-columns: minmax(220px, 1fr) minmax(300px, 2fr) auto;
+  grid-template-columns:
+    minmax(200px, 1fr) minmax(260px, 1.5fr) minmax(220px, 1fr)
+    auto;
   padding: ${themeCssVariables.spacing[3]};
 
   @media (max-width: 900px) {
@@ -254,6 +278,23 @@ const formatDateTime = (value: string) =>
     timeStyle: 'short',
   }).format(new Date(value));
 
+const candidateId = (candidate: ErpBankReconciliationCandidate) =>
+  candidate.kind === 'SUPPLIER'
+    ? candidate.supplierPaymentPreparationId
+    : candidate.customerPaymentId;
+
+const candidateLabel = (candidate: ErpBankReconciliationCandidate) =>
+  candidate.kind === 'SUPPLIER'
+    ? `${candidate.score}% · Fournisseur ${candidate.supplierName} · ${candidate.supplierInvoiceReference} · ${candidate.paymentDate} · ${formatMadCents(candidate.amountCents)}`
+    : `${candidate.score}% · Client ${candidate.customerName} · ${candidate.invoiceReferences.join(', ') || 'sans affectation'} · ${candidate.paymentDate} · ${formatMadCents(candidate.amountCents)}`;
+
+const reconciliationLabel = (line: ErpBankStatementLine) => {
+  if (line.reconciliation === null) return '';
+  return line.reconciliation.kind === 'SUPPLIER'
+    ? `${line.reconciliation.supplierName} · ${line.reconciliation.supplierInvoiceReference}`
+    : `${line.reconciliation.customerName} · ${line.reconciliation.invoiceReferences.join(', ') || 'encaissement client'}`;
+};
+
 const downloadCsv = (statement: ErpBankStatementDetail) => {
   const blob = new Blob([bankStatementLinesToCsv(statement.lines)], {
     type: 'text/csv;charset=utf-8',
@@ -261,7 +302,7 @@ const downloadCsv = (statement: ErpBankStatementDetail) => {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = statement.originalFilename.replace(/\.pdf$/i, '.csv');
+  anchor.download = statement.originalFilename.replace(/\.[^.]+$/i, '.csv');
   anchor.click();
   URL.revokeObjectURL(url);
 };
@@ -270,10 +311,19 @@ export const ErpBankStatementsPage = () => {
   const { client } = useErpMarocContext();
   const fileInput = useRef<HTMLInputElement>(null);
   const [imports, setImports] = useState<ErpBankStatement[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<ErpBankAccount[]>([]);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState('');
+  const [showAccountForm, setShowAccountForm] = useState(false);
+  const [accountName, setAccountName] = useState('Compte principal');
+  const [accountBankName, setAccountBankName] = useState('');
+  const [accountRib, setAccountRib] = useState('');
+  const [accountingAccountCode, setAccountingAccountCode] = useState('5141');
+  const [savingAccount, setSavingAccount] = useState(false);
   const [detail, setDetail] = useState<ErpBankStatementDetail | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [uploading, setUploading] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reconciliationLineId, setReconciliationLineId] = useState<
     string | null
@@ -303,6 +353,17 @@ export const ErpBankStatementsPage = () => {
     return result;
   }, [client]);
 
+  const loadBankAccounts = useCallback(async () => {
+    const result = await client.request({
+      method: 'GET',
+      path: '/bank-accounts',
+      schema: erpBankAccountListSchema,
+    });
+    setBankAccounts(result);
+    setSelectedBankAccountId((current) => current || result[0]?.id || '');
+    return result;
+  }, [client]);
+
   const loadDetail = useCallback(
     async (id: string) => {
       const result = await client.request({
@@ -316,8 +377,10 @@ export const ErpBankStatementsPage = () => {
   );
 
   useEffect(() => {
-    void loadImports().catch(() => setState('error'));
-  }, [loadImports]);
+    void Promise.all([loadImports(), loadBankAccounts()]).catch(() =>
+      setState('error'),
+    );
+  }, [loadBankAccounts, loadImports]);
 
   useEffect(() => {
     if (
@@ -396,16 +459,65 @@ export const ErpBankStatementsPage = () => {
     [loadDetail],
   );
 
+  const createBankAccount = async () => {
+    if (
+      !accountName.trim() ||
+      !accountBankName.trim() ||
+      !/^\d{24}$/.test(accountRib.replace(/\s/g, '')) ||
+      !/^\d{4,8}$/.test(accountingAccountCode)
+    ) {
+      setError(
+        'Renseignez le nom, la banque, un RIB de 24 chiffres et le compte comptable',
+      );
+      return;
+    }
+    setSavingAccount(true);
+    setError(null);
+    try {
+      const intent = client.createMutationIntent({
+        method: 'POST',
+        path: '/bank-accounts',
+        schema: erpBankAccountSchema,
+        body: {
+          name: accountName.trim(),
+          bankName: accountBankName.trim(),
+          rib: accountRib.replace(/\s/g, ''),
+          accountingAccountCode,
+          openingBalanceCents: 0,
+        },
+      });
+      const created = await intent.execute();
+      await loadBankAccounts();
+      setSelectedBankAccountId(created.id);
+      setShowAccountForm(false);
+      setAccountRib('');
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Création du compte impossible',
+      );
+    } finally {
+      setSavingAccount(false);
+    }
+  };
+
   const upload = async (file: File) => {
     setUploading(true);
     setError(null);
     try {
-      const contentBase64 = await bankStatementPdfToBase64(file);
+      const contentBase64 = await bankStatementFileToBase64(file);
       const intent = client.createMutationIntent({
         method: 'POST',
         path: '/bank-statements',
         schema: erpBankStatementSchema,
-        body: { filename: file.name, contentBase64 },
+        body: {
+          filename: file.name,
+          contentBase64,
+          ...(selectedBankAccountId
+            ? { bankAccountId: selectedBankAccountId }
+            : {}),
+        },
       });
       const created = await intent.execute();
       await loadImports();
@@ -418,6 +530,48 @@ export const ErpBankStatementsPage = () => {
     }
   };
 
+  const assignBankAccount = async (bankAccountId: string) => {
+    if (!detail || !bankAccountId) return;
+    setError(null);
+    try {
+      const intent = client.createMutationIntent({
+        method: 'PATCH',
+        path: `/bank-statements/${detail.id}/bank-account`,
+        schema: erpBankStatementDetailSchema,
+        body: { bankAccountId },
+      });
+      setDetail(await intent.execute());
+      setSelectedBankAccountId(bankAccountId);
+      await loadImports();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Affectation du compte impossible',
+      );
+    }
+  };
+
+  const closeStatement = async () => {
+    if (!detail) return;
+    setClosing(true);
+    setError(null);
+    try {
+      const intent = client.createMutationIntent({
+        method: 'POST',
+        path: `/bank-statements/${detail.id}/close`,
+        schema: erpBankStatementDetailSchema,
+        body: {},
+      });
+      setDetail(await intent.execute());
+      await loadImports();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Clôture impossible');
+    } finally {
+      setClosing(false);
+    }
+  };
+
   const updateLine = (id: string, changes: Partial<ErpBankStatementLine>) => {
     setDetail((current) =>
       current === null
@@ -426,19 +580,6 @@ export const ErpBankStatementsPage = () => {
             ...current,
             lines: current.lines.map((line) =>
               line.id === id ? { ...line, ...changes } : line,
-            ),
-          },
-    );
-  };
-
-  const replaceLine = (line: ErpBankStatementLine) => {
-    setDetail((current) =>
-      current === null
-        ? null
-        : {
-            ...current,
-            lines: current.lines.map((item) =>
-              item.id === line.id ? line : item,
             ),
           },
     );
@@ -457,7 +598,7 @@ export const ErpBankStatementsPage = () => {
     setSelectedCandidateId('');
     setReconciliationReason('');
     setError(null);
-    if (line.reconciliation !== null) return;
+    if (line.reconciliation !== null || line.review !== null) return;
 
     setLoadingCandidates(true);
     try {
@@ -468,7 +609,7 @@ export const ErpBankStatementsPage = () => {
       });
       setReconciliationCandidates(result.candidates);
       setSelectedCandidateId(
-        result.candidates[0]?.supplierPaymentPreparationId ?? '',
+        result.candidates.length > 0 ? candidateId(result.candidates[0]) : '',
       );
     } catch (caught) {
       setError(
@@ -483,16 +624,27 @@ export const ErpBankStatementsPage = () => {
 
   const reconcile = async () => {
     if (!reconciliationLine || !selectedCandidateId) return;
+    const candidate = reconciliationCandidates.find(
+      (item) => candidateId(item) === selectedCandidateId,
+    );
+    if (!candidate) return;
     setReconciling(true);
     setError(null);
     try {
       const intent = client.createMutationIntent({
         method: 'POST',
-        path: `/bank-statement-lines/${reconciliationLine.id}/reconcile-supplier-payment`,
+        path:
+          candidate.kind === 'SUPPLIER'
+            ? `/bank-statement-lines/${reconciliationLine.id}/reconcile-supplier-payment`
+            : `/bank-statement-lines/${reconciliationLine.id}/reconcile-customer-payment`,
         schema: erpBankStatementLineSchema,
-        body: { supplierPaymentPreparationId: selectedCandidateId },
+        body:
+          candidate.kind === 'SUPPLIER'
+            ? { supplierPaymentPreparationId: selectedCandidateId }
+            : { customerPaymentId: selectedCandidateId },
       });
-      replaceLine(await intent.execute());
+      await intent.execute();
+      if (detail) await loadDetail(detail.id);
       closeReconciliation();
     } catch (caught) {
       setError(
@@ -504,23 +656,80 @@ export const ErpBankStatementsPage = () => {
   };
 
   const unreconcile = async () => {
-    if (!reconciliationLine || reconciliationReason.trim().length < 10) return;
+    if (
+      !reconciliationLine ||
+      reconciliationLine.reconciliation === null ||
+      reconciliationReason.trim().length < 10
+    )
+      return;
     setReconciling(true);
     setError(null);
     try {
       const intent = client.createMutationIntent({
         method: 'POST',
-        path: `/bank-statement-lines/${reconciliationLine.id}/unreconcile-supplier-payment`,
+        path:
+          reconciliationLine.reconciliation.kind === 'SUPPLIER'
+            ? `/bank-statement-lines/${reconciliationLine.id}/unreconcile-supplier-payment`
+            : `/bank-statement-lines/${reconciliationLine.id}/unreconcile-customer-payment`,
         schema: erpBankStatementLineSchema,
         body: { reason: reconciliationReason.trim() },
       });
-      replaceLine(await intent.execute());
+      await intent.execute();
+      if (detail) await loadDetail(detail.id);
       closeReconciliation();
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
           : 'Annulation du rapprochement impossible',
+      );
+    } finally {
+      setReconciling(false);
+    }
+  };
+
+  const reviewLine = async () => {
+    if (!reconciliationLine || reconciliationReason.trim().length < 10) return;
+    setReconciling(true);
+    setError(null);
+    try {
+      const intent = client.createMutationIntent({
+        method: 'POST',
+        path: `/bank-statement-lines/${reconciliationLine.id}/review`,
+        schema: erpBankStatementLineSchema,
+        body: { reason: reconciliationReason.trim() },
+      });
+      await intent.execute();
+      if (detail) await loadDetail(detail.id);
+      closeReconciliation();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : 'Contrôle manuel impossible',
+      );
+    } finally {
+      setReconciling(false);
+    }
+  };
+
+  const unreviewLine = async () => {
+    if (!reconciliationLine || reconciliationReason.trim().length < 10) return;
+    setReconciling(true);
+    setError(null);
+    try {
+      const intent = client.createMutationIntent({
+        method: 'POST',
+        path: `/bank-statement-lines/${reconciliationLine.id}/unreview`,
+        schema: erpBankStatementLineSchema,
+        body: { reason: reconciliationReason.trim() },
+      });
+      await intent.execute();
+      if (detail) await loadDetail(detail.id);
+      closeReconciliation();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Annulation du contrôle impossible',
       );
     } finally {
       setReconciling(false);
@@ -557,14 +766,23 @@ export const ErpBankStatementsPage = () => {
       errorLabel="Impossible de charger les relevés"
       onRetry={() => {
         setState('loading');
-        void loadImports().catch(() => setState('error'));
+        void Promise.all([loadImports(), loadBankAccounts()]).catch(() =>
+          setState('error'),
+        );
       }}
       actions={
         <>
+          <Button
+            title="Ajouter un compte bancaire"
+            ariaLabel="Ajouter un compte bancaire"
+            Icon={IconPlus}
+            variant="secondary"
+            onClick={() => setShowAccountForm((current) => !current)}
+          />
           <StyledFileInput
             ref={fileInput}
             type="file"
-            accept="application/pdf,.pdf"
+            accept="application/pdf,text/csv,.pdf,.csv,.sta,.mt940"
             onChange={(event) => {
               const file = event.target.files?.[0];
               if (file) void upload(file);
@@ -572,7 +790,7 @@ export const ErpBankStatementsPage = () => {
           />
           <Button
             title={uploading ? 'Envoi en cours' : 'Importer un relevé'}
-            ariaLabel="Importer un relevé PDF"
+            ariaLabel="Importer un relevé PDF, CSV ou MT940"
             Icon={IconUpload}
             variant="primary"
             disabled={uploading}
@@ -582,6 +800,54 @@ export const ErpBankStatementsPage = () => {
       }
     >
       {error ? <StyledError role="alert">{error}</StyledError> : null}
+      {showAccountForm ? (
+        <StyledAccountForm>
+          <StyledReconciliationField>
+            <span>Nom du compte</span>
+            <StyledInput
+              value={accountName}
+              maxLength={100}
+              onChange={(event) => setAccountName(event.target.value)}
+            />
+          </StyledReconciliationField>
+          <StyledReconciliationField>
+            <span>Banque</span>
+            <StyledInput
+              value={accountBankName}
+              maxLength={100}
+              placeholder="Ex. Attijariwafa bank"
+              onChange={(event) => setAccountBankName(event.target.value)}
+            />
+          </StyledReconciliationField>
+          <StyledReconciliationField>
+            <span>RIB (24 chiffres)</span>
+            <StyledInput
+              value={accountRib}
+              inputMode="numeric"
+              maxLength={30}
+              onChange={(event) => setAccountRib(event.target.value)}
+            />
+          </StyledReconciliationField>
+          <StyledReconciliationField>
+            <span>Compte comptable</span>
+            <StyledInput
+              value={accountingAccountCode}
+              inputMode="numeric"
+              maxLength={8}
+              onChange={(event) => setAccountingAccountCode(event.target.value)}
+            />
+          </StyledReconciliationField>
+          <Button
+            title="Créer le compte"
+            ariaLabel="Créer le compte bancaire"
+            Icon={IconCheck}
+            variant="primary"
+            disabled={savingAccount}
+            isLoading={savingAccount}
+            onClick={() => void createBankAccount()}
+          />
+        </StyledAccountForm>
+      ) : null}
       <StyledContent>
         <StyledImports>
           <ErpOperationalTable
@@ -607,6 +873,28 @@ export const ErpBankStatementsPage = () => {
               <StyledReviewHeader>
                 <StyledReviewTitle>{detail.originalFilename}</StyledReviewTitle>
                 <StyledReviewActions>
+                  <StyledReconciliationField>
+                    <span>Compte bancaire</span>
+                    <StyledSelectInput
+                      value={detail.bankAccount?.id ?? ''}
+                      disabled={
+                        detail.status === 'CLOSED' || bankAccounts.length === 0
+                      }
+                      onChange={(event) =>
+                        void assignBankAccount(event.target.value)
+                      }
+                    >
+                      <option value="">À affecter</option>
+                      {bankAccounts
+                        .filter((account) => account.isActive)
+                        .map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {account.name} · {account.bankName} ·{' '}
+                            {account.rib.slice(-6)}
+                          </option>
+                        ))}
+                    </StyledSelectInput>
+                  </StyledReconciliationField>
                   <Button
                     title="Télécharger le CSV"
                     ariaLabel="Télécharger le CSV"
@@ -628,6 +916,28 @@ export const ErpBankStatementsPage = () => {
                       onClick={() => void confirm()}
                     />
                   ) : null}
+                  {detail.status === 'CONFIRMED' ? (
+                    <Button
+                      title={
+                        detail.unresolvedLineCount > 0
+                          ? `${detail.unresolvedLineCount} ligne(s) à résoudre`
+                          : closing
+                            ? 'Clôture en cours'
+                            : 'Clôturer le relevé'
+                      }
+                      ariaLabel="Clôturer le relevé bancaire"
+                      Icon={IconCheck}
+                      variant="primary"
+                      disabled={
+                        closing ||
+                        detail.unresolvedLineCount > 0 ||
+                        detail.bankAccount === null ||
+                        detail.balanceCheckPassed === false
+                      }
+                      isLoading={closing}
+                      onClick={() => void closeStatement()}
+                    />
+                  ) : null}
                 </StyledReviewActions>
               </StyledReviewHeader>
               {reconciliationLine !== null ? (
@@ -636,13 +946,17 @@ export const ErpBankStatementsPage = () => {
                     <span>Ligne bancaire</span>
                     <StyledReconciliationText>
                       {reconciliationLine.transactionDate} ·{' '}
-                      {formatMadCents(reconciliationLine.debitCents)} ·{' '}
-                      {reconciliationLine.description}
+                      {formatMadCents(
+                        reconciliationLine.debitCents ||
+                          reconciliationLine.creditCents,
+                      )}{' '}
+                      · {reconciliationLine.description}
                     </StyledReconciliationText>
                   </StyledReconciliationField>
-                  {reconciliationLine.reconciliation === null ? (
+                  {reconciliationLine.reconciliation === null &&
+                  reconciliationLine.review === null ? (
                     <StyledReconciliationField>
-                      <span>Paiement fournisseur candidat</span>
+                      <span>Paiement candidat</span>
                       <StyledSelectInput
                         value={selectedCandidateId}
                         disabled={loadingCandidates || reconciling}
@@ -659,47 +973,53 @@ export const ErpBankStatementsPage = () => {
                         ) : null}
                         {reconciliationCandidates.map((candidate) => (
                           <option
-                            key={candidate.supplierPaymentPreparationId}
-                            value={candidate.supplierPaymentPreparationId}
+                            key={candidateId(candidate)}
+                            value={candidateId(candidate)}
                           >
-                            {candidate.score}% · {candidate.supplierName} ·{' '}
-                            {candidate.supplierInvoiceReference} ·{' '}
-                            {candidate.paymentDate} ·{' '}
-                            {formatMadCents(candidate.amountCents)}
+                            {candidateLabel(candidate)}
                           </option>
                         ))}
                       </StyledSelectInput>
                     </StyledReconciliationField>
-                  ) : (
+                  ) : null}
+                  <StyledReconciliationField>
+                    <span>
+                      {reconciliationLine.reconciliation !== null ||
+                      reconciliationLine.review !== null
+                        ? 'Motif d’annulation'
+                        : 'Motif du contrôle manuel'}
+                    </span>
+                    <StyledInput
+                      value={reconciliationReason}
+                      minLength={10}
+                      maxLength={500}
+                      placeholder="Ex. opération vérifiée sur le justificatif"
+                      disabled={reconciling}
+                      onChange={(event) =>
+                        setReconciliationReason(event.target.value)
+                      }
+                    />
+                  </StyledReconciliationField>
+                  {reconciliationLine.reconciliation !== null ? (
                     <StyledReconciliationField>
-                      <span>Motif d’annulation du rapprochement</span>
-                      <StyledInput
-                        value={reconciliationReason}
-                        minLength={10}
-                        maxLength={500}
-                        placeholder="Ex. paiement sélectionné par erreur"
-                        disabled={reconciling}
-                        onChange={(event) =>
-                          setReconciliationReason(event.target.value)
-                        }
-                      />
+                      <span>Rapprochement actuel</span>
+                      <StyledReconciliationText>
+                        {reconciliationLabel(reconciliationLine)}
+                      </StyledReconciliationText>
                     </StyledReconciliationField>
-                  )}
+                  ) : reconciliationLine.review !== null ? (
+                    <StyledReconciliationField>
+                      <span>Contrôle actuel</span>
+                      <StyledReconciliationText>
+                        {reconciliationLine.review.reason}
+                      </StyledReconciliationText>
+                    </StyledReconciliationField>
+                  ) : null}
                   <StyledReconciliationActions>
-                    {reconciliationLine.reconciliation === null ? (
-                      <Button
-                        title="Rapprocher"
-                        ariaLabel="Confirmer le rapprochement fournisseur"
-                        Icon={IconLink}
-                        variant="primary"
-                        disabled={!selectedCandidateId || reconciling}
-                        isLoading={reconciling}
-                        onClick={() => void reconcile()}
-                      />
-                    ) : (
+                    {reconciliationLine.reconciliation !== null ? (
                       <Button
                         title="Annuler le rapprochement"
-                        ariaLabel="Annuler le rapprochement fournisseur"
+                        ariaLabel="Annuler le rapprochement bancaire"
                         Icon={IconUnlink}
                         accent="danger"
                         disabled={
@@ -708,6 +1028,42 @@ export const ErpBankStatementsPage = () => {
                         isLoading={reconciling}
                         onClick={() => void unreconcile()}
                       />
+                    ) : reconciliationLine.review !== null ? (
+                      <Button
+                        title="Annuler le contrôle"
+                        ariaLabel="Annuler le contrôle manuel"
+                        Icon={IconUnlink}
+                        accent="danger"
+                        disabled={
+                          reconciliationReason.trim().length < 10 || reconciling
+                        }
+                        isLoading={reconciling}
+                        onClick={() => void unreviewLine()}
+                      />
+                    ) : (
+                      <>
+                        <Button
+                          title="Rapprocher"
+                          ariaLabel="Confirmer le rapprochement bancaire"
+                          Icon={IconLink}
+                          variant="primary"
+                          disabled={!selectedCandidateId || reconciling}
+                          isLoading={reconciling}
+                          onClick={() => void reconcile()}
+                        />
+                        <Button
+                          title="Marquer contrôlé"
+                          ariaLabel="Marquer la ligne comme contrôlée manuellement"
+                          Icon={IconCheck}
+                          variant="secondary"
+                          disabled={
+                            reconciliationReason.trim().length < 10 ||
+                            reconciling
+                          }
+                          isLoading={reconciling}
+                          onClick={() => void reviewLine()}
+                        />
+                      </>
                     )}
                     <Button
                       title="Fermer"
@@ -748,7 +1104,8 @@ export const ErpBankStatementsPage = () => {
                   </thead>
                   <tbody>
                     {detail.lines.map((line) => {
-                      const disabled = detail.status === 'CONFIRMED';
+                      const disabled = detail.status !== 'READY_FOR_REVIEW';
+                      const canResolve = detail.status === 'CONFIRMED';
                       return (
                         <tr key={line.id}>
                           <StyledCell>
@@ -843,34 +1200,61 @@ export const ErpBankStatementsPage = () => {
                             </StyledConfidence>
                           </StyledCell>
                           <StyledCell>
-                            {detail.status !== 'CONFIRMED' ||
-                            line.debitCents === 0 ? (
+                            {!canResolve && detail.status !== 'CLOSED' ? (
                               '—'
-                            ) : line.reconciliation === null ? (
-                              <Button
-                                title="Rapprocher"
-                                ariaLabel={`Rapprocher la ligne ${line.description}`}
-                                Icon={IconLink}
-                                variant="secondary"
-                                disabled={reconciling}
-                                onClick={() => void openReconciliation(line)}
-                              />
-                            ) : (
-                              <StyledReconciliationCell>
-                                <StyledReconciliationText
-                                  title={`${line.reconciliation.supplierName} · ${line.reconciliation.supplierInvoiceReference}`}
-                                >
-                                  {line.reconciliation.supplierName} ·{' '}
-                                  {line.reconciliation.supplierInvoiceReference}
-                                </StyledReconciliationText>
+                            ) : line.reconciliation === null &&
+                              line.review === null ? (
+                              canResolve ? (
                                 <Button
-                                  title="Annuler"
-                                  ariaLabel={`Annuler le rapprochement ${line.reconciliation.supplierInvoiceReference}`}
-                                  Icon={IconUnlink}
-                                  accent="danger"
+                                  title="Rapprocher ou contrôler"
+                                  ariaLabel={`Rapprocher ou contrôler la ligne ${line.description}`}
+                                  Icon={IconLink}
+                                  variant="secondary"
                                   disabled={reconciling}
                                   onClick={() => void openReconciliation(line)}
                                 />
+                              ) : (
+                                'Non résolue'
+                              )
+                            ) : line.review !== null ? (
+                              <StyledReconciliationCell>
+                                <StyledReconciliationText
+                                  title={line.review.reason}
+                                >
+                                  Contrôlé · {line.review.reason}
+                                </StyledReconciliationText>
+                                {canResolve ? (
+                                  <Button
+                                    title="Annuler"
+                                    ariaLabel="Annuler le contrôle manuel"
+                                    Icon={IconUnlink}
+                                    accent="danger"
+                                    disabled={reconciling}
+                                    onClick={() =>
+                                      void openReconciliation(line)
+                                    }
+                                  />
+                                ) : null}
+                              </StyledReconciliationCell>
+                            ) : (
+                              <StyledReconciliationCell>
+                                <StyledReconciliationText
+                                  title={reconciliationLabel(line)}
+                                >
+                                  {reconciliationLabel(line)}
+                                </StyledReconciliationText>
+                                {canResolve ? (
+                                  <Button
+                                    title="Annuler"
+                                    ariaLabel={`Annuler le rapprochement ${reconciliationLabel(line)}`}
+                                    Icon={IconUnlink}
+                                    accent="danger"
+                                    disabled={reconciling}
+                                    onClick={() =>
+                                      void openReconciliation(line)
+                                    }
+                                  />
+                                ) : null}
                               </StyledReconciliationCell>
                             )}
                           </StyledCell>

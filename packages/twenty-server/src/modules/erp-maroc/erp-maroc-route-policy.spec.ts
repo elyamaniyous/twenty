@@ -2,6 +2,8 @@ import {
   erpAccountingEntryPageSchema,
   erpAccountingEntrySchema,
   erpBalanceReportSchema,
+  erpBankAccountListSchema,
+  erpBankAccountSchema,
   erpBankReconciliationCandidatesSchema,
   erpBankStatementDetailSchema,
   erpBankStatementLineSchema,
@@ -68,9 +70,17 @@ const requiredIdempotencyRoutes = new Set([
   `POST /supplier-payment-preparations/${id}/cancel`,
   `POST /supplier-payment-preparations/${id}/execute`,
   'POST /bank-statements',
+  'POST /bank-accounts',
+  `PATCH /bank-accounts/${id}`,
   `POST /bank-statements/${id}/confirm`,
+  `PATCH /bank-statements/${id}/bank-account`,
+  `POST /bank-statements/${id}/close`,
   `POST /bank-statement-lines/${id}/reconcile-supplier-payment`,
   `POST /bank-statement-lines/${id}/unreconcile-supplier-payment`,
+  `POST /bank-statement-lines/${id}/reconcile-customer-payment`,
+  `POST /bank-statement-lines/${id}/unreconcile-customer-payment`,
+  `POST /bank-statement-lines/${id}/review`,
+  `POST /bank-statement-lines/${id}/unreview`,
 ]);
 
 const approvedRoutes = [
@@ -313,6 +323,19 @@ const approvedRoutes = [
   ],
   [
     'GET',
+    '/bank-accounts',
+    'bank-accounts.collection',
+    erpBankAccountListSchema,
+  ],
+  ['POST', '/bank-accounts', 'bank-accounts.collection', erpBankAccountSchema],
+  [
+    'PATCH',
+    `/bank-accounts/${id}`,
+    'bank-accounts.detail',
+    erpBankAccountSchema,
+  ],
+  [
+    'GET',
     '/bank-statements',
     'bank-statements.collection',
     erpBankStatementListSchema,
@@ -322,6 +345,18 @@ const approvedRoutes = [
     '/bank-statements',
     'bank-statements.collection',
     erpBankStatementSchema,
+  ],
+  [
+    'PATCH',
+    `/bank-statements/${id}/bank-account`,
+    'bank-statements.assignBankAccount',
+    erpBankStatementDetailSchema,
+  ],
+  [
+    'POST',
+    `/bank-statements/${id}/close`,
+    'bank-statements.close',
+    erpBankStatementDetailSchema,
   ],
   [
     'GET',
@@ -351,6 +386,30 @@ const approvedRoutes = [
     'POST',
     `/bank-statement-lines/${id}/unreconcile-supplier-payment`,
     'bank-statement-lines.unreconcileSupplierPayment',
+    erpBankStatementLineSchema,
+  ],
+  [
+    'POST',
+    `/bank-statement-lines/${id}/reconcile-customer-payment`,
+    'bank-statement-lines.reconcileCustomerPayment',
+    erpBankStatementLineSchema,
+  ],
+  [
+    'POST',
+    `/bank-statement-lines/${id}/unreconcile-customer-payment`,
+    'bank-statement-lines.unreconcileCustomerPayment',
+    erpBankStatementLineSchema,
+  ],
+  [
+    'POST',
+    `/bank-statement-lines/${id}/review`,
+    'bank-statement-lines.review',
+    erpBankStatementLineSchema,
+  ],
+  [
+    'POST',
+    `/bank-statement-lines/${id}/unreview`,
+    'bank-statement-lines.unreview',
     erpBankStatementLineSchema,
   ],
 ] as const;

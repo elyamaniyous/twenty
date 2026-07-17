@@ -1671,6 +1671,7 @@ describe('ERP Maroc response contracts', () => {
 
   it('parses supplier bank reconciliation candidates and confirmed matches', () => {
     const candidate = {
+      kind: 'SUPPLIER',
       supplierPaymentPreparationId: ids.supplierPaymentPreparation,
       supplierId: ids.tier,
       supplierName: 'Atlas Fournitures',
@@ -1708,6 +1709,7 @@ describe('ERP Maroc response contracts', () => {
         needsReview: false,
         sourceText: 'VIR-0042 Atlas Fournitures',
         boundingBox: null,
+        review: null,
         reconciliation: {
           ...candidate,
           reconciledAt: '2026-07-17T10:00:00.000Z',
@@ -1982,6 +1984,11 @@ describe('ERP Maroc upstream routes', () => {
       expectedPath: `/accounting/entries/${ids.accountingEntry}/reject`,
     },
     {
+      helper: erpMarocUpstreamRoutes.bankAccounts.detail,
+      validId: ids.bankStatement,
+      expectedPath: `/bank-accounts/${ids.bankStatement}`,
+    },
+    {
       helper: erpMarocUpstreamRoutes.bankStatements.detail,
       validId: ids.bankStatement,
       expectedPath: `/bank-statements/${ids.bankStatement}`,
@@ -1990,6 +1997,16 @@ describe('ERP Maroc upstream routes', () => {
       helper: erpMarocUpstreamRoutes.bankStatements.confirm,
       validId: ids.bankStatement,
       expectedPath: `/bank-statements/${ids.bankStatement}/confirm`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.bankStatements.assignBankAccount,
+      validId: ids.bankStatement,
+      expectedPath: `/bank-statements/${ids.bankStatement}/bank-account`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.bankStatements.close,
+      validId: ids.bankStatement,
+      expectedPath: `/bank-statements/${ids.bankStatement}/close`,
     },
     {
       helper:
@@ -2008,6 +2025,28 @@ describe('ERP Maroc upstream routes', () => {
         erpMarocUpstreamRoutes.bankStatementLines.unreconcileSupplierPayment,
       validId: ids.bankStatementLine,
       expectedPath: `/bank-statement-lines/${ids.bankStatementLine}/unreconcile-supplier-payment`,
+    },
+    {
+      helper:
+        erpMarocUpstreamRoutes.bankStatementLines.reconcileCustomerPayment,
+      validId: ids.bankStatementLine,
+      expectedPath: `/bank-statement-lines/${ids.bankStatementLine}/reconcile-customer-payment`,
+    },
+    {
+      helper:
+        erpMarocUpstreamRoutes.bankStatementLines.unreconcileCustomerPayment,
+      validId: ids.bankStatementLine,
+      expectedPath: `/bank-statement-lines/${ids.bankStatementLine}/unreconcile-customer-payment`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.bankStatementLines.review,
+      validId: ids.bankStatementLine,
+      expectedPath: `/bank-statement-lines/${ids.bankStatementLine}/review`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.bankStatementLines.unreview,
+      validId: ids.bankStatementLine,
+      expectedPath: `/bank-statement-lines/${ids.bankStatementLine}/unreview`,
     },
   ];
 
@@ -2071,15 +2110,25 @@ describe('ERP Maroc upstream routes', () => {
       accountingLettrageSuggestions: 'accounting.lettrage.suggestions',
       accountingLettrageMatch: 'accounting.lettrage.match',
       accountingLettrageUnmatch: 'accounting.lettrage.unmatch',
+      bankAccountsCollection: 'bank-accounts.collection',
+      bankAccountDetail: 'bank-accounts.detail',
       bankStatementsCollection: 'bank-statements.collection',
       bankStatementDetail: 'bank-statements.detail',
       bankStatementConfirm: 'bank-statements.confirm',
+      bankStatementAssignBankAccount: 'bank-statements.assignBankAccount',
+      bankStatementClose: 'bank-statements.close',
       bankStatementLineReconciliationCandidates:
         'bank-statement-lines.reconciliationCandidates',
       bankStatementLineReconcileSupplierPayment:
         'bank-statement-lines.reconcileSupplierPayment',
       bankStatementLineUnreconcileSupplierPayment:
         'bank-statement-lines.unreconcileSupplierPayment',
+      bankStatementLineReconcileCustomerPayment:
+        'bank-statement-lines.reconcileCustomerPayment',
+      bankStatementLineUnreconcileCustomerPayment:
+        'bank-statement-lines.unreconcileCustomerPayment',
+      bankStatementLineReview: 'bank-statement-lines.review',
+      bankStatementLineUnreview: 'bank-statement-lines.unreview',
     });
   });
 
@@ -2122,6 +2171,9 @@ describe('ERP Maroc upstream routes', () => {
     );
     expect(erpMarocUpstreamRoutes.bankStatements.collection).toBe(
       '/bank-statements',
+    );
+    expect(erpMarocUpstreamRoutes.bankAccounts.collection).toBe(
+      '/bank-accounts',
     );
   });
 

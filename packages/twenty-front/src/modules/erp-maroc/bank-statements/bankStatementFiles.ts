@@ -1,17 +1,28 @@
 import type { ErpBankStatementLine } from 'twenty-shared/erp-maroc';
 
-const MAX_PDF_BYTES = 15 * 1024 * 1024;
+const MAX_STATEMENT_BYTES = 15 * 1024 * 1024;
+const SUPPORTED_EXTENSIONS = ['.pdf', '.csv', '.sta', '.mt940'] as const;
 
-export const bankStatementPdfToBase64 = async (file: File): Promise<string> => {
+export const bankStatementFileToBase64 = async (
+  file: File,
+): Promise<string> => {
+  const extension = SUPPORTED_EXTENSIONS.find((candidate) =>
+    file.name.toLowerCase().endsWith(candidate),
+  );
   if (
     file.size === 0 ||
-    file.size > MAX_PDF_BYTES ||
-    !file.name.toLowerCase().endsWith('.pdf')
+    file.size > MAX_STATEMENT_BYTES ||
+    extension === undefined
   ) {
-    throw new Error('Le relevé doit être un PDF de 15 Mo maximum');
+    throw new Error(
+      'Le relevé doit être un fichier PDF, CSV ou MT940 de 15 Mo maximum',
+    );
   }
   const bytes = new Uint8Array(await file.arrayBuffer());
-  if (new TextDecoder('ascii').decode(bytes.subarray(0, 5)) !== '%PDF-') {
+  if (
+    extension === '.pdf' &&
+    new TextDecoder('ascii').decode(bytes.subarray(0, 5)) !== '%PDF-'
+  ) {
     throw new Error('Le fichier sélectionné n’est pas un PDF valide');
   }
   let binary = '';
@@ -20,6 +31,8 @@ export const bankStatementPdfToBase64 = async (file: File): Promise<string> => {
   }
   return btoa(binary);
 };
+
+export const bankStatementPdfToBase64 = bankStatementFileToBase64;
 
 const csvCell = (value: string): string => `"${value.replaceAll('"', '""')}"`;
 
