@@ -58,6 +58,18 @@ const ErpMarocQuoteDetailPage = lazy(() =>
   })),
 );
 
+const ErpSalesOrdersPage = lazy(() =>
+  import('~/pages/erp-maroc/sales-orders/ErpSalesOrdersPage').then(
+    (module) => ({ default: module.ErpSalesOrdersPage }),
+  ),
+);
+
+const ErpSalesOrderDetailPage = lazy(() =>
+  import('~/pages/erp-maroc/sales-orders/ErpSalesOrderDetailPage').then(
+    (module) => ({ default: module.ErpSalesOrderDetailPage }),
+  ),
+);
+
 const ErpPurchaseOrdersPage = lazy(() =>
   import('~/pages/erp-maroc/purchase-orders/ErpPurchaseOrdersPage').then(
     (module) => ({ default: module.ErpPurchaseOrdersPage }),
@@ -465,6 +477,22 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpMarocQuoteDetailPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.salesOrders}
+                element={
+                  <LazyRoute>
+                    <ErpSalesOrdersPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.salesOrderDetail}
+                element={
+                  <LazyRoute>
+                    <ErpSalesOrderDetailPage />
                   </LazyRoute>
                 }
               />

@@ -1839,6 +1839,31 @@ describe('ERP Maroc upstream routes', () => {
       expectedPath: `/quotes/${ids.quote}/reject`,
     },
     {
+      helper: erpMarocUpstreamRoutes.salesOrders.fromQuote,
+      validId: ids.quote,
+      expectedPath: `/sales-orders/from-quote/${ids.quote}`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.salesOrders.detail,
+      validId: ids.quote,
+      expectedPath: `/sales-orders/${ids.quote}`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.salesOrders.confirm,
+      validId: ids.quote,
+      expectedPath: `/sales-orders/${ids.quote}/confirm`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.salesOrders.cancel,
+      validId: ids.quote,
+      expectedPath: `/sales-orders/${ids.quote}/cancel`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.salesOrders.deliveries,
+      validId: ids.quote,
+      expectedPath: `/sales-orders/${ids.quote}/deliveries`,
+    },
+    {
       helper: erpMarocUpstreamRoutes.purchaseOrders.detail,
       validId: ids.purchaseOrder,
       expectedPath: `/purchase-orders/${ids.purchaseOrder}`,
@@ -1897,6 +1922,11 @@ describe('ERP Maroc upstream routes', () => {
       helper: erpMarocUpstreamRoutes.invoices.fromQuote,
       validId: ids.quote,
       expectedPath: `/invoices/from-quote/${ids.quote}`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.invoices.fromSalesOrder,
+      validId: ids.quote,
+      expectedPath: `/invoices/from-sales-order/${ids.quote}`,
     },
     {
       helper: erpMarocUpstreamRoutes.invoices.detail,
@@ -2085,6 +2115,13 @@ describe('ERP Maroc upstream routes', () => {
       quoteSend: 'quotes.send',
       quoteAccept: 'quotes.accept',
       quoteReject: 'quotes.reject',
+      salesOrdersCollection: 'sales-orders.collection',
+      salesOrderFromQuote: 'sales-orders.fromQuote',
+      salesOrderDetail: 'sales-orders.detail',
+      salesOrderConfirm: 'sales-orders.confirm',
+      salesOrderCancel: 'sales-orders.cancel',
+      salesOrderDeliveries: 'sales-orders.deliveries',
+      salesOrderDeliveryCancel: 'sales-orders.delivery.cancel',
       purchaseOrdersCollection: 'purchase-orders.collection',
       purchaseOrderDetail: 'purchase-orders.detail',
       purchaseOrderConfirm: 'purchase-orders.confirm',
@@ -2101,6 +2138,7 @@ describe('ERP Maroc upstream routes', () => {
         'supplier-payment-preparations.execute',
       invoicesCollection: 'invoices.collection',
       invoiceFromQuote: 'invoices.fromQuote',
+      invoiceFromSalesOrder: 'invoices.fromSalesOrder',
       invoiceDetail: 'invoices.detail',
       invoiceValidate: 'invoices.validate',
       invoiceSend: 'invoices.send',
@@ -2173,6 +2211,7 @@ describe('ERP Maroc upstream routes', () => {
     expect(erpMarocUpstreamRoutes.quotes.fromOpportunity).toBe(
       '/quotes/from-opportunity',
     );
+    expect(erpMarocUpstreamRoutes.salesOrders.collection).toBe('/sales-orders');
     expect(erpMarocUpstreamRoutes.purchaseOrders.collection).toBe(
       '/purchase-orders',
     );
@@ -2229,6 +2268,18 @@ describe('ERP Maroc upstream routes', () => {
     for (const { helper, validId, expectedPath } of dynamicRouteCases) {
       expect(helper(validId)).toBe(expectedPath);
     }
+  });
+
+  it('builds and validates the nested delivery cancellation route', () => {
+    expect(
+      erpMarocUpstreamRoutes.salesOrders.cancelDelivery(ids.quote, ids.product),
+    ).toBe(`/sales-orders/${ids.quote}/deliveries/${ids.product}/cancel`);
+    expect(() =>
+      erpMarocUpstreamRoutes.salesOrders.cancelDelivery('..', ids.product),
+    ).toThrow();
+    expect(() =>
+      erpMarocUpstreamRoutes.salesOrders.cancelDelivery(ids.quote, '..'),
+    ).toThrow();
   });
 
   it('rejects unsafe IDs in every dynamic upstream route', () => {

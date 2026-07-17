@@ -23,6 +23,7 @@ const TIER_ID = '49b11318-8d30-43ab-bbf4-fb16ce1867ba';
 const QUOTE_ID = 'ac4fab7d-0ea2-4102-839e-50be33a1d2aa';
 const LINE_ID = 'c24db3d3-6353-4f7c-a47e-6a1e44799e38';
 const INVOICE_ID = 'ad157ccc-9820-4977-84cb-569f83787ad8';
+const SALES_ORDER_ID = 'a0b9b85f-f900-4712-b6f0-2eaef8507037';
 
 const tier = {
   id: TIER_ID,
@@ -210,6 +211,10 @@ const renderPage = (
       {
         path: '/erp-maroc/invoices/:invoiceId',
         element: <span>Détail facture</span>,
+      },
+      {
+        path: '/erp-maroc/sales-orders/:salesOrderId',
+        element: <span>Détail commande client</span>,
       },
     ],
     {
@@ -524,6 +529,30 @@ describe('ErpQuoteDetailPage', () => {
     expect(
       mutationCalls(request, `/invoices/from-quote/${QUOTE_ID}`),
     ).toHaveLength(1);
+  });
+
+  it('creates a sales order from an accepted quote and opens it', async () => {
+    const request = jest.fn(async ({ method, path }) => {
+      if (method === 'GET' && path === `/quotes/${QUOTE_ID}`)
+        return asStatus('ACCEPTED');
+      if (method === 'GET' && path === '/tiers') return [tier];
+      if (method === 'POST' && path === `/sales-orders/from-quote/${QUOTE_ID}`)
+        return { id: SALES_ORDER_ID };
+      throw new Error(`Unexpected request ${method} ${path}`);
+    });
+    const { router } = renderPage(request);
+
+    await confirm('Créer la commande');
+
+    await screen.findByText('Détail commande client');
+    expect(router.state.location.pathname).toBe(
+      `/erp-maroc/sales-orders/${SALES_ORDER_ID}`,
+    );
+    const [mutation] = mutationCalls(
+      request,
+      `/sales-orders/from-quote/${QUOTE_ID}`,
+    );
+    expect(mutation[0].body.issueDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it('navigates to the invoice when conversion reconciliation finds a converted quote without a second POST', async () => {

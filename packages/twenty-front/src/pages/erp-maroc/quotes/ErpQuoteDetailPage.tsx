@@ -17,15 +17,17 @@ import { generatePath, useNavigate, useParams } from 'react-router-dom';
 import {
   erpInvoiceSchema,
   erpQuoteSchema,
+  erpSalesOrderSchema,
   erpTierListSchema,
   type ErpInvoice,
   type ErpQuote,
+  type ErpSalesOrder,
   type ErpTier,
 } from 'twenty-shared/erp-maroc';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
-type QuoteAction = 'send' | 'accept' | 'reject' | 'convert';
+type QuoteAction = 'send' | 'accept' | 'reject' | 'createOrder' | 'convert';
 type ReconciliationPhase = 'refreshing' | 'failed' | 'needs-ack';
 
 type Reconciliation = {
@@ -69,6 +71,12 @@ const ACTION_COPY: Record<
     title: 'Rejeter le devis',
     message: 'Confirmer le rejet de ce devis.',
     expectedStatus: 'REJECTED',
+  },
+  createOrder: {
+    button: 'Créer la commande',
+    title: 'Créer la commande client',
+    message:
+      'Créer une commande client pour préparer la livraison et la sortie de stock.',
   },
   convert: {
     button: 'Convertir en facture',
@@ -162,6 +170,15 @@ export const ErpQuoteDetailPage = ({
     [navigate],
   );
 
+  const navigateToSalesOrder = useCallback(
+    (salesOrderId: string) => {
+      void navigate(
+        generatePath(erpMarocPaths.salesOrderDetail, { id: salesOrderId }),
+      );
+    },
+    [navigate],
+  );
+
   useEffect(() => {
     if (quoteId === null) {
       return;
@@ -217,6 +234,7 @@ export const ErpQuoteDetailPage = ({
             status: quote.status,
             lineCount: quote.lines.length,
             convertedInvoiceId: quote.convertedInvoiceId,
+            convertedSalesOrderId: quote.convertedSalesOrderId,
           }),
     [context, quote],
   );
@@ -270,6 +288,15 @@ export const ErpQuoteDetailPage = ({
             navigateToInvoice(refreshed.convertedInvoiceId);
             return;
           }
+        } else if (action === 'createOrder') {
+          if (
+            refreshed.status === 'CONVERTED' &&
+            refreshed.convertedSalesOrderId != null
+          ) {
+            completeAction();
+            navigateToSalesOrder(refreshed.convertedSalesOrderId);
+            return;
+          }
         } else if (refreshed.status === expectedStatus) {
           setActionMessage(message);
           completeAction();
@@ -292,7 +319,7 @@ export const ErpQuoteDetailPage = ({
         }
       }
     },
-    [client, completeAction, navigateToInvoice, quoteId],
+    [client, completeAction, navigateToInvoice, navigateToSalesOrder, quoteId],
   );
 
   const runAction = async (action: QuoteAction) => {
@@ -311,6 +338,7 @@ export const ErpQuoteDetailPage = ({
       status: currentQuote.status,
       lineCount: currentQuote.lines.length,
       convertedInvoiceId: currentQuote.convertedInvoiceId,
+      convertedSalesOrderId: currentQuote.convertedSalesOrderId,
     });
     if (!currentPolicy[action]) return;
 
@@ -319,13 +347,27 @@ export const ErpQuoteDetailPage = ({
     setActionMessage(null);
 
     const isConversion = action === 'convert';
+    const isOrderCreation = action === 'createOrder';
     const intent = client.createMutationIntent(
       {
         method: 'POST',
         path: isConversion
           ? `/invoices/from-quote/${quoteId}`
-          : `/quotes/${quoteId}/${action}`,
-        schema: isConversion ? erpInvoiceSchema : erpQuoteSchema,
+          : isOrderCreation
+            ? `/sales-orders/from-quote/${quoteId}`
+            : `/quotes/${quoteId}/${action}`,
+        schema: isConversion
+          ? erpInvoiceSchema
+          : isOrderCreation
+            ? erpSalesOrderSchema
+            : erpQuoteSchema,
+        body: isOrderCreation
+          ? {
+              issueDate: new Date().toLocaleDateString('en-CA', {
+                timeZone: 'Africa/Casablanca',
+              }),
+            }
+          : undefined,
       },
       { idempotency: 'forbidden' },
     );
@@ -334,6 +376,11 @@ export const ErpQuoteDetailPage = ({
       const result = await intent.execute();
       if (isConversion) {
         handleConverted(result as ErpInvoice);
+        return;
+      }
+      if (isOrderCreation) {
+        completeAction();
+        navigateToSalesOrder((result as ErpSalesOrder).id);
         return;
       }
 
@@ -467,7 +514,9 @@ export const ErpQuoteDetailPage = ({
                 }}
               />
             ) : null}
-            {(['send', 'accept', 'reject', 'convert'] as const).map((action) =>
+            {(
+              ['send', 'accept', 'reject', 'createOrder', 'convert'] as const
+            ).map((action) =>
               policy[action] ? (
                 <Button
                   key={action}

@@ -69,6 +69,14 @@ jest.mock('~/pages/erp-maroc/purchase-orders/ErpPurchaseOrdersPage', () => ({
   ErpPurchaseOrdersPage: () => <div>Phase 3 purchases list</div>,
 }));
 
+jest.mock('~/pages/erp-maroc/sales-orders/ErpSalesOrdersPage', () => ({
+  ErpSalesOrdersPage: () => <div>Sales orders list</div>,
+}));
+
+jest.mock('~/pages/erp-maroc/sales-orders/ErpSalesOrderDetailPage', () => ({
+  ErpSalesOrderDetailPage: () => <div>Sales order detail</div>,
+}));
+
 jest.mock(
   '~/pages/erp-maroc/purchase-orders/ErpPurchaseOrderEditorPage',
   () => ({
@@ -392,6 +400,30 @@ describe('useCreateAppRouter ERP Maroc registration', () => {
       'Task 14-C2 invoice detail',
     ],
   ])('resolves %s to its intended Task 14 page module', async (path, text) => {
+    const { router, view } = renderEnabledErpRoute(
+      {
+        status: 'ready',
+        context: {} as ErpContext,
+        error: null,
+        refetch,
+        client,
+      },
+      path,
+    );
+
+    expect(await screen.findByText(text)).toBeInTheDocument();
+
+    view.unmount();
+    router.dispose();
+  });
+
+  it.each([
+    [erpMarocPaths.salesOrders, 'Sales orders list'],
+    [
+      '/erp-maroc/sales-orders/ac4fab7d-0ea2-4102-839e-50be33a1d2aa',
+      'Sales order detail',
+    ],
+  ])('resolves %s to its sales order page', async (path, text) => {
     const { router, view } = renderEnabledErpRoute(
       {
         status: 'ready',

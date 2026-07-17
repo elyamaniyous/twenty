@@ -6,6 +6,8 @@ export const erpMarocPaths = {
   quoteNew: '/erp-maroc/quotes/new',
   quoteEdit: '/erp-maroc/quotes/:id/edit',
   quoteDetail: '/erp-maroc/quotes/:id',
+  salesOrders: '/erp-maroc/sales-orders',
+  salesOrderDetail: '/erp-maroc/sales-orders/:id',
   purchaseOrders: '/erp-maroc/purchase-orders',
   purchaseOrderNew: '/erp-maroc/purchase-orders/new',
   purchaseOrderDetail: '/erp-maroc/purchase-orders/:id',

@@ -29,6 +29,7 @@ describe('getQuoteCommandPolicy', () => {
       send: true,
       accept: false,
       reject: false,
+      createOrder: false,
       convert: false,
     });
   });
@@ -53,6 +54,7 @@ describe('getQuoteCommandPolicy', () => {
       send: false,
       accept: true,
       reject: true,
+      createOrder: false,
       convert: false,
     });
   });
@@ -70,6 +72,19 @@ describe('getQuoteCommandPolicy', () => {
     ).toBe(false);
   });
 
+  it('allows creating a sales order only for an unconverted ACCEPTED quote', () => {
+    expect(
+      getQuoteCommandPolicy({ ...draftInput, status: 'ACCEPTED' }).createOrder,
+    ).toBe(true);
+    expect(
+      getQuoteCommandPolicy({
+        ...draftInput,
+        status: 'ACCEPTED',
+        convertedSalesOrderId: '66666666-6666-4666-8666-666666666666',
+      }).createOrder,
+    ).toBe(false);
+  });
+
   it.each(['REJECTED', 'EXPIRED', 'CONVERTED'] as const)(
     'exposes no document command for %s',
     (status) => {
@@ -79,6 +94,7 @@ describe('getQuoteCommandPolicy', () => {
         send: false,
         accept: false,
         reject: false,
+        createOrder: false,
         convert: false,
       });
     },
@@ -98,6 +114,7 @@ describe('getQuoteCommandPolicy', () => {
       send: false,
       accept: false,
       reject: false,
+      createOrder: false,
       convert: false,
     });
   });

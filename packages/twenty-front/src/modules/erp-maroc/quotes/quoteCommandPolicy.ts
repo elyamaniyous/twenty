@@ -6,6 +6,7 @@ export type QuoteCommandPolicyInput = {
   status: ErpQuote['status'];
   lineCount: number;
   convertedInvoiceId: string | null;
+  convertedSalesOrderId?: string | null;
 };
 
 export type QuoteCommandPolicy = {
@@ -15,6 +16,7 @@ export type QuoteCommandPolicy = {
   send: boolean;
   accept: boolean;
   reject: boolean;
+  createOrder: boolean;
   convert: boolean;
 };
 
@@ -32,6 +34,7 @@ const noCommands: QuoteCommandPolicy = {
   send: false,
   accept: false,
   reject: false,
+  createOrder: false,
   convert: false,
 };
 
@@ -41,6 +44,7 @@ export const getQuoteCommandPolicy = ({
   status,
   lineCount,
   convertedInvoiceId,
+  convertedSalesOrderId,
 }: QuoteCommandPolicyInput): QuoteCommandPolicy => {
   if (!manageSalesDocuments || !linkedRoles.has(role)) {
     return { ...noCommands };
@@ -58,6 +62,13 @@ export const getQuoteCommandPolicy = ({
     send: isDraft && hasLines,
     accept: isSent,
     reject: isSent,
-    convert: status === 'ACCEPTED' && convertedInvoiceId === null,
+    createOrder:
+      status === 'ACCEPTED' &&
+      convertedInvoiceId === null &&
+      (convertedSalesOrderId ?? null) === null,
+    convert:
+      status === 'ACCEPTED' &&
+      convertedInvoiceId === null &&
+      (convertedSalesOrderId ?? null) === null,
   };
 };
