@@ -27,4 +27,5 @@ export const erpMarocPaths = {
   accountingBalance: '/erp-maroc/accounting/balance',
   accountingLettrage: '/erp-maroc/accounting/lettrage',
   bankStatements: '/erp-maroc/bank-statements',
+  inventory: '/erp-maroc/inventory',
 } as const;

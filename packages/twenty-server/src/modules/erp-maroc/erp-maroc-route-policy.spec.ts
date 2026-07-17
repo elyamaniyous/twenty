@@ -32,6 +32,11 @@ import {
   erpSupplierInvoiceDetailSchema,
   erpSupplierPaymentPreparationListSchema,
   erpSupplierPaymentPreparationSchema,
+  erpStockLevelListSchema,
+  erpStockMovementListSchema,
+  erpStockMovementSchema,
+  erpWarehouseListSchema,
+  erpWarehouseSchema,
   erpQuoteListSchema,
   erpQuoteSchema,
   erpReminderPageSchema,
@@ -81,6 +86,9 @@ const requiredIdempotencyRoutes = new Set([
   `POST /bank-statement-lines/${id}/unreconcile-customer-payment`,
   `POST /bank-statement-lines/${id}/review`,
   `POST /bank-statement-lines/${id}/unreview`,
+  'POST /warehouses',
+  'POST /inventory/adjustments',
+  'POST /inventory/transfers',
 ]);
 
 const approvedRoutes = [
@@ -411,6 +419,27 @@ const approvedRoutes = [
     `/bank-statement-lines/${id}/unreview`,
     'bank-statement-lines.unreview',
     erpBankStatementLineSchema,
+  ],
+  ['GET', '/warehouses', 'warehouses.collection', erpWarehouseListSchema],
+  ['POST', '/warehouses', 'warehouses.collection', erpWarehouseSchema],
+  ['GET', '/inventory/levels', 'inventory.levels', erpStockLevelListSchema],
+  [
+    'GET',
+    '/inventory/movements',
+    'inventory.movements',
+    erpStockMovementListSchema,
+  ],
+  [
+    'POST',
+    '/inventory/adjustments',
+    'inventory.adjustments',
+    erpStockMovementSchema,
+  ],
+  [
+    'POST',
+    '/inventory/transfers',
+    'inventory.transfers',
+    erpStockMovementListSchema,
   ],
 ] as const;
 

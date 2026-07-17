@@ -194,6 +194,7 @@ export const erpContextSchema = z.object({
     manageCreditNotes: z.boolean(),
     allocateCustomerCredit: z.boolean(),
     manageSupplierAccounting: z.boolean(),
+    manageInventory: z.boolean(),
   }),
   features: z.object({
     salesUi: z.boolean(),
@@ -372,9 +373,16 @@ export const erpPurchaseOrderListSchema = z.array(erpPurchaseOrderSchema);
 
 export const erpPurchaseReceiptOrderLineSchema = z.object({
   id: uuidSchema,
+  productId: nullableUuidSchema,
   description: z.string(),
   unit: nullableStringSchema,
   quantity: z.number().finite().positive(),
+});
+
+export const erpWarehouseSummarySchema = z.object({
+  id: uuidSchema,
+  code: z.string(),
+  name: z.string(),
 });
 
 export const erpPurchaseReceiptLineSchema = z.object({
@@ -392,12 +400,14 @@ export const erpPurchaseReceiptSchema = z.object({
   id: uuidSchema,
   societeId: uuidSchema,
   purchaseOrderId: uuidSchema,
+  warehouseId: uuidSchema,
   number: z.string(),
   year: nonNegativeIntegerSchema,
   receiptDate: civilDateHttpSchema,
   notes: nullableStringSchema,
   createdAt: instantSchema,
   updatedAt: instantSchema,
+  warehouse: erpWarehouseSummarySchema,
   lines: z.array(erpPurchaseReceiptLineSchema),
 });
 
@@ -1546,6 +1556,58 @@ export const erpBankStatementDetailSchema = erpBankStatementSchema.extend({
   lines: z.array(erpBankStatementLineSchema),
 });
 
+export const erpWarehouseSchema = erpWarehouseSummarySchema.extend({
+  societeId: uuidSchema,
+  address: nullableStringSchema,
+  isDefault: z.boolean(),
+  isActive: z.boolean(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+export const erpWarehouseListSchema = z.array(erpWarehouseSchema);
+
+export const erpStockProductSchema = z.object({
+  id: uuidSchema,
+  code: z.string(),
+  name: z.string(),
+  unit: z.string(),
+});
+
+export const erpStockLevelSchema = z.object({
+  warehouse: erpWarehouseSummarySchema.extend({ isDefault: z.boolean() }),
+  product: erpStockProductSchema,
+  quantity: z.number().finite().nonnegative(),
+  updatedAt: nullableInstantSchema,
+});
+export const erpStockLevelListSchema = z.array(erpStockLevelSchema);
+
+export const erpStockMovementTypeSchema = z.enum([
+  'PURCHASE_RECEIPT',
+  'ADJUSTMENT_IN',
+  'ADJUSTMENT_OUT',
+  'TRANSFER_IN',
+  'TRANSFER_OUT',
+]);
+
+export const erpStockMovementSchema = z.object({
+  id: uuidSchema,
+  warehouseId: uuidSchema,
+  productId: uuidSchema,
+  type: erpStockMovementTypeSchema,
+  quantityDelta: z.number().finite(),
+  quantityAfter: z.number().finite().nonnegative(),
+  reference: nullableStringSchema,
+  notes: nullableStringSchema,
+  transferGroupId: nullableUuidSchema,
+  purchaseReceiptLineId: nullableUuidSchema,
+  occurredAt: civilDateHttpSchema,
+  createdByTwentyUserId: nonBlankStringSchema,
+  createdAt: instantSchema,
+  warehouse: erpWarehouseSummarySchema,
+  product: erpStockProductSchema,
+});
+export const erpStockMovementListSchema = z.array(erpStockMovementSchema);
+
 const encodeRouteId = (id: string): string => {
   return encodeURIComponent(uuidSchema.parse(id));
 };
@@ -1625,6 +1687,11 @@ export const erpMarocRouteIds = {
     'bank-statement-lines.unreconcileCustomerPayment',
   bankStatementLineReview: 'bank-statement-lines.review',
   bankStatementLineUnreview: 'bank-statement-lines.unreview',
+  warehousesCollection: 'warehouses.collection',
+  inventoryLevels: 'inventory.levels',
+  inventoryMovements: 'inventory.movements',
+  inventoryAdjustments: 'inventory.adjustments',
+  inventoryTransfers: 'inventory.transfers',
 } as const;
 
 export const erpMarocUpstreamRoutes = {
@@ -1740,6 +1807,15 @@ export const erpMarocUpstreamRoutes = {
     unreview: (id: string) =>
       `/bank-statement-lines/${encodeRouteId(id)}/unreview`,
   },
+  warehouses: {
+    collection: '/warehouses',
+  },
+  inventory: {
+    levels: '/inventory/levels',
+    movements: '/inventory/movements',
+    adjustments: '/inventory/adjustments',
+    transfers: '/inventory/transfers',
+  },
 } as const;
 
 export type ErpRole = z.infer<typeof erpRoleSchema>;
@@ -1831,5 +1907,11 @@ export type ErpBankStatement = z.infer<typeof erpBankStatementSchema>;
 export type ErpBankStatementDetail = z.infer<
   typeof erpBankStatementDetailSchema
 >;
+export type ErpWarehouse = z.infer<typeof erpWarehouseSchema>;
+export type ErpWarehouseList = z.infer<typeof erpWarehouseListSchema>;
+export type ErpStockLevel = z.infer<typeof erpStockLevelSchema>;
+export type ErpStockLevelList = z.infer<typeof erpStockLevelListSchema>;
+export type ErpStockMovement = z.infer<typeof erpStockMovementSchema>;
+export type ErpStockMovementList = z.infer<typeof erpStockMovementListSchema>;
 export type ErpMarocRouteId =
   (typeof erpMarocRouteIds)[keyof typeof erpMarocRouteIds];

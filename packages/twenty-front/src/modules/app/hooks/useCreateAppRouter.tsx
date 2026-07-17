@@ -178,6 +178,12 @@ const ErpBankStatementsPage = lazy(() =>
   ),
 );
 
+const ErpInventoryPage = lazy(() =>
+  import('~/pages/erp-maroc/inventory/ErpInventoryPage').then((module) => ({
+    default: module.ErpInventoryPage,
+  })),
+);
+
 const RecordIndexPage = lazy(() =>
   import('~/pages/object-record/RecordIndexPage').then((module) => ({
     default: module.RecordIndexPage,
@@ -627,6 +633,14 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpBankStatementsPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.inventory}
+                element={
+                  <LazyRoute>
+                    <ErpInventoryPage />
                   </LazyRoute>
                 }
               />

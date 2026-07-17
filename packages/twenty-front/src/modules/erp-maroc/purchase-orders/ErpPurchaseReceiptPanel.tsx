@@ -13,8 +13,10 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   erpPurchaseReceiptListSchema,
   erpPurchaseReceiptSchema,
+  erpWarehouseListSchema,
   type ErpPurchaseOrder,
   type ErpPurchaseReceipt,
+  type ErpWarehouse,
 } from 'twenty-shared/erp-maroc';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
@@ -58,6 +60,23 @@ const StyledFields = styled.div`
   @media (max-width: 768px) {
     grid-template-columns: minmax(0, 1fr);
   }
+`;
+
+const StyledSelectField = styled.label`
+  color: ${themeCssVariables.font.color.secondary};
+  display: flex;
+  flex-direction: column;
+  font-size: ${themeCssVariables.font.size.sm};
+  gap: ${themeCssVariables.spacing[1]};
+`;
+
+const StyledSelect = styled.select`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: ${themeCssVariables.border.radius.sm};
+  color: ${themeCssVariables.font.color.primary};
+  height: 32px;
+  padding: 0 ${themeCssVariables.spacing[2]};
 `;
 
 const StyledLines = styled.div`
@@ -127,6 +146,8 @@ export const ErpPurchaseReceiptPanel = ({
 }) => {
   const { client } = useErpMarocContext();
   const [receipts, setReceipts] = useState<ErpPurchaseReceipt[]>([]);
+  const [warehouses, setWarehouses] = useState<ErpWarehouse[]>([]);
+  const [warehouseId, setWarehouseId] = useState('');
   const [historyState, setHistoryState] =
     useState<ErpOperationalTableState>('loading');
   const [historyGeneration, setHistoryGeneration] = useState(0);
@@ -158,6 +179,34 @@ export const ErpPurchaseReceiptPanel = ({
       ),
     );
   }, [isOpen, remainingLines]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const abortController = new AbortController();
+    client
+      .request({
+        method: 'GET',
+        path: '/warehouses',
+        schema: erpWarehouseListSchema,
+        signal: abortController.signal,
+      })
+      .then((result) => {
+        if (abortController.signal.aborted) return;
+        const active = result.filter((warehouse) => warehouse.isActive);
+        setWarehouses(active);
+        setWarehouseId(
+          active.find((warehouse) => warehouse.isDefault)?.id ??
+            active[0]?.id ??
+            '',
+        );
+      })
+      .catch(() => {
+        if (!abortController.signal.aborted) {
+          setError('Impossible de charger les dépôts.');
+        }
+      });
+    return () => abortController.abort();
+  }, [client, isOpen]);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -198,6 +247,12 @@ export const ErpPurchaseReceiptPanel = ({
         render: (receipt) => formatPurchaseOrderDate(receipt.receiptDate),
       },
       {
+        key: 'warehouse',
+        header: 'Dépôt',
+        width: '180px',
+        render: (receipt) => receipt.warehouse.name,
+      },
+      {
         key: 'lines',
         header: 'Quantités reçues',
         width: '360px',
@@ -221,6 +276,10 @@ export const ErpPurchaseReceiptPanel = ({
   const submitReceipt = async () => {
     if (disabled || isSaving) return;
     setError(null);
+    if (warehouseId === '') {
+      setError('Sélectionnez un dépôt actif.');
+      return;
+    }
 
     const lines = remainingLines.flatMap((line) => {
       const value = quantities[line.id]?.trim() ?? '';
@@ -259,6 +318,7 @@ export const ErpPurchaseReceiptPanel = ({
           path: `/purchase-orders/${order.id}/receipts`,
           schema: erpPurchaseReceiptSchema,
           body: {
+            warehouseId,
             receiptDate,
             notes: notes.trim() || null,
             lines,
@@ -305,6 +365,20 @@ export const ErpPurchaseReceiptPanel = ({
             <StyledAlert role="alert">{error}</StyledAlert>
           )}
           <StyledFields>
+            <StyledSelectField>
+              Dépôt de réception
+              <StyledSelect
+                value={warehouseId}
+                disabled={isSaving || warehouses.length === 0}
+                onChange={(event) => setWarehouseId(event.target.value)}
+              >
+                {warehouses.map((warehouse) => (
+                  <option key={warehouse.id} value={warehouse.id}>
+                    {warehouse.code} · {warehouse.name}
+                  </option>
+                ))}
+              </StyledSelect>
+            </StyledSelectField>
             <TextInput
               label="Date de réception"
               type="date"

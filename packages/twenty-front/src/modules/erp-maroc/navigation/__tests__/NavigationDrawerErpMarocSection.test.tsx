@@ -109,6 +109,8 @@ const labels = [
   'Grand livre',
   'Balance',
   'Lettrage',
+  'Banque',
+  'Stock',
 ];
 
 const renderWithNavigation = ({
@@ -170,6 +172,8 @@ describe('NavigationDrawerErpMarocSection', () => {
       accountingGrandLivre: '/erp-maroc/accounting/grand-livre',
       accountingBalance: '/erp-maroc/accounting/balance',
       accountingLettrage: '/erp-maroc/accounting/lettrage',
+      bankStatements: '/erp-maroc/bank-statements',
+      inventory: '/erp-maroc/inventory',
     });
   });
 
@@ -211,6 +215,8 @@ describe('NavigationDrawerErpMarocSection', () => {
     [erpMarocPaths.accountingGrandLivre, 'Grand livre'],
     [erpMarocPaths.accountingBalance, 'Balance'],
     [erpMarocPaths.accountingLettrage, 'Lettrage'],
+    [erpMarocPaths.bankStatements, 'Banque'],
+    [erpMarocPaths.inventory, 'Stock'],
   ])('marks only the exact item active at %s', (path, activeLabel) => {
     renderWithNavigation({ path });
 

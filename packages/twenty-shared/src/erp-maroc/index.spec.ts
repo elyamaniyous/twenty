@@ -72,6 +72,7 @@ const ids = {
   purchaseOrder: '44444444-4444-4444-9444-444444444445',
   purchaseReceipt: '44444444-4444-4444-9444-444444444446',
   purchaseReceiptLine: '44444444-4444-4444-9444-444444444447',
+  warehouse: '44444444-4444-4444-9444-444444444451',
   supplierInvoice: '44444444-4444-4444-9444-444444444448',
   supplierInvoiceLine: '44444444-4444-4444-9444-444444444449',
   supplierPaymentPreparation: '44444444-4444-4444-9444-444444444450',
@@ -233,12 +234,18 @@ const purchaseReceiptJson = {
   organisationId: 'internal-organisation-id',
   societeId: ids.societe,
   purchaseOrderId: ids.purchaseOrder,
+  warehouseId: ids.warehouse,
   number: 'BRF-2026-00001',
   year: 2026,
   receiptDate: '2026-07-16T00:00:00.000Z',
   notes: 'Livraison partielle',
   createdAt: instant,
   updatedAt: laterInstant,
+  warehouse: {
+    id: ids.warehouse,
+    code: 'PRINCIPAL',
+    name: 'Dépôt principal',
+  },
   lines: [
     {
       id: ids.purchaseReceiptLine,
@@ -250,6 +257,7 @@ const purchaseReceiptJson = {
       updatedAt: laterInstant,
       purchaseOrderLine: {
         id: ids.line,
+        productId: ids.product,
         description: 'Matériel de bureau',
         unit: 'UNITE',
         quantity: 2.5,
@@ -722,6 +730,7 @@ describe('ERP Maroc response contracts', () => {
         manageCreditNotes: false,
         allocateCustomerCredit: false,
         manageSupplierAccounting: false,
+        manageInventory: false,
         internalGrant: true,
       },
       features: {
@@ -755,6 +764,7 @@ describe('ERP Maroc response contracts', () => {
         manageCreditNotes: false,
         allocateCustomerCredit: false,
         manageSupplierAccounting: false,
+        manageInventory: false,
       },
       features: {
         salesUi: true,
@@ -2129,6 +2139,11 @@ describe('ERP Maroc upstream routes', () => {
         'bank-statement-lines.unreconcileCustomerPayment',
       bankStatementLineReview: 'bank-statement-lines.review',
       bankStatementLineUnreview: 'bank-statement-lines.unreview',
+      warehousesCollection: 'warehouses.collection',
+      inventoryLevels: 'inventory.levels',
+      inventoryMovements: 'inventory.movements',
+      inventoryAdjustments: 'inventory.adjustments',
+      inventoryTransfers: 'inventory.transfers',
     });
   });
 
@@ -2174,6 +2189,17 @@ describe('ERP Maroc upstream routes', () => {
     );
     expect(erpMarocUpstreamRoutes.bankAccounts.collection).toBe(
       '/bank-accounts',
+    );
+    expect(erpMarocUpstreamRoutes.warehouses.collection).toBe('/warehouses');
+    expect(erpMarocUpstreamRoutes.inventory.levels).toBe('/inventory/levels');
+    expect(erpMarocUpstreamRoutes.inventory.movements).toBe(
+      '/inventory/movements',
+    );
+    expect(erpMarocUpstreamRoutes.inventory.adjustments).toBe(
+      '/inventory/adjustments',
+    );
+    expect(erpMarocUpstreamRoutes.inventory.transfers).toBe(
+      '/inventory/transfers',
     );
   });
 
