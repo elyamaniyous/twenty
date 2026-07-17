@@ -10,6 +10,10 @@ import { useErpMarocContext } from '@/erp-maroc/context/useErpMarocContext';
 import { erpMarocPaths } from '@/erp-maroc/navigation/erpMarocPaths';
 import { ErpSalesDeliveryPanel } from '@/erp-maroc/sales-orders/ErpSalesDeliveryPanel';
 import {
+  ErpSalesReservationPanel,
+  type ErpSalesStockAction,
+} from '@/erp-maroc/sales-orders/ErpSalesReservationPanel';
+import {
   formatSalesOrderDate,
   salesOrderStatusAppearance,
 } from '@/erp-maroc/sales-orders/salesOrderUi';
@@ -27,7 +31,7 @@ import {
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
-type SalesOrderAction = 'confirm' | 'cancel' | 'invoice';
+type SalesOrderAction = 'cancel' | 'invoice';
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -93,11 +97,6 @@ const StyledLink = styled(Link)`
 `;
 
 const actionCopy = {
-  confirm: {
-    button: 'Confirmer',
-    title: 'Confirmer la commande client',
-    message: 'La commande sera verrouillée et pourra ensuite être livrée.',
-  },
   cancel: {
     button: 'Annuler',
     title: 'Annuler la commande client',
@@ -122,6 +121,9 @@ export const ErpSalesOrderDetailPage = () => {
   const [generation, setGeneration] = useState(0);
   const [action, setAction] = useState<SalesOrderAction | null>(null);
   const [isMutating, setIsMutating] = useState(false);
+  const [stockAction, setStockAction] = useState<ErpSalesStockAction | null>(
+    null,
+  );
   const [isDeliveryOpen, setIsDeliveryOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const canManage = context?.capabilities.manageSalesDocuments === true;
@@ -174,6 +176,28 @@ export const ErpSalesOrderDetailPage = () => {
         width: '110px',
         align: 'right',
         render: (line) => line.quantityDelivered,
+      },
+      {
+        key: 'reserved',
+        header: 'Réservée',
+        width: '110px',
+        align: 'right',
+        render: (line) =>
+          line.allocations.reduce(
+            (total, allocation) => total + allocation.quantityReserved,
+            0,
+          ),
+      },
+      {
+        key: 'prepared',
+        header: 'Préparée',
+        width: '110px',
+        align: 'right',
+        render: (line) =>
+          line.allocations.reduce(
+            (total, allocation) => total + allocation.quantityPrepared,
+            0,
+          ),
       },
       {
         key: 'remaining',
@@ -268,12 +292,56 @@ export const ErpSalesOrderDetailPage = () => {
   }
 
   const appearance = salesOrderStatusAppearance[order.status];
-  const canConfirm = canManage && order.status === 'DRAFT';
+  const unreservedQuantity = order.lines.reduce(
+    (total, line) =>
+      line.product?.type === 'PRODUIT'
+        ? total +
+          Math.max(
+            0,
+            line.quantity -
+              line.quantityDelivered -
+              line.allocations.reduce(
+                (sum, allocation) => sum + allocation.quantityReserved,
+                0,
+              ),
+          )
+        : total,
+    0,
+  );
+  const reservedQuantity = order.lines.reduce(
+    (total, line) =>
+      total +
+      line.allocations.reduce(
+        (sum, allocation) => sum + allocation.quantityReserved,
+        0,
+      ),
+    0,
+  );
+  const preparedQuantity = order.lines.reduce(
+    (total, line) =>
+      total +
+      line.allocations.reduce(
+        (sum, allocation) => sum + allocation.quantityPrepared,
+        0,
+      ),
+    0,
+  );
+  const canReserve =
+    canManage &&
+    (order.status === 'DRAFT' ||
+      ((order.status === 'CONFIRMED' ||
+        order.status === 'PARTIALLY_DELIVERED') &&
+        unreservedQuantity > 1e-9));
+  const canPrepare =
+    canManage &&
+    (order.status === 'CONFIRMED' || order.status === 'PARTIALLY_DELIVERED') &&
+    reservedQuantity > 1e-9;
   const canCancel =
     canManage && (order.status === 'DRAFT' || order.status === 'CONFIRMED');
   const canDeliver =
     canManage &&
-    (order.status === 'CONFIRMED' || order.status === 'PARTIALLY_DELIVERED');
+    (order.status === 'CONFIRMED' || order.status === 'PARTIALLY_DELIVERED') &&
+    preparedQuantity > 1e-9;
   const canInvoice = canManage && order.status === 'DELIVERED';
   const copy = action === null ? null : actionCopy[action];
 
@@ -284,12 +352,22 @@ export const ErpSalesOrderDetailPage = () => {
       actions={
         <StyledActions>
           <ErpStatusBadge label={appearance.label} tone={appearance.tone} />
-          {canConfirm ? (
+          {canReserve ? (
             <Button
-              title="Confirmer"
-              ariaLabel="Confirmer la commande client"
+              title={
+                order.status === 'DRAFT' ? 'Confirmer et réserver' : 'Réserver'
+              }
+              ariaLabel="Réserver le stock de la commande client"
               accent="blue"
-              onClick={() => setAction('confirm')}
+              onClick={() => setStockAction('reserve')}
+            />
+          ) : null}
+          {canPrepare ? (
+            <Button
+              title="Préparer"
+              ariaLabel="Préparer la commande client"
+              variant="secondary"
+              onClick={() => setStockAction('prepare')}
             />
           ) : null}
           {canCancel ? (
@@ -391,6 +469,16 @@ export const ErpSalesOrderDetailPage = () => {
           rows={order.lines}
           getRowKey={(line) => line.id}
           emptyLabel="Aucune ligne"
+        />
+        <ErpSalesReservationPanel
+          order={order}
+          mode={stockAction}
+          disabled={!canManage}
+          onClose={() => setStockAction(null)}
+          onSaved={(updatedOrder) => {
+            setOrder(updatedOrder);
+            setStockAction(null);
+          }}
         />
         <ErpSalesDeliveryPanel
           order={order}

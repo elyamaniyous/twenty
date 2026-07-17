@@ -36,6 +36,8 @@ type DrawerMode = 'warehouse' | 'adjustment' | 'transfer' | null;
 
 const movementLabels: Record<ErpStockMovement['type'], string> = {
   PURCHASE_RECEIPT: 'Réception fournisseur',
+  SALES_DELIVERY: 'Livraison client',
+  SALES_DELIVERY_CANCEL: 'Annulation livraison client',
   ADJUSTMENT_IN: 'Ajustement entrée',
   ADJUSTMENT_OUT: 'Ajustement sortie',
   TRANSFER_IN: 'Transfert entrant',
@@ -355,10 +357,31 @@ export const ErpInventoryPage = () => {
       },
       {
         key: 'quantity',
-        header: 'Disponible',
-        width: '160px',
+        header: 'Physique',
+        width: '130px',
         align: 'right',
         render: (level) => `${level.quantity} ${level.product.unit}`,
+      },
+      {
+        key: 'reserved',
+        header: 'Réservé',
+        width: '130px',
+        align: 'right',
+        render: (level) => `${level.reservedQuantity} ${level.product.unit}`,
+      },
+      {
+        key: 'prepared',
+        header: 'Préparé',
+        width: '130px',
+        align: 'right',
+        render: (level) => `${level.preparedQuantity} ${level.product.unit}`,
+      },
+      {
+        key: 'available',
+        header: 'Disponible',
+        width: '140px',
+        align: 'right',
+        render: (level) => `${level.availableQuantity} ${level.product.unit}`,
       },
     ],
     [],

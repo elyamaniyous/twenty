@@ -15,10 +15,8 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   erpDeliveryNoteListSchema,
   erpDeliveryNoteSchema,
-  erpWarehouseListSchema,
   type ErpDeliveryNote,
   type ErpSalesOrder,
-  type ErpWarehouse,
 } from 'twenty-shared/erp-maroc';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
@@ -137,7 +135,6 @@ export const ErpSalesDeliveryPanel = ({
 }) => {
   const { client } = useErpMarocContext();
   const [deliveries, setDeliveries] = useState<ErpDeliveryNote[]>([]);
-  const [warehouses, setWarehouses] = useState<ErpWarehouse[]>([]);
   const [warehouseId, setWarehouseId] = useState('');
   const [deliveryDate, setDeliveryDate] = useState(getTodayInCasablanca);
   const [notes, setNotes] = useState('');
@@ -148,15 +145,36 @@ export const ErpSalesDeliveryPanel = ({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const remainingLines = useMemo(
+  const preparedWarehouses = useMemo(
     () =>
-      order.lines
-        .map((line) => ({
-          ...line,
-          remaining: line.quantity - line.quantityDelivered,
-        }))
-        .filter((line) => line.remaining > 1e-9),
+      Array.from(
+        new Map(
+          order.lines.flatMap((line) =>
+            line.allocations
+              .filter((allocation) => allocation.quantityPrepared > 1e-9)
+              .map(
+                (allocation) =>
+                  [allocation.warehouse.id, allocation.warehouse] as const,
+              ),
+          ),
+        ).values(),
+      ),
     [order.lines],
+  );
+
+  const deliverableLines = useMemo(
+    () =>
+      order.lines.flatMap((line) => {
+        const allocation = line.allocations.find(
+          (candidate) =>
+            candidate.warehouseId === warehouseId &&
+            candidate.quantityPrepared > 1e-9,
+        );
+        return allocation
+          ? [{ ...line, deliverable: allocation.quantityPrepared }]
+          : [];
+      }),
+    [order.lines, warehouseId],
   );
 
   useEffect(() => {
@@ -164,39 +182,17 @@ export const ErpSalesDeliveryPanel = ({
     setDeliveryDate(getTodayInCasablanca());
     setNotes('');
     setError(null);
-    setQuantities(
-      Object.fromEntries(
-        remainingLines.map((line) => [line.id, String(line.remaining)]),
-      ),
-    );
-  }, [isOpen, remainingLines]);
+    setWarehouseId(preparedWarehouses[0]?.id ?? '');
+  }, [isOpen, preparedWarehouses]);
 
   useEffect(() => {
     if (!isOpen) return;
-    const abortController = new AbortController();
-    client
-      .request({
-        method: 'GET',
-        path: '/warehouses',
-        schema: erpWarehouseListSchema,
-        signal: abortController.signal,
-      })
-      .then((result) => {
-        if (abortController.signal.aborted) return;
-        const active = result.filter((warehouse) => warehouse.isActive);
-        setWarehouses(active);
-        setWarehouseId(
-          active.find((warehouse) => warehouse.isDefault)?.id ??
-            active[0]?.id ??
-            '',
-        );
-      })
-      .catch(() => {
-        if (!abortController.signal.aborted)
-          setError('Impossible de charger les dépôts.');
-      });
-    return () => abortController.abort();
-  }, [client, isOpen]);
+    setQuantities(
+      Object.fromEntries(
+        deliverableLines.map((line) => [line.id, String(line.deliverable)]),
+      ),
+    );
+  }, [deliverableLines, isOpen]);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -272,7 +268,7 @@ export const ErpSalesDeliveryPanel = ({
       setError('Sélectionnez un dépôt actif.');
       return;
     }
-    const lines = remainingLines.flatMap((line, position) => {
+    const lines = deliverableLines.flatMap((line, position) => {
       const quantity = Number(quantities[line.id]?.trim() ?? '');
       return Number.isFinite(quantity) && quantity > 0
         ? [{ salesOrderLineId: line.id, quantity, position }]
@@ -284,13 +280,13 @@ export const ErpSalesDeliveryPanel = ({
     }
     if (
       lines.some((line) => {
-        const orderLine = remainingLines.find(
+        const orderLine = deliverableLines.find(
           (candidate) => candidate.id === line.salesOrderLineId,
         );
-        return orderLine === undefined || line.quantity > orderLine.remaining;
+        return orderLine === undefined || line.quantity > orderLine.deliverable;
       })
     ) {
-      setError('Une quantité dépasse le reliquat à livrer.');
+      setError('Une quantité dépasse la quantité préparée.');
       return;
     }
 
@@ -354,10 +350,10 @@ export const ErpSalesDeliveryPanel = ({
               Dépôt de sortie
               <StyledSelect
                 value={warehouseId}
-                disabled={isSaving || warehouses.length === 0}
+                disabled={isSaving || preparedWarehouses.length === 0}
                 onChange={(event) => setWarehouseId(event.target.value)}
               >
-                {warehouses.map((warehouse) => (
+                {preparedWarehouses.map((warehouse) => (
                   <option key={warehouse.id} value={warehouse.id}>
                     {warehouse.code} · {warehouse.name}
                   </option>
@@ -383,19 +379,19 @@ export const ErpSalesDeliveryPanel = ({
             />
           </StyledFields>
           <StyledLines>
-            {remainingLines.map((line) => (
+            {deliverableLines.map((line) => (
               <StyledLine key={line.id}>
                 <StyledLineLabel>
                   {line.description}
                   <span>
-                    Reste {line.remaining} {line.unit ?? ''}
+                    Préparé {line.deliverable} {line.unit ?? ''}
                   </span>
                 </StyledLineLabel>
                 <TextInput
                   label="Quantité livrée"
                   type="number"
                   min="0"
-                  max={String(line.remaining)}
+                  max={String(line.deliverable)}
                   step="any"
                   value={quantities[line.id] ?? ''}
                   disabled={isSaving}

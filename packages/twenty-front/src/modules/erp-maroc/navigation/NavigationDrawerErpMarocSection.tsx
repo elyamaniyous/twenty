@@ -65,7 +65,11 @@ export const NavigationDrawerErpMarocSection = () => {
     {
       label: t`Commandes clients`,
       path: erpMarocPaths.salesOrders,
-      activePaths: [erpMarocPaths.salesOrders, erpMarocPaths.salesOrderDetail],
+      activePaths: [
+        erpMarocPaths.salesOrders,
+        erpMarocPaths.salesOrdersPreparation,
+        erpMarocPaths.salesOrderDetail,
+      ],
       Icon: IconListDetails,
     },
     {

@@ -1854,6 +1854,16 @@ describe('ERP Maroc upstream routes', () => {
       expectedPath: `/sales-orders/${ids.quote}/confirm`,
     },
     {
+      helper: erpMarocUpstreamRoutes.salesOrders.reserve,
+      validId: ids.quote,
+      expectedPath: `/sales-orders/${ids.quote}/reservations`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.salesOrders.prepare,
+      validId: ids.quote,
+      expectedPath: `/sales-orders/${ids.quote}/preparation`,
+    },
+    {
       helper: erpMarocUpstreamRoutes.salesOrders.cancel,
       validId: ids.quote,
       expectedPath: `/sales-orders/${ids.quote}/cancel`,
@@ -2119,6 +2129,8 @@ describe('ERP Maroc upstream routes', () => {
       salesOrderFromQuote: 'sales-orders.fromQuote',
       salesOrderDetail: 'sales-orders.detail',
       salesOrderConfirm: 'sales-orders.confirm',
+      salesOrderReserve: 'sales-orders.reserve',
+      salesOrderPrepare: 'sales-orders.prepare',
       salesOrderCancel: 'sales-orders.cancel',
       salesOrderDeliveries: 'sales-orders.deliveries',
       salesOrderDeliveryCancel: 'sales-orders.delivery.cancel',

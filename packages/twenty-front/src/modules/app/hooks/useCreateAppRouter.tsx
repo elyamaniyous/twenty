@@ -64,6 +64,12 @@ const ErpSalesOrdersPage = lazy(() =>
   ),
 );
 
+const ErpSalesPreparationPage = lazy(() =>
+  import('~/pages/erp-maroc/sales-orders/ErpSalesPreparationPage').then(
+    (module) => ({ default: module.ErpSalesPreparationPage }),
+  ),
+);
+
 const ErpSalesOrderDetailPage = lazy(() =>
   import('~/pages/erp-maroc/sales-orders/ErpSalesOrderDetailPage').then(
     (module) => ({ default: module.ErpSalesOrderDetailPage }),
@@ -485,6 +491,14 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpSalesOrdersPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.salesOrdersPreparation}
+                element={
+                  <LazyRoute>
+                    <ErpSalesPreparationPage />
                   </LazyRoute>
                 }
               />

@@ -150,6 +150,18 @@ const approvedRoutes = [
   ],
   [
     'POST',
+    `/sales-orders/${id}/reservations`,
+    'sales-orders.reserve',
+    erpSalesOrderSchema,
+  ],
+  [
+    'POST',
+    `/sales-orders/${id}/preparation`,
+    'sales-orders.prepare',
+    erpSalesOrderSchema,
+  ],
+  [
+    'POST',
     `/sales-orders/${id}/cancel`,
     'sales-orders.cancel',
     erpSalesOrderSchema,

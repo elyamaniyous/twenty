@@ -328,6 +328,32 @@ export const erpSalesOrderProductSchema = z.object({
   type: z.string(),
 });
 
+export const erpSalesOrderAllocationSchema = z
+  .object({
+    id: uuidSchema,
+    societeId: uuidSchema,
+    salesOrderId: uuidSchema,
+    salesOrderLineId: uuidSchema,
+    warehouseId: uuidSchema,
+    quantityReserved: z.number().finite().nonnegative(),
+    quantityPrepared: z.number().finite().nonnegative(),
+    createdByTwentyUserId: nonBlankStringSchema,
+    updatedByTwentyUserId: nonBlankStringSchema,
+    preparedAt: nullableInstantSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+    warehouse: erpWarehouseSummarySchema,
+  })
+  .superRefine((allocation, context) => {
+    if (allocation.quantityPrepared > allocation.quantityReserved) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Prepared quantity cannot exceed reserved quantity',
+        path: ['quantityPrepared'],
+      });
+    }
+  });
+
 export const erpSalesOrderLineSchema = z
   .object({
     id: uuidSchema,
@@ -346,6 +372,7 @@ export const erpSalesOrderLineSchema = z
     createdAt: instantSchema,
     updatedAt: instantSchema,
     product: erpSalesOrderProductSchema.nullable(),
+    allocations: z.array(erpSalesOrderAllocationSchema).default([]),
   })
   .superRefine((line, context) => {
     if (line.quantityDelivered > line.quantity) {
@@ -353,6 +380,18 @@ export const erpSalesOrderLineSchema = z
         code: 'custom',
         message: 'Delivered quantity cannot exceed ordered quantity',
         path: ['quantityDelivered'],
+      });
+    }
+    const reserved = line.allocations.reduce(
+      (total, allocation) => total + allocation.quantityReserved,
+      0,
+    );
+    if (reserved + line.quantityDelivered > line.quantity + 1e-9) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Reserved and delivered quantities cannot exceed ordered quantity',
+        path: ['allocations'],
       });
     }
   });
@@ -1713,12 +1752,17 @@ export const erpStockLevelSchema = z.object({
   warehouse: erpWarehouseSummarySchema.extend({ isDefault: z.boolean() }),
   product: erpStockProductSchema,
   quantity: z.number().finite().nonnegative(),
+  reservedQuantity: z.number().finite().nonnegative(),
+  preparedQuantity: z.number().finite().nonnegative(),
+  availableQuantity: z.number().finite().nonnegative(),
   updatedAt: nullableInstantSchema,
 });
 export const erpStockLevelListSchema = z.array(erpStockLevelSchema);
 
 export const erpStockMovementTypeSchema = z.enum([
   'PURCHASE_RECEIPT',
+  'SALES_DELIVERY',
+  'SALES_DELIVERY_CANCEL',
   'ADJUSTMENT_IN',
   'ADJUSTMENT_OUT',
   'TRANSFER_IN',
@@ -1739,6 +1783,7 @@ export const erpStockMovementSchema = z.object({
   transferGroupId: nullableUuidSchema,
   purchaseReceiptLineId: nullableUuidSchema,
   inventoryCountLineId: nullableUuidSchema,
+  deliveryNoteLineId: nullableUuidSchema,
   occurredAt: civilDateHttpSchema,
   createdByTwentyUserId: nonBlankStringSchema,
   createdAt: instantSchema,
@@ -1802,6 +1847,10 @@ export const erpReplenishmentSuggestionSchema = z.object({
   warehouse: erpWarehouseSummarySchema,
   product: erpStockProductSchema,
   currentQuantity: z.number().finite().nonnegative(),
+  physicalQuantity: z.number().finite().nonnegative(),
+  reservedQuantity: z.number().finite().nonnegative(),
+  preparedQuantity: z.number().finite().nonnegative(),
+  availableQuantity: z.number().finite().nonnegative(),
   minimumQuantity: z.number().finite().nonnegative(),
   targetQuantity: z.number().finite().nonnegative(),
   suggestedQuantity: z.number().finite().positive(),
@@ -1831,6 +1880,8 @@ export const erpMarocRouteIds = {
   salesOrderFromQuote: 'sales-orders.fromQuote',
   salesOrderDetail: 'sales-orders.detail',
   salesOrderConfirm: 'sales-orders.confirm',
+  salesOrderReserve: 'sales-orders.reserve',
+  salesOrderPrepare: 'sales-orders.prepare',
   salesOrderCancel: 'sales-orders.cancel',
   salesOrderDeliveries: 'sales-orders.deliveries',
   salesOrderDeliveryCancel: 'sales-orders.delivery.cancel',
@@ -1934,6 +1985,8 @@ export const erpMarocUpstreamRoutes = {
       `/sales-orders/from-quote/${encodeRouteId(quoteId)}`,
     detail: (id: string) => `/sales-orders/${encodeRouteId(id)}`,
     confirm: (id: string) => `/sales-orders/${encodeRouteId(id)}/confirm`,
+    reserve: (id: string) => `/sales-orders/${encodeRouteId(id)}/reservations`,
+    prepare: (id: string) => `/sales-orders/${encodeRouteId(id)}/preparation`,
     cancel: (id: string) => `/sales-orders/${encodeRouteId(id)}/cancel`,
     deliveries: (id: string) => `/sales-orders/${encodeRouteId(id)}/deliveries`,
     cancelDelivery: (id: string, deliveryId: string) =>
@@ -2064,6 +2117,9 @@ export type ErpTierList = z.infer<typeof erpTierListSchema>;
 export type ErpQuoteLine = z.infer<typeof erpQuoteLineSchema>;
 export type ErpQuote = z.infer<typeof erpQuoteSchema>;
 export type ErpQuoteList = z.infer<typeof erpQuoteListSchema>;
+export type ErpSalesOrderAllocation = z.infer<
+  typeof erpSalesOrderAllocationSchema
+>;
 export type ErpSalesOrderLine = z.infer<typeof erpSalesOrderLineSchema>;
 export type ErpSalesOrder = z.infer<typeof erpSalesOrderSchema>;
 export type ErpSalesOrderList = z.infer<typeof erpSalesOrderListSchema>;

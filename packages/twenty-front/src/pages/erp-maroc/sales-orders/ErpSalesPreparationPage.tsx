@@ -6,21 +6,23 @@ import { ErpPageShell } from '@/erp-maroc/components/ErpPageShell';
 import { ErpStatusBadge } from '@/erp-maroc/components/ErpStatusBadge';
 import { useErpMarocContext } from '@/erp-maroc/context/useErpMarocContext';
 import { erpMarocPaths } from '@/erp-maroc/navigation/erpMarocPaths';
-import {
-  formatSalesOrderDate,
-  salesOrderStatusAppearance,
-} from '@/erp-maroc/sales-orders/salesOrderUi';
-import { formatMadCents } from '@/erp-maroc/utils/money';
+import { formatSalesOrderDate } from '@/erp-maroc/sales-orders/salesOrderUi';
 import { styled } from '@linaria/react';
 import { useEffect, useMemo, useState } from 'react';
-import { generatePath, Link, useNavigate } from 'react-router-dom';
+import { generatePath, Link } from 'react-router-dom';
 import {
   erpSalesOrderListSchema,
   type ErpSalesOrder,
 } from 'twenty-shared/erp-maroc';
 import { IconArrowRight } from 'twenty-ui/display';
-import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
+
+type PreparationRow = {
+  order: ErpSalesOrder;
+  reserved: number;
+  prepared: number;
+  warehouses: string;
+};
 
 const StyledContent = styled.div`
   display: flex;
@@ -54,9 +56,8 @@ const StyledOpenLink = styled(Link)`
   }
 `;
 
-export const ErpSalesOrdersPage = () => {
+export const ErpSalesPreparationPage = () => {
   const { client } = useErpMarocContext();
-  const navigate = useNavigate();
   const [orders, setOrders] = useState<ErpSalesOrder[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [generation, setGeneration] = useState(0);
@@ -82,13 +83,44 @@ export const ErpSalesOrdersPage = () => {
     return () => abortController.abort();
   }, [client, generation]);
 
-  const columns = useMemo<ErpOperationalTableColumn<ErpSalesOrder>[]>(
+  const rows = useMemo<PreparationRow[]>(
+    () =>
+      orders.flatMap((order) => {
+        if (
+          order.status !== 'CONFIRMED' &&
+          order.status !== 'PARTIALLY_DELIVERED'
+        ) {
+          return [];
+        }
+        const allocations = order.lines.flatMap((line) => line.allocations);
+        const reserved = allocations.reduce(
+          (total, allocation) => total + allocation.quantityReserved,
+          0,
+        );
+        if (reserved <= 1e-9) return [];
+        const prepared = allocations.reduce(
+          (total, allocation) => total + allocation.quantityPrepared,
+          0,
+        );
+        const warehouses = Array.from(
+          new Set(
+            allocations
+              .filter((allocation) => allocation.quantityReserved > 1e-9)
+              .map((allocation) => allocation.warehouse.name),
+          ),
+        ).join(', ');
+        return [{ order, reserved, prepared, warehouses }];
+      }),
+    [orders],
+  );
+
+  const columns = useMemo<ErpOperationalTableColumn<PreparationRow>[]>(
     () => [
       {
         key: 'number',
         header: 'Commande client',
         width: '180px',
-        render: (order) => (
+        render: ({ order }) => (
           <StyledOrderLink
             to={generatePath(erpMarocPaths.salesOrderDetail, { id: order.id })}
           >
@@ -100,47 +132,66 @@ export const ErpSalesOrdersPage = () => {
         key: 'customer',
         header: 'Client',
         width: '230px',
-        render: (order) => order.customer.name,
-      },
-      {
-        key: 'issueDate',
-        header: 'Émission',
-        width: '140px',
-        render: (order) => formatSalesOrderDate(order.issueDate),
+        render: ({ order }) => order.customer.name,
       },
       {
         key: 'delivery',
         header: 'Livraison prévue',
         width: '160px',
-        render: (order) => formatSalesOrderDate(order.expectedDeliveryDate),
+        render: ({ order }) => formatSalesOrderDate(order.expectedDeliveryDate),
+      },
+      {
+        key: 'warehouses',
+        header: 'Dépôt',
+        width: '220px',
+        render: ({ warehouses }) => warehouses,
+      },
+      {
+        key: 'reserved',
+        header: 'Réservé',
+        width: '120px',
+        align: 'right',
+        render: ({ reserved }) => reserved,
+      },
+      {
+        key: 'prepared',
+        header: 'Préparé',
+        width: '120px',
+        align: 'right',
+        render: ({ prepared }) => prepared,
       },
       {
         key: 'status',
-        header: 'Statut',
-        width: '180px',
-        render: (order) => {
-          const appearance = salesOrderStatusAppearance[order.status];
-          return (
-            <ErpStatusBadge label={appearance.label} tone={appearance.tone} />
-          );
-        },
-      },
-      {
-        key: 'total',
-        header: 'Total TTC',
+        header: 'Préparation',
         width: '150px',
-        align: 'right',
-        render: (order) => formatMadCents(order.totalTtcCents),
+        render: ({ reserved, prepared }) => (
+          <ErpStatusBadge
+            label={
+              prepared <= 1e-9
+                ? 'À préparer'
+                : prepared + 1e-9 >= reserved
+                  ? 'Prête'
+                  : 'Partielle'
+            }
+            tone={
+              prepared <= 1e-9
+                ? 'neutral'
+                : prepared + 1e-9 >= reserved
+                  ? 'success'
+                  : 'warning'
+            }
+          />
+        ),
       },
       {
         key: 'open',
         header: '',
         width: '56px',
         align: 'right',
-        render: (order) => (
+        render: ({ order }) => (
           <StyledOpenLink
             to={generatePath(erpMarocPaths.salesOrderDetail, { id: order.id })}
-            aria-label={`Ouvrir ${order.number}`}
+            aria-label={`Préparer ${order.number}`}
           >
             <IconArrowRight size={16} />
           </StyledOpenLink>
@@ -152,27 +203,19 @@ export const ErpSalesOrdersPage = () => {
 
   return (
     <ErpPageShell
-      title="Commandes clients"
-      description="Préparation, livraison et facturation des ventes"
-      actions={
-        <Button
-          title="Commandes à préparer"
-          ariaLabel="Ouvrir les commandes à préparer"
-          variant="secondary"
-          onClick={() => void navigate(erpMarocPaths.salesOrdersPreparation)}
-        />
-      }
+      title="Commandes à préparer"
+      description="Réservations actives et avancement par dépôt"
     >
       <StyledContent>
         <ErpOperationalTable
-          ariaLabel="Commandes clients"
+          ariaLabel="Commandes clients à préparer"
           columns={columns}
-          rows={orders}
-          getRowKey={(order) => order.id}
+          rows={rows}
+          getRowKey={({ order }) => order.id}
           state={state}
-          loadingLabel="Chargement des commandes clients"
-          emptyLabel="Aucune commande client"
-          errorLabel="Impossible de charger les commandes clients"
+          loadingLabel="Chargement des préparations"
+          emptyLabel="Aucune commande à préparer"
+          errorLabel="Impossible de charger les préparations"
           retryLabel="Réessayer"
           onRetry={() => setGeneration((value) => value + 1)}
         />
