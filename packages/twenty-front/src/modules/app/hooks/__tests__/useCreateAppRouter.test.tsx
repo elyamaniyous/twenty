@@ -95,6 +95,10 @@ jest.mock('~/pages/erp-maroc/invoices/ErpInvoiceDetailPage', () => ({
   ErpInvoiceDetailPage: () => <div>Task 14-C2 invoice detail</div>,
 }));
 
+jest.mock('~/pages/erp-maroc/customer-returns/ErpCustomerReturnsPage', () => ({
+  ErpCustomerReturnsPage: () => <div>Phase 3 customer returns</div>,
+}));
+
 jest.mock('~/pages/erp-maroc/invoices/ErpInvoicesPage', () => ({
   ErpInvoicesPage: () => <div>Task 14-D invoices list</div>,
 }));

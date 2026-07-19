@@ -1208,6 +1208,120 @@ export const erpCreditNoteSchema = z
 
 export const erpCreditNotePageSchema = listPageSchema(erpCreditNoteSchema);
 
+export const erpCustomerReturnStatusSchema = z.enum([
+  'DRAFT',
+  'VALIDATED',
+  'CANCELLED',
+]);
+
+const erpCustomerReturnInvoiceLineSchema = z.object({
+  id: uuidSchema,
+  description: z.string(),
+  unit: nullableStringSchema,
+  quantity: z.number().finite().positive(),
+  unitPriceHtCents: centsSchema,
+  tvaRate: nonNegativeIntegerSchema,
+  totalHtCents: centsSchema,
+  totalTtcCents: centsSchema,
+});
+
+const erpCustomerReturnProductSchema = z.object({
+  id: uuidSchema,
+  code: z.string(),
+  name: z.string(),
+  type: z.string(),
+});
+
+export const erpCustomerReturnLineSchema = z.object({
+  id: uuidSchema,
+  customerReturnId: uuidSchema,
+  salesInvoiceAllocationId: uuidSchema,
+  creditNoteLineId: nullableUuidSchema,
+  quantity: z.number().finite().positive(),
+  position: nonNegativeIntegerSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  creditNoteLine: z.object({ id: uuidSchema }).nullable(),
+  salesInvoiceAllocation: z.object({
+    invoiceLine: erpCustomerReturnInvoiceLineSchema,
+    deliveryNoteLine: z.object({
+      salesOrderLine: z.object({
+        product: erpCustomerReturnProductSchema.nullable(),
+      }),
+    }),
+  }),
+});
+
+export const erpCustomerReturnSchema = z.object({
+  id: uuidSchema,
+  societeId: uuidSchema,
+  customerId: uuidSchema,
+  salesOrderId: uuidSchema,
+  deliveryNoteId: uuidSchema,
+  sourceInvoiceId: uuidSchema,
+  warehouseId: uuidSchema,
+  number: z.string(),
+  year: nonNegativeIntegerSchema,
+  status: erpCustomerReturnStatusSchema,
+  returnDate: civilDateHttpSchema,
+  reason: z.string(),
+  notes: nullableStringSchema,
+  createdByTwentyUserId: nonBlankStringSchema,
+  validatedAt: nullableInstantSchema,
+  validatedByTwentyUserId: nullableStringSchema,
+  cancelledAt: nullableInstantSchema,
+  cancelledByTwentyUserId: nullableStringSchema,
+  cancellationReason: nullableStringSchema,
+  creditNoteId: nullableUuidSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  customer: z.object({ id: uuidSchema, name: z.string() }),
+  salesOrder: z.object({ id: uuidSchema, number: z.string() }),
+  deliveryNote: z.object({
+    id: uuidSchema,
+    number: z.string(),
+    deliveryDate: civilDateHttpSchema,
+  }),
+  sourceInvoice: z.object({
+    id: uuidSchema,
+    number: nullableStringSchema,
+    status: erpInvoiceStatusSchema,
+  }),
+  warehouse: erpWarehouseSummarySchema,
+  creditNote: z
+    .object({
+      id: uuidSchema,
+      number: nullableStringSchema,
+      status: erpCreditNoteStatusSchema,
+      totalTtcCents: centsSchema,
+    })
+    .nullable(),
+  lines: z.array(erpCustomerReturnLineSchema).min(1),
+});
+
+export const erpCustomerReturnListSchema = z.array(erpCustomerReturnSchema);
+
+export const erpCustomerReturnEligibleLineSchema = z.object({
+  salesInvoiceAllocationId: uuidSchema,
+  invoiceId: uuidSchema,
+  invoiceLineId: uuidSchema,
+  deliveryNoteId: uuidSchema,
+  deliveryNoteNumber: z.string(),
+  warehouse: erpWarehouseSummarySchema,
+  product: erpCustomerReturnProductSchema,
+  description: z.string(),
+  unit: nullableStringSchema,
+  quantityInvoiced: z.number().finite().positive(),
+  quantityReturned: z.number().finite().nonnegative(),
+  quantityAvailable: z.number().finite().positive(),
+  unitPriceHtCents: centsSchema,
+  tvaRate: nonNegativeIntegerSchema,
+});
+
+export const erpCustomerReturnEligibleLineListSchema = z.array(
+  erpCustomerReturnEligibleLineSchema,
+);
+
 export const erpReminderLevelSchema = z.enum(['LEVEL_1', 'LEVEL_2', 'LEVEL_3']);
 export const erpReminderStatusSchema = z.enum([
   'PROPOSED',
@@ -1806,6 +1920,7 @@ export const erpStockMovementTypeSchema = z.enum([
   'PURCHASE_RECEIPT',
   'SALES_DELIVERY',
   'SALES_DELIVERY_CANCEL',
+  'CUSTOMER_RETURN',
   'ADJUSTMENT_IN',
   'ADJUSTMENT_OUT',
   'TRANSFER_IN',
@@ -1827,6 +1942,7 @@ export const erpStockMovementSchema = z.object({
   purchaseReceiptLineId: nullableUuidSchema,
   inventoryCountLineId: nullableUuidSchema,
   deliveryNoteLineId: nullableUuidSchema,
+  customerReturnLineId: nullableUuidSchema,
   occurredAt: civilDateHttpSchema,
   createdByTwentyUserId: nonBlankStringSchema,
   createdAt: instantSchema,
@@ -1958,6 +2074,11 @@ export const erpMarocRouteIds = {
   creditNoteEligibleInvoices: 'credit-notes.eligibleInvoices',
   creditNoteAllocate: 'credit-notes.allocate',
   creditNoteCancel: 'credit-notes.cancel',
+  customerReturnsCollection: 'customer-returns.collection',
+  customerReturnEligibleLines: 'customer-returns.eligibleLines',
+  customerReturnDetail: 'customer-returns.detail',
+  customerReturnValidate: 'customer-returns.validate',
+  customerReturnCancel: 'customer-returns.cancel',
   remindersCollection: 'reminders.collection',
   remindersScan: 'reminders.scan',
   reminderDetail: 'reminders.detail',
@@ -2085,6 +2206,13 @@ export const erpMarocUpstreamRoutes = {
     allocate: (id: string) => `/credit-notes/${encodeRouteId(id)}/allocate`,
     cancel: (id: string) => `/credit-notes/${encodeRouteId(id)}/cancel`,
   },
+  customerReturns: {
+    collection: '/customer-returns',
+    eligibleLines: '/customer-returns/eligible-lines',
+    detail: (id: string) => `/customer-returns/${encodeRouteId(id)}`,
+    validate: (id: string) => `/customer-returns/${encodeRouteId(id)}/validate`,
+    cancel: (id: string) => `/customer-returns/${encodeRouteId(id)}/cancel`,
+  },
   reminders: {
     collection: '/reminders',
     scan: '/reminders/scan',
@@ -2210,6 +2338,15 @@ export type ErpCreditNoteLine = z.infer<typeof erpCreditNoteLineSchema>;
 export type ErpCreditAllocation = z.infer<typeof erpCreditAllocationSchema>;
 export type ErpCreditNote = z.infer<typeof erpCreditNoteSchema>;
 export type ErpCreditNotePage = z.infer<typeof erpCreditNotePageSchema>;
+export type ErpCustomerReturnLine = z.infer<typeof erpCustomerReturnLineSchema>;
+export type ErpCustomerReturn = z.infer<typeof erpCustomerReturnSchema>;
+export type ErpCustomerReturnList = z.infer<typeof erpCustomerReturnListSchema>;
+export type ErpCustomerReturnEligibleLine = z.infer<
+  typeof erpCustomerReturnEligibleLineSchema
+>;
+export type ErpCustomerReturnEligibleLineList = z.infer<
+  typeof erpCustomerReturnEligibleLineListSchema
+>;
 export type ErpReminder = z.infer<typeof erpReminderSchema>;
 export type ErpReminderPage = z.infer<typeof erpReminderPageSchema>;
 export type ErpReminderScanResult = z.infer<typeof erpReminderScanResultSchema>;

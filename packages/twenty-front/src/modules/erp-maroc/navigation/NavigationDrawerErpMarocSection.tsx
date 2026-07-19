@@ -115,6 +115,12 @@ export const NavigationDrawerErpMarocSection = () => {
       Icon: IconFileText,
     },
     {
+      label: t`Retours clients`,
+      path: erpMarocPaths.customerReturns,
+      activePaths: [erpMarocPaths.customerReturns],
+      Icon: IconBox,
+    },
+    {
       label: t`Relances`,
       path: erpMarocPaths.reminders,
       activePaths: [erpMarocPaths.reminders],

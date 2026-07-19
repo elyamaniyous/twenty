@@ -112,6 +112,12 @@ const ErpInvoiceDetailPage = lazy(() =>
   })),
 );
 
+const ErpCustomerReturnsPage = lazy(() =>
+  import('~/pages/erp-maroc/customer-returns/ErpCustomerReturnsPage').then(
+    (module) => ({ default: module.ErpCustomerReturnsPage }),
+  ),
+);
+
 const ErpInvoiceEditorRoute = () => {
   const { id: invoiceId } = useParams<{ id: string }>();
 
@@ -563,6 +569,14 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpInvoiceDetailPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.customerReturns}
+                element={
+                  <LazyRoute>
+                    <ErpCustomerReturnsPage />
                   </LazyRoute>
                 }
               />

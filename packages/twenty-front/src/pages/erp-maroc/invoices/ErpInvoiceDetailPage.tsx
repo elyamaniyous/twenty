@@ -8,6 +8,7 @@ import {
   getInvoiceStatusAppearance,
 } from '@/erp-maroc/invoices/ErpInvoiceDetailContent';
 import { getInvoiceCommandPolicy } from '@/erp-maroc/invoices/invoiceCommandPolicy';
+import { erpMarocPaths } from '@/erp-maroc/navigation/erpMarocPaths';
 import { pollInvoicePdf } from '@/erp-maroc/invoices/pollInvoicePdf';
 import { formatCivilDate } from '@/erp-maroc/utils/civilDate';
 import { formatMadCents } from '@/erp-maroc/utils/money';
@@ -630,6 +631,25 @@ export const ErpInvoiceDetailPage = ({
                 });
                 navigate(
                   `/erp-maroc/credit-notes/new?${searchParams.toString()}`,
+                );
+              }}
+            />
+          ) : null}
+          {context.capabilities.manageInventory === true &&
+          context.capabilities.manageCreditNotes === true &&
+          invoice.salesInvoiceAllocations.length > 0 &&
+          invoice.status !== 'DRAFT' &&
+          invoice.status !== 'CANCELLED' ? (
+            <Button
+              title="Enregistrer un retour"
+              ariaLabel="Enregistrer un retour client"
+              variant="secondary"
+              onClick={() => {
+                const searchParams = new URLSearchParams({
+                  invoiceId: invoice.id,
+                });
+                navigate(
+                  `${erpMarocPaths.customerReturns}?${searchParams.toString()}`,
                 );
               }}
             />

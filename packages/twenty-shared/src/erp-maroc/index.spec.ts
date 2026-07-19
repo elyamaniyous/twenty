@@ -2004,6 +2004,21 @@ describe('ERP Maroc upstream routes', () => {
       expectedPath: `/credit-notes/${ids.creditNote}/cancel`,
     },
     {
+      helper: erpMarocUpstreamRoutes.customerReturns.detail,
+      validId: ids.creditNote,
+      expectedPath: `/customer-returns/${ids.creditNote}`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.customerReturns.validate,
+      validId: ids.creditNote,
+      expectedPath: `/customer-returns/${ids.creditNote}/validate`,
+    },
+    {
+      helper: erpMarocUpstreamRoutes.customerReturns.cancel,
+      validId: ids.creditNote,
+      expectedPath: `/customer-returns/${ids.creditNote}/cancel`,
+    },
+    {
       helper: erpMarocUpstreamRoutes.reminders.detail,
       validId: ids.reminder,
       expectedPath: `/reminders/${ids.reminder}`,
@@ -2166,6 +2181,11 @@ describe('ERP Maroc upstream routes', () => {
       creditNoteEligibleInvoices: 'credit-notes.eligibleInvoices',
       creditNoteAllocate: 'credit-notes.allocate',
       creditNoteCancel: 'credit-notes.cancel',
+      customerReturnsCollection: 'customer-returns.collection',
+      customerReturnEligibleLines: 'customer-returns.eligibleLines',
+      customerReturnDetail: 'customer-returns.detail',
+      customerReturnValidate: 'customer-returns.validate',
+      customerReturnCancel: 'customer-returns.cancel',
       remindersCollection: 'reminders.collection',
       remindersScan: 'reminders.scan',
       reminderDetail: 'reminders.detail',
@@ -2230,6 +2250,12 @@ describe('ERP Maroc upstream routes', () => {
     expect(erpMarocUpstreamRoutes.invoices.collection).toBe('/invoices');
     expect(erpMarocUpstreamRoutes.payments.collection).toBe('/payments');
     expect(erpMarocUpstreamRoutes.creditNotes.collection).toBe('/credit-notes');
+    expect(erpMarocUpstreamRoutes.customerReturns.collection).toBe(
+      '/customer-returns',
+    );
+    expect(erpMarocUpstreamRoutes.customerReturns.eligibleLines).toBe(
+      '/customer-returns/eligible-lines',
+    );
     expect(erpMarocUpstreamRoutes.reminders.collection).toBe('/reminders');
     expect(erpMarocUpstreamRoutes.reminders.scan).toBe('/reminders/scan');
     expect(erpMarocUpstreamRoutes.accounting.entries).toBe(

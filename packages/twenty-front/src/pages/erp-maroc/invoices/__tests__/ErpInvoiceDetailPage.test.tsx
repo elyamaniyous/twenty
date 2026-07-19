@@ -245,6 +245,7 @@ type RenderOptions = {
   canManage?: boolean;
   canCreatePendingPayment?: boolean;
   canManageCreditNotes?: boolean;
+  canManageInventory?: boolean;
 };
 
 const renderPage = (
@@ -257,12 +258,14 @@ const renderPage = (
     canManage = true,
     canCreatePendingPayment = false,
     canManageCreditNotes = false,
+    canManageInventory = false,
   }: RenderOptions = {},
 ) => {
   const access = {
     canManage,
     canCreatePendingPayment,
     canManageCreditNotes,
+    canManageInventory,
   };
   const createMutationIntent = jest.fn((input, options) => ({
     execute: () => request(input),
@@ -292,6 +295,9 @@ const renderPage = (
               },
               get manageCreditNotes() {
                 return access.canManageCreditNotes;
+              },
+              get manageInventory() {
+                return access.canManageInventory;
               },
             },
             features: { invoiceValidation: true, invoiceEmail: true },
@@ -444,6 +450,46 @@ describe('ErpInvoiceDetailPage', () => {
 
     expect(screen.getByTestId('current-url')).toHaveTextContent(
       `/erp-maroc/credit-notes/new?invoiceId=${INVOICE_ID}`,
+    );
+  });
+
+  it('opens customer return entry from a delivered invoice', async () => {
+    const returnableInvoice = asInvoice({
+      ...validatedInvoice,
+      salesInvoiceAllocations: [
+        {
+          id: '79c90690-4f4a-4e2e-91ce-3700f16a8ca1',
+          salesOrderId: '79c90690-4f4a-4e2e-91ce-3700f16a8ca2',
+          salesOrderLineId: '79c90690-4f4a-4e2e-91ce-3700f16a8ca3',
+          deliveryNoteId: '79c90690-4f4a-4e2e-91ce-3700f16a8ca4',
+          deliveryNoteLineId: '79c90690-4f4a-4e2e-91ce-3700f16a8ca5',
+          invoiceId: INVOICE_ID,
+          invoiceLineId: invoice.lines[0].id,
+          quantity: 1,
+          createdAt: '2026-07-12T09:00:00Z',
+          deliveryNote: {
+            id: '79c90690-4f4a-4e2e-91ce-3700f16a8ca4',
+            number: 'BL-2026-00001',
+            status: 'POSTED',
+            deliveryDate: '2026-07-12',
+          },
+        },
+      ],
+    });
+    renderPage(getRequest(returnableInvoice), jest.fn(), {
+      role: 'COMPTABLE',
+      canManageCreditNotes: true,
+      canManageInventory: true,
+    });
+
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: 'Enregistrer un retour client',
+      }),
+    );
+
+    expect(screen.getByTestId('current-url')).toHaveTextContent(
+      `/erp-maroc/customer-returns?invoiceId=${INVOICE_ID}`,
     );
   });
 

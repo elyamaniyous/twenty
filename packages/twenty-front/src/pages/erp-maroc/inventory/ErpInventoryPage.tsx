@@ -38,6 +38,7 @@ const movementLabels: Record<ErpStockMovement['type'], string> = {
   PURCHASE_RECEIPT: 'Réception fournisseur',
   SALES_DELIVERY: 'Livraison client',
   SALES_DELIVERY_CANCEL: 'Annulation livraison client',
+  CUSTOMER_RETURN: 'Retour client',
   ADJUSTMENT_IN: 'Ajustement entrée',
   ADJUSTMENT_OUT: 'Ajustement sortie',
   TRANSFER_IN: 'Transfert entrant',
