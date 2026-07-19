@@ -209,6 +209,17 @@ export const ErpInvoiceDetailContent = ({
     }
     return [...grouped.entries()].sort(([left], [right]) => left - right);
   }, [invoice.lines]);
+  const sourceDeliveryNotes = useMemo(
+    () => [
+      ...new Map(
+        invoice.salesInvoiceAllocations.map((allocation) => [
+          allocation.deliveryNote.id,
+          allocation.deliveryNote,
+        ]),
+      ).values(),
+    ],
+    [invoice.salesInvoiceAllocations],
+  );
 
   const columns: ErpOperationalTableColumn<ErpInvoiceLine>[] = [
     {
@@ -331,6 +342,26 @@ export const ErpInvoiceDetailContent = ({
             <StyledLink to={`/erp-maroc/quotes/${invoice.sourceQuote.id}`}>
               {invoice.sourceQuote.number}
             </StyledLink>
+          </StyledSummaryItem>
+        )}
+        {invoice.sourceSalesOrder === null ? null : (
+          <StyledSummaryItem>
+            <StyledLabel>Commande source</StyledLabel>
+            <StyledLink
+              to={`/erp-maroc/sales-orders/${invoice.sourceSalesOrder.id}`}
+            >
+              {invoice.sourceSalesOrder.number}
+            </StyledLink>
+          </StyledSummaryItem>
+        )}
+        {sourceDeliveryNotes.length === 0 ? null : (
+          <StyledSummaryItem>
+            <StyledLabel>Bons de livraison</StyledLabel>
+            <StyledValue>
+              {sourceDeliveryNotes
+                .map((delivery) => delivery.number)
+                .join(', ')}
+            </StyledValue>
           </StyledSummaryItem>
         )}
       </StyledSummary>

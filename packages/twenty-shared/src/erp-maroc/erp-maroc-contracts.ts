@@ -373,6 +373,15 @@ export const erpSalesOrderLineSchema = z
     updatedAt: instantSchema,
     product: erpSalesOrderProductSchema.nullable(),
     allocations: z.array(erpSalesOrderAllocationSchema).default([]),
+    invoiceAllocations: z
+      .array(
+        z.object({
+          id: uuidSchema,
+          invoiceId: uuidSchema,
+          quantity: z.number().finite().positive(),
+        }),
+      )
+      .default([]),
   })
   .superRefine((line, context) => {
     if (line.quantityDelivered > line.quantity) {
@@ -417,6 +426,12 @@ export const erpSalesOrderConvertedInvoiceSchema = z.object({
   status: z.string(),
 });
 
+export const erpSalesOrderInvoiceSummarySchema =
+  erpSalesOrderConvertedInvoiceSchema.extend({
+    totalTtcCents: centsSchema,
+    createdAt: instantSchema,
+  });
+
 export const erpSalesOrderSchema = z.object({
   id: uuidSchema,
   societeId: uuidSchema,
@@ -444,6 +459,7 @@ export const erpSalesOrderSchema = z.object({
   customer: erpSalesOrderCustomerSchema,
   sourceQuote: erpSalesOrderSourceQuoteSchema.nullable(),
   convertedInvoice: erpSalesOrderConvertedInvoiceSchema.nullable(),
+  invoices: z.array(erpSalesOrderInvoiceSummarySchema).default([]),
   lines: z.array(erpSalesOrderLineSchema),
 });
 
@@ -741,6 +757,30 @@ export const erpSourceQuoteSummarySchema = z.object({
   status: erpQuoteStatusSchema,
 });
 
+export const erpSourceSalesOrderSummarySchema = z.object({
+  id: uuidSchema,
+  number: z.string(),
+  status: erpSalesOrderStatusSchema,
+});
+
+export const erpSalesInvoiceAllocationSchema = z.object({
+  id: uuidSchema,
+  salesOrderId: uuidSchema,
+  salesOrderLineId: uuidSchema,
+  deliveryNoteId: uuidSchema,
+  deliveryNoteLineId: uuidSchema,
+  invoiceId: uuidSchema,
+  invoiceLineId: uuidSchema,
+  quantity: z.number().finite().positive(),
+  createdAt: instantSchema,
+  deliveryNote: z.object({
+    id: uuidSchema,
+    number: z.string(),
+    status: erpDeliveryNoteStatusSchema,
+    deliveryDate: civilDateHttpSchema,
+  }),
+});
+
 const erpInvoiceEmailDeliverySchema = z.object({
   status: erpInvoiceEmailOutboxStatusSchema,
   sentAt: nullableInstantSchema,
@@ -794,6 +834,9 @@ const erpInvoiceBaseSchema = z.object({
   tier: erpInvoiceTierSummarySchema,
   societe: erpSocieteLegalSummarySchema,
   sourceQuote: erpSourceQuoteSummarySchema.nullable(),
+  sourceSalesOrderId: nullableUuidSchema.default(null),
+  sourceSalesOrder: erpSourceSalesOrderSummarySchema.nullable().default(null),
+  salesInvoiceAllocations: z.array(erpSalesInvoiceAllocationSchema).default([]),
 });
 
 const erpInvoiceWireEmailDeliverySchema = z.object({

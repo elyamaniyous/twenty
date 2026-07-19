@@ -109,6 +109,9 @@ const invoice: ErpInvoiceRead = {
     number: 'DEV-2026-0017',
     status: 'ACCEPTED' as const,
   },
+  sourceSalesOrderId: null,
+  sourceSalesOrder: null,
+  salesInvoiceAllocations: [],
   emailDelivery: {
     status: 'SENT' as const,
     sentAt: '2026-07-12T10:00:00Z',

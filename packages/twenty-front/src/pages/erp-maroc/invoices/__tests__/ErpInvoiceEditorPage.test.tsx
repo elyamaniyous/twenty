@@ -140,6 +140,9 @@ const draftInvoice: ErpInvoice = {
     taxeProfessionnelleArticle: null,
   },
   sourceQuote: null,
+  sourceSalesOrderId: null,
+  sourceSalesOrder: null,
+  salesInvoiceAllocations: [],
   emailDelivery: null,
   lines: [
     {

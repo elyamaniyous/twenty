@@ -32,6 +32,7 @@ import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 type SalesOrderAction = 'cancel' | 'invoice';
+type SalesOrderInvoice = ErpSalesOrder['invoices'][number];
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -104,10 +105,21 @@ const actionCopy = {
   },
   invoice: {
     button: 'Créer la facture',
-    title: 'Facturer la commande livrée',
-    message: 'Une facture brouillon sera créée à partir de la commande livrée.',
+    title: 'Facturer les livraisons',
+    message:
+      'La facture brouillon reprendra uniquement les quantités livrées qui ne sont pas encore facturées.',
   },
 } as const;
+
+const invoiceStatusLabel: Record<string, string> = {
+  DRAFT: 'Brouillon',
+  VALIDATED: 'Validée',
+  SENT: 'Envoyée',
+  PARTIALLY_PAID: 'Partiellement réglée',
+  PAID: 'Payée',
+  OVERDUE: 'Échue',
+  CANCELLED: 'Annulée',
+};
 
 export const ErpSalesOrderDetailPage = () => {
   const { client, context } = useErpMarocContext();
@@ -178,6 +190,17 @@ export const ErpSalesOrderDetailPage = () => {
         render: (line) => line.quantityDelivered,
       },
       {
+        key: 'invoiced',
+        header: 'Facturée',
+        width: '110px',
+        align: 'right',
+        render: (line) =>
+          line.invoiceAllocations.reduce(
+            (total, allocation) => total + allocation.quantity,
+            0,
+          ),
+      },
+      {
         key: 'reserved',
         header: 'Réservée',
         width: '110px',
@@ -201,10 +224,23 @@ export const ErpSalesOrderDetailPage = () => {
       },
       {
         key: 'remaining',
-        header: 'Reliquat',
+        header: 'À livrer',
         width: '110px',
         align: 'right',
         render: (line) => line.quantity - line.quantityDelivered,
+      },
+      {
+        key: 'billable',
+        header: 'À facturer',
+        width: '110px',
+        align: 'right',
+        render: (line) => {
+          const invoiced = line.invoiceAllocations.reduce(
+            (total, allocation) => total + allocation.quantity,
+            0,
+          );
+          return Math.max(0, line.quantityDelivered - invoiced);
+        },
       },
       {
         key: 'unitPrice',
@@ -219,6 +255,40 @@ export const ErpSalesOrderDetailPage = () => {
         width: '140px',
         align: 'right',
         render: (line) => formatMadCents(line.totalTtcCents),
+      },
+    ],
+    [],
+  );
+
+  const invoiceColumns = useMemo<
+    ErpOperationalTableColumn<SalesOrderInvoice>[]
+  >(
+    () => [
+      {
+        key: 'number',
+        header: 'Facture',
+        width: '220px',
+        render: (invoice) => (
+          <StyledLink
+            to={generatePath(erpMarocPaths.invoiceDetail, { id: invoice.id })}
+          >
+            {invoice.number ?? 'Brouillon'}
+          </StyledLink>
+        ),
+      },
+      {
+        key: 'status',
+        header: 'Statut',
+        width: '180px',
+        render: (invoice) =>
+          invoiceStatusLabel[invoice.status] ?? invoice.status,
+      },
+      {
+        key: 'amount',
+        header: 'Total TTC',
+        width: '160px',
+        align: 'right',
+        render: (invoice) => formatMadCents(invoice.totalTtcCents),
       },
     ],
     [],
@@ -326,6 +396,13 @@ export const ErpSalesOrderDetailPage = () => {
       ),
     0,
   );
+  const billableQuantity = order.lines.reduce((total, line) => {
+    const invoiced = line.invoiceAllocations.reduce(
+      (sum, allocation) => sum + allocation.quantity,
+      0,
+    );
+    return total + Math.max(0, line.quantityDelivered - invoiced);
+  }, 0);
   const canReserve =
     canManage &&
     (order.status === 'DRAFT' ||
@@ -342,7 +419,10 @@ export const ErpSalesOrderDetailPage = () => {
     canManage &&
     (order.status === 'CONFIRMED' || order.status === 'PARTIALLY_DELIVERED') &&
     preparedQuantity > 1e-9;
-  const canInvoice = canManage && order.status === 'DELIVERED';
+  const canInvoice =
+    canManage &&
+    (order.status === 'PARTIALLY_DELIVERED' || order.status === 'DELIVERED') &&
+    billableQuantity > 1e-9;
   const copy = action === null ? null : actionCopy[action];
 
   return (
@@ -389,8 +469,8 @@ export const ErpSalesOrderDetailPage = () => {
           ) : null}
           {canInvoice ? (
             <Button
-              title="Créer la facture"
-              ariaLabel="Créer la facture de la commande livrée"
+              title="Facturer les livraisons"
+              ariaLabel="Facturer les quantités livrées non facturées"
               accent="blue"
               onClick={() => setAction('invoice')}
             />
@@ -469,6 +549,14 @@ export const ErpSalesOrderDetailPage = () => {
           rows={order.lines}
           getRowKey={(line) => line.id}
           emptyLabel="Aucune ligne"
+        />
+        <StyledSectionTitle>Factures liées</StyledSectionTitle>
+        <ErpOperationalTable
+          ariaLabel="Factures liées à la commande client"
+          columns={invoiceColumns}
+          rows={order.invoices}
+          getRowKey={(invoice) => invoice.id}
+          emptyLabel="Aucune facture"
         />
         <ErpSalesReservationPanel
           order={order}
