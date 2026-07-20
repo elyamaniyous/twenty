@@ -56,6 +56,9 @@ import {
   erpReminderStatusSchema,
   erpRoleSchema,
   erpRoles,
+  erpStockLevelSchema,
+  erpStockMovementSchema,
+  erpGrossMarginReportSchema,
   erpTierListSchema,
   erpTierSchema,
   erpTierTypeSchema,
@@ -73,6 +76,8 @@ const ids = {
   purchaseReceipt: '44444444-4444-4444-9444-444444444446',
   purchaseReceiptLine: '44444444-4444-4444-9444-444444444447',
   warehouse: '44444444-4444-4444-9444-444444444451',
+  salesOrder: '44444444-4444-4444-9444-444444444452',
+  deliveryNote: '44444444-4444-4444-9444-444444444453',
   supplierInvoice: '44444444-4444-4444-9444-444444444448',
   supplierInvoiceLine: '44444444-4444-4444-9444-444444444449',
   supplierPaymentPreparation: '44444444-4444-4444-9444-444444444450',
@@ -1750,6 +1755,114 @@ describe('ERP Maroc response contracts', () => {
       erpPaymentSchema.safeParse({ ...paymentJson, amountCents: 12.5 }).success,
     ).toBe(false);
   });
+
+  it('parses authoritative CUMP and stock movement valuations', () => {
+    expect(
+      erpStockLevelSchema.parse({
+        warehouse: {
+          id: ids.warehouse,
+          code: 'DEPOT',
+          name: 'Dépôt principal',
+          isDefault: true,
+        },
+        product: {
+          id: ids.product,
+          code: 'PROD-1',
+          name: 'Produit',
+          unit: 'unité',
+        },
+        quantity: 8,
+        averageUnitCostCents: 12_500,
+        inventoryValueCents: 100_000,
+        reservedQuantity: 2,
+        preparedQuantity: 1,
+        availableQuantity: 6,
+        updatedAt: '2026-07-19T12:00:00Z',
+      }),
+    ).toMatchObject({
+      averageUnitCostCents: 12_500,
+      inventoryValueCents: 100_000,
+    });
+
+    expect(
+      erpStockMovementSchema.parse({
+        id: ids.line,
+        warehouseId: ids.warehouse,
+        productId: ids.product,
+        type: 'SALES_DELIVERY',
+        quantityDelta: -2,
+        quantityAfter: 8,
+        unitCostCents: 12_500,
+        valueDeltaCents: -25_000,
+        inventoryValueAfterCents: 100_000,
+        reference: 'BL-2026-00001',
+        notes: null,
+        transferGroupId: null,
+        purchaseReceiptLineId: null,
+        inventoryCountLineId: null,
+        deliveryNoteLineId: ids.task,
+        customerReturnLineId: null,
+        occurredAt: '2026-07-19',
+        createdByTwentyUserId: 'user-1',
+        createdAt: '2026-07-19T12:00:00Z',
+        warehouse: {
+          id: ids.warehouse,
+          code: 'DEPOT',
+          name: 'Dépôt principal',
+        },
+        product: {
+          id: ids.product,
+          code: 'PROD-1',
+          name: 'Produit',
+          unit: 'unité',
+        },
+      }),
+    ).toMatchObject({
+      unitCostCents: 12_500,
+      valueDeltaCents: -25_000,
+      inventoryValueAfterCents: 100_000,
+    });
+  });
+
+  it('parses gross margins based on delivered CUMP and validated returns', () => {
+    expect(
+      erpGrossMarginReportSchema.parse({
+        summary: {
+          deliveryCount: 1,
+          grossRevenueHtCents: 100_000,
+          returnedRevenueHtCents: 20_000,
+          deliveredCostCents: 60_000,
+          returnedCostCents: 12_000,
+          netRevenueHtCents: 80_000,
+          netCostCents: 48_000,
+          grossMarginCents: 32_000,
+          marginRateBasisPoints: 4_000,
+        },
+        deliveries: [
+          {
+            deliveryNoteId: ids.deliveryNote,
+            deliveryNumber: 'BL-2026-00001',
+            deliveryDate: '2026-07-19',
+            salesOrderId: ids.salesOrder,
+            salesOrderNumber: 'CC-2026-00001',
+            customerId: ids.tier,
+            customerName: 'Client Atlas',
+            grossRevenueHtCents: 100_000,
+            returnedRevenueHtCents: 20_000,
+            deliveredCostCents: 60_000,
+            returnedCostCents: 12_000,
+            netRevenueHtCents: 80_000,
+            netCostCents: 48_000,
+            grossMarginCents: 32_000,
+            marginRateBasisPoints: 4_000,
+          },
+        ],
+      }),
+    ).toMatchObject({
+      summary: { grossMarginCents: 32_000 },
+      deliveries: [{ marginRateBasisPoints: 4_000 }],
+    });
+  });
 });
 
 describe('ERP Maroc normalized errors', () => {
@@ -2222,6 +2335,7 @@ describe('ERP Maroc upstream routes', () => {
       warehousesCollection: 'warehouses.collection',
       inventoryLevels: 'inventory.levels',
       inventoryMovements: 'inventory.movements',
+      inventoryGrossMargins: 'inventory.grossMargins',
       inventoryAdjustments: 'inventory.adjustments',
       inventoryTransfers: 'inventory.transfers',
       inventoryCounts: 'inventory.counts',
@@ -2286,6 +2400,9 @@ describe('ERP Maroc upstream routes', () => {
     expect(erpMarocUpstreamRoutes.inventory.levels).toBe('/inventory/levels');
     expect(erpMarocUpstreamRoutes.inventory.movements).toBe(
       '/inventory/movements',
+    );
+    expect(erpMarocUpstreamRoutes.inventory.grossMargins).toBe(
+      '/inventory/gross-margins',
     );
     expect(erpMarocUpstreamRoutes.inventory.adjustments).toBe(
       '/inventory/adjustments',

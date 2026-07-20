@@ -38,6 +38,7 @@ import {
   erpSupplierPaymentPreparationListSchema,
   erpSupplierPaymentPreparationSchema,
   erpStockLevelListSchema,
+  erpGrossMarginReportSchema,
   erpStockMovementListSchema,
   erpStockMovementSchema,
   erpInventoryCountListSchema,
@@ -539,6 +540,12 @@ const approvedRoutes = [
     '/inventory/movements',
     'inventory.movements',
     erpStockMovementListSchema,
+  ],
+  [
+    'GET',
+    '/inventory/gross-margins',
+    'inventory.grossMargins',
+    erpGrossMarginReportSchema,
   ],
   [
     'POST',

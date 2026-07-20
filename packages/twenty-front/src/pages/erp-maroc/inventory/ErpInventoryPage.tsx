@@ -23,6 +23,7 @@ import {
   IconAdjustments,
   IconBox,
   IconBuildingSkyscraper,
+  IconChartBar,
   IconLink,
   IconListCheck,
   IconRefreshAlert,
@@ -30,6 +31,7 @@ import {
 import { Button, TabButton } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { ErpInventoryCountsPanel } from './ErpInventoryCountsPanel';
+import { ErpGrossMarginPanel } from './ErpGrossMarginPanel';
 import { ErpReplenishmentPanel } from './ErpReplenishmentPanel';
 
 type DrawerMode = 'warehouse' | 'adjustment' | 'transfer' | null;
@@ -49,6 +51,14 @@ const movementLabels: Record<ErpStockMovement['type'], string> = {
 
 const today = () =>
   new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Casablanca' });
+
+const madFormatter = new Intl.NumberFormat('fr-MA', {
+  style: 'currency',
+  currency: 'MAD',
+  minimumFractionDigits: 2,
+});
+
+const formatCents = (value: number) => madFormatter.format(value / 100);
 
 const StyledActions = styled.div`
   display: flex;
@@ -137,9 +147,9 @@ export const ErpInventoryPage = () => {
   const [drawer, setDrawer] = useState<DrawerMode>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<'stock' | 'counts' | 'replenishment'>(
-    'stock',
-  );
+  const [view, setView] = useState<
+    'stock' | 'counts' | 'replenishment' | 'margins'
+  >('stock');
 
   const [warehouseCode, setWarehouseCode] = useState('');
   const [warehouseName, setWarehouseName] = useState('');
@@ -150,6 +160,7 @@ export const ErpInventoryPage = () => {
   const [productId, setProductId] = useState('');
   const [direction, setDirection] = useState<'IN' | 'OUT'>('IN');
   const [quantity, setQuantity] = useState('');
+  const [unitCostMad, setUnitCostMad] = useState('');
   const [occurredAt, setOccurredAt] = useState(today);
   const [reference, setReference] = useState('');
   const [reason, setReason] = useState('');
@@ -217,6 +228,7 @@ export const ErpInventoryPage = () => {
     setProductId(products[0]?.id ?? '');
     setDirection('IN');
     setQuantity('');
+    setUnitCostMad('');
     setOccurredAt(today());
     setReference('');
     setReason('');
@@ -277,14 +289,25 @@ export const ErpInventoryPage = () => {
 
   const saveMovement = async () => {
     const parsedQuantity = Number(quantity);
+    const parsedUnitCostMad = Number(unitCostMad);
+    const unitCostCents = Math.round(parsedUnitCostMad * 100);
+    const requiresUnitCost = drawer === 'adjustment' && direction === 'IN';
     if (
       warehouseId === '' ||
       productId === '' ||
       !Number.isFinite(parsedQuantity) ||
       parsedQuantity <= 0 ||
+      (requiresUnitCost &&
+        (!Number.isFinite(parsedUnitCostMad) ||
+          parsedUnitCostMad < 0 ||
+          Math.abs(parsedUnitCostMad * 100 - unitCostCents) > 1e-7)) ||
       reason.trim() === ''
     ) {
-      setError('Dépôt, produit, quantité et motif sont obligatoires.');
+      setError(
+        requiresUnitCost
+          ? 'Dépôt, produit, quantité, coût unitaire et motif sont obligatoires.'
+          : 'Dépôt, produit, quantité et motif sont obligatoires.',
+      );
       return;
     }
     if (drawer === 'transfer' && destinationWarehouseId === '') {
@@ -317,6 +340,7 @@ export const ErpInventoryPage = () => {
                 productId,
                 quantityDelta:
                   direction === 'IN' ? parsedQuantity : -parsedQuantity,
+                unitCostCents: direction === 'IN' ? unitCostCents : null,
                 occurredAt,
                 reference: reference.trim() || null,
                 reason: reason.trim(),
@@ -384,6 +408,20 @@ export const ErpInventoryPage = () => {
         align: 'right',
         render: (level) => `${level.availableQuantity} ${level.product.unit}`,
       },
+      {
+        key: 'averageCost',
+        header: 'CUMP',
+        width: '150px',
+        align: 'right',
+        render: (level) => formatCents(level.averageUnitCostCents),
+      },
+      {
+        key: 'inventoryValue',
+        header: 'Valeur du stock',
+        width: '170px',
+        align: 'right',
+        render: (level) => formatCents(level.inventoryValueCents),
+      },
     ],
     [],
   );
@@ -434,6 +472,30 @@ export const ErpInventoryPage = () => {
           `${movement.quantityAfter} ${movement.product.unit}`,
       },
       {
+        key: 'unitCost',
+        header: 'Coût unitaire',
+        width: '150px',
+        align: 'right',
+        render: (movement) => formatCents(movement.unitCostCents),
+      },
+      {
+        key: 'valueDelta',
+        header: 'Valeur mouvement',
+        width: '170px',
+        align: 'right',
+        render: (movement) =>
+          `${movement.valueDeltaCents > 0 ? '+' : ''}${formatCents(
+            movement.valueDeltaCents,
+          )}`,
+      },
+      {
+        key: 'valueAfter',
+        header: 'Valeur après',
+        width: '160px',
+        align: 'right',
+        render: (movement) => formatCents(movement.inventoryValueAfterCents),
+      },
+      {
         key: 'reference',
         header: 'Référence',
         width: '180px',
@@ -449,6 +511,10 @@ export const ErpInventoryPage = () => {
       : drawer === 'transfer'
         ? 'Transférer du stock'
         : 'Ajuster le stock';
+  const totalInventoryValueCents = levels.reduce(
+    (total, level) => total + level.inventoryValueCents,
+    0,
+  );
 
   return (
     <ErpPageShell
@@ -507,11 +573,20 @@ export const ErpInventoryPage = () => {
           active={view === 'replenishment'}
           onClick={() => setView('replenishment')}
         />
+        <TabButton
+          id="inventory-margins"
+          title="Marges"
+          LeftIcon={IconChartBar}
+          active={view === 'margins'}
+          onClick={() => setView('margins')}
+        />
       </StyledTabs>
       {view === 'stock' ? (
         <StyledContent>
           <StyledSection>
-            <StyledSectionTitle>Stock disponible</StyledSectionTitle>
+            <StyledSectionTitle>
+              Stock disponible · {formatCents(totalInventoryValueCents)}
+            </StyledSectionTitle>
             <ErpOperationalTable
               ariaLabel="Niveaux de stock"
               columns={levelColumns}
@@ -545,6 +620,8 @@ export const ErpInventoryPage = () => {
         </StyledContent>
       ) : view === 'counts' ? (
         <ErpInventoryCountsPanel />
+      ) : view === 'margins' ? (
+        <ErpGrossMarginPanel />
       ) : (
         <ErpReplenishmentPanel />
       )}
@@ -701,6 +778,18 @@ export const ErpInventoryPage = () => {
                 fullWidth
                 onChange={setQuantity}
               />
+              {drawer === 'adjustment' && direction === 'IN' ? (
+                <TextInput
+                  label="Coût unitaire HT (MAD)"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={unitCostMad}
+                  disabled={isSaving}
+                  fullWidth
+                  onChange={setUnitCostMad}
+                />
+              ) : null}
               <TextInput
                 label="Date"
                 type="date"

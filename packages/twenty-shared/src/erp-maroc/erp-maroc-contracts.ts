@@ -1909,6 +1909,8 @@ export const erpStockLevelSchema = z.object({
   warehouse: erpWarehouseSummarySchema.extend({ isDefault: z.boolean() }),
   product: erpStockProductSchema,
   quantity: z.number().finite().nonnegative(),
+  averageUnitCostCents: z.number().finite().nonnegative(),
+  inventoryValueCents: centsSchema,
   reservedQuantity: z.number().finite().nonnegative(),
   preparedQuantity: z.number().finite().nonnegative(),
   availableQuantity: z.number().finite().nonnegative(),
@@ -1936,6 +1938,9 @@ export const erpStockMovementSchema = z.object({
   type: erpStockMovementTypeSchema,
   quantityDelta: z.number().finite(),
   quantityAfter: z.number().finite().nonnegative(),
+  unitCostCents: z.number().finite().nonnegative(),
+  valueDeltaCents: signedCentsSchema,
+  inventoryValueAfterCents: centsSchema,
   reference: nullableStringSchema,
   notes: nullableStringSchema,
   transferGroupId: nullableUuidSchema,
@@ -1950,6 +1955,34 @@ export const erpStockMovementSchema = z.object({
   product: erpStockProductSchema,
 });
 export const erpStockMovementListSchema = z.array(erpStockMovementSchema);
+
+const erpGrossMarginAmountsSchema = z.object({
+  grossRevenueHtCents: centsSchema,
+  returnedRevenueHtCents: centsSchema,
+  deliveredCostCents: centsSchema,
+  returnedCostCents: centsSchema,
+  netRevenueHtCents: centsSchema,
+  netCostCents: centsSchema,
+  grossMarginCents: signedCentsSchema,
+  marginRateBasisPoints: signedCentsSchema.nullable(),
+});
+
+export const erpGrossMarginDeliverySchema = erpGrossMarginAmountsSchema.extend({
+  deliveryNoteId: uuidSchema,
+  deliveryNumber: nonBlankStringSchema,
+  deliveryDate: civilDateHttpSchema,
+  salesOrderId: uuidSchema,
+  salesOrderNumber: nonBlankStringSchema,
+  customerId: uuidSchema,
+  customerName: nonBlankStringSchema,
+});
+
+export const erpGrossMarginReportSchema = z.object({
+  summary: erpGrossMarginAmountsSchema.extend({
+    deliveryCount: nonNegativeIntegerSchema,
+  }),
+  deliveries: z.array(erpGrossMarginDeliverySchema),
+});
 
 export const erpInventoryCountStatusSchema = z.enum([
   'DRAFT',
@@ -2115,6 +2148,7 @@ export const erpMarocRouteIds = {
   warehousesCollection: 'warehouses.collection',
   inventoryLevels: 'inventory.levels',
   inventoryMovements: 'inventory.movements',
+  inventoryGrossMargins: 'inventory.grossMargins',
   inventoryAdjustments: 'inventory.adjustments',
   inventoryTransfers: 'inventory.transfers',
   inventoryCounts: 'inventory.counts',
@@ -2265,6 +2299,7 @@ export const erpMarocUpstreamRoutes = {
   inventory: {
     levels: '/inventory/levels',
     movements: '/inventory/movements',
+    grossMargins: '/inventory/gross-margins',
     adjustments: '/inventory/adjustments',
     transfers: '/inventory/transfers',
     counts: '/inventory/counts',
@@ -2390,6 +2425,10 @@ export type ErpStockLevel = z.infer<typeof erpStockLevelSchema>;
 export type ErpStockLevelList = z.infer<typeof erpStockLevelListSchema>;
 export type ErpStockMovement = z.infer<typeof erpStockMovementSchema>;
 export type ErpStockMovementList = z.infer<typeof erpStockMovementListSchema>;
+export type ErpGrossMarginDelivery = z.infer<
+  typeof erpGrossMarginDeliverySchema
+>;
+export type ErpGrossMarginReport = z.infer<typeof erpGrossMarginReportSchema>;
 export type ErpInventoryCount = z.infer<typeof erpInventoryCountSchema>;
 export type ErpInventoryCountList = z.infer<typeof erpInventoryCountListSchema>;
 export type ErpInventoryThreshold = z.infer<typeof erpInventoryThresholdSchema>;
