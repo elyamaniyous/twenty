@@ -127,12 +127,28 @@ jest.mock('~/pages/erp-maroc/compliance/ErpFiscalPage', () => ({
   ErpFiscalPage: () => <div>Fiscalité marocaine</div>,
 }));
 
+jest.mock('~/pages/erp-maroc/compliance/ErpLiassePage', () => ({
+  ErpLiassePage: () => <div>Liasse fiscale PCGM</div>,
+}));
+
 jest.mock('~/pages/erp-maroc/compliance/ErpClosingPage', () => ({
   ErpClosingPage: () => <div>Clôture comptable</div>,
 }));
 
 jest.mock('~/pages/erp-maroc/compliance/ErpPayrollPage', () => ({
   ErpPayrollPage: () => <div>Paie et RH</div>,
+}));
+
+jest.mock('~/pages/erp-maroc/compliance/ErpApprovalsPage', () => ({
+  ErpApprovalsPage: () => <div>Approbations avancées</div>,
+}));
+
+jest.mock('~/pages/erp-maroc/compliance/ErpAccountingAiPage', () => ({
+  ErpAccountingAiPage: () => <div>Assistant comptable IA</div>,
+}));
+
+jest.mock('~/pages/erp-maroc/compliance/ErpPortalAdminPage', () => ({
+  ErpPortalAdminPage: () => <div>Portail client et cabinet</div>,
 }));
 
 jest.mock('~/pages/erp-maroc/compliance/ErpDocumentsPage', () => ({
@@ -517,8 +533,12 @@ describe('useCreateAppRouter ERP Maroc registration', () => {
 
   it.each([
     [erpMarocPaths.fiscal, 'Fiscalité marocaine'],
+    [erpMarocPaths.liasse, 'Liasse fiscale PCGM'],
     [erpMarocPaths.closing, 'Clôture comptable'],
     [erpMarocPaths.payroll, 'Paie et RH'],
+    [erpMarocPaths.approvals, 'Approbations avancées'],
+    [erpMarocPaths.accountingAssistant, 'Assistant comptable IA'],
+    [erpMarocPaths.portal, 'Portail client et cabinet'],
     [erpMarocPaths.documents, 'GED et OCR'],
     [erpMarocPaths.management, 'Pilotage PME'],
   ])('resolves %s to its compliance page', async (path, text) => {

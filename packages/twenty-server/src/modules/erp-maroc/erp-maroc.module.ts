@@ -17,10 +17,11 @@ import { ErpMarocAuthFilter } from './erp-maroc-auth.filter';
 import { ErpMarocController } from './erp-maroc.controller';
 import { ErpMarocEnabledMiddleware } from './erp-maroc-enabled.middleware';
 import { ErpMarocProxyService } from './erp-maroc-proxy.service';
+import { ErpMarocPortalController } from './erp-maroc-portal.controller';
 
 @Module({
   imports: [TokenModule, TwentyConfigModule, WorkspaceCacheStorageModule],
-  controllers: [ErpMarocController],
+  controllers: [ErpMarocController, ErpMarocPortalController],
   providers: [
     ErpMarocProxyService,
     ErpMarocEnabledMiddleware,

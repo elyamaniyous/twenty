@@ -24,6 +24,7 @@ import {
   erpFileExportSchema,
   erpFiscalDeadlineListSchema,
   erpFiscalDeadlineSchema,
+  erpRegulatoryFileSchema,
   erpTaxDeclarationListSchema,
   erpTaxDeclarationSchema,
   type ErpExercise,
@@ -242,6 +243,27 @@ export const ErpFiscalPage = () => {
     }
   };
 
+  const exportAdc080f = async (declaration: ErpTaxDeclaration) => {
+    setBusyId(declaration.id);
+    try {
+      const file = await client.request({
+        method: 'GET',
+        path: `/fiscal/declarations/${declaration.id}/adc080f`,
+        query: { regime: 'ENCAISSEMENT' },
+        schema: erpRegulatoryFileSchema,
+      });
+      if (!file.content) throw new Error('Missing export content');
+      downloadTextContent(file.filename, file.content, file.contentType);
+      enqueueSuccessSnackBar({
+        message: 'ADC080F généré, à valider sur la plateforme DGI',
+      });
+    } catch {
+      enqueueErrorSnackBar({ message: 'Export ADC080F impossible' });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const seedCalendar = async () => {
     const year = periodKey.slice(0, 4);
     setBusyId('calendar');
@@ -354,14 +376,24 @@ export const ErpFiscalPage = () => {
               />
             )}
             {row.type === 'TVA' ? (
-              <Button
-                title="XML SIMPL"
-                ariaLabel="Télécharger XML SIMPL"
-                Icon={IconDownload}
-                variant="secondary"
-                disabled={busyId !== null}
-                onClick={() => void exportSimpl(row)}
-              />
+              <>
+                <Button
+                  title="XML SIMPL"
+                  ariaLabel="Télécharger XML SIMPL"
+                  Icon={IconDownload}
+                  variant="secondary"
+                  disabled={busyId !== null}
+                  onClick={() => void exportSimpl(row)}
+                />
+                <Button
+                  title="ADC080F"
+                  ariaLabel="Télécharger le relevé de déductions ADC080F"
+                  Icon={IconDownload}
+                  variant="secondary"
+                  disabled={busyId !== null}
+                  onClick={() => void exportAdc080f(row)}
+                />
+              </>
             ) : null}
           </StyledErpWorkspaceInlineActions>
         );

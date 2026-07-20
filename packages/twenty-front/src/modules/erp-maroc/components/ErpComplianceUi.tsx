@@ -156,6 +156,24 @@ export const downloadTextContent = (
   URL.revokeObjectURL(url);
 };
 
+export const downloadBase64Content = (
+  filename: string,
+  contentBase64: string,
+  contentType: string,
+) => {
+  const binary = atob(contentBase64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  const url = URL.createObjectURL(new Blob([bytes], { type: contentType }));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+};
+
 export const readFileAsBase64 = async (file: File): Promise<string> => {
   const buffer = await file.arrayBuffer();
   const bytes = new Uint8Array(buffer);

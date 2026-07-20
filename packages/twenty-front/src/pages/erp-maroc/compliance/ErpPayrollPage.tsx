@@ -3,6 +3,7 @@ import {
   type ErpOperationalTableColumn,
 } from '@/erp-maroc/components/ErpOperationalTable';
 import {
+  downloadBase64Content,
   downloadTextContent,
   StyledErpWorkspaceContent,
   StyledErpWorkspaceField,
@@ -31,6 +32,7 @@ import {
   erpLeaveRequestSchema,
   erpPayslipListSchema,
   erpPayslipSchema,
+  erpRegulatoryFileSchema,
   type ErpEmployee,
   type ErpLeaveRequest,
   type ErpPayslip,
@@ -207,8 +209,14 @@ export const ErpPayrollPage = () => {
       return;
     return runMutation(
       employee.id,
-      () =>
-        client
+      async () => {
+        await downloadPdf(
+          `/payroll/employees/${employee.id}/final-settlement/pdf`,
+          {
+            terminationDate,
+          },
+        );
+        return client
           .createMutationIntent(
             {
               method: 'POST',
@@ -218,8 +226,9 @@ export const ErpPayrollPage = () => {
             },
             { idempotency: 'forbidden' },
           )
-          .execute(),
-      'Salarié sorti et STC calculé',
+          .execute();
+      },
+      'STC téléchargé et salarié sorti',
     );
   };
 
@@ -338,6 +347,85 @@ export const ErpPayrollPage = () => {
     }
   };
 
+  const exportCnssBds = async (format: 'xml' | 'txt') => {
+    setBusyId(`cnss-${format}`);
+    try {
+      const file = await client.request({
+        method: 'GET',
+        path: '/payroll/cnss/bds',
+        query: { periodKey, format },
+        schema: erpRegulatoryFileSchema,
+      });
+      if (!file.content) throw new Error('Missing export content');
+      downloadTextContent(file.filename, file.content, file.contentType);
+      enqueueSuccessSnackBar({
+        message: 'BDS généré, à valider dans DAMANCOM',
+      });
+    } catch {
+      enqueueErrorSnackBar({ message: 'Export BDS impossible' });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const downloadPdf = async (path: string, body?: unknown) => {
+    const file = body
+      ? await client
+          .createMutationIntent(
+            {
+              method: 'POST',
+              path,
+              body,
+              schema: erpRegulatoryFileSchema,
+            },
+            { idempotency: 'forbidden' },
+          )
+          .execute()
+      : await client.request({
+          method: 'GET',
+          path,
+          schema: erpRegulatoryFileSchema,
+        });
+    if (!file.contentBase64) throw new Error('Missing PDF content');
+    downloadBase64Content(file.filename, file.contentBase64, file.contentType);
+  };
+
+  const downloadAttestation = async (
+    employee: ErpEmployee,
+    type: 'travail' | 'salaire' | 'certificat',
+  ) => {
+    setBusyId(`attestation-${employee.id}`);
+    try {
+      const file = await client.request({
+        method: 'GET',
+        path: `/payroll/employees/${employee.id}/attestation`,
+        query: { type },
+        schema: erpRegulatoryFileSchema,
+      });
+      if (!file.contentBase64) throw new Error('Missing PDF content');
+      downloadBase64Content(
+        file.filename,
+        file.contentBase64,
+        file.contentType,
+      );
+    } catch {
+      enqueueErrorSnackBar({ message: 'Document RH impossible' });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const downloadPayrollStatement = async () => {
+    setBusyId('statement');
+    try {
+      await downloadPdf(`/payroll/statements/${periodKey}/pdf`);
+    } catch {
+      enqueueErrorSnackBar({ message: 'État de paie impossible' });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const employeeColumns: ErpOperationalTableColumn<ErpEmployee>[] = [
     {
       key: 'number',
@@ -379,17 +467,43 @@ export const ErpPayrollPage = () => {
     {
       key: 'action',
       header: 'Action',
-      width: '180px',
-      render: (row) =>
-        row.status === 'ACTIVE' && canManage ? (
+      width: '360px',
+      render: (row) => (
+        <StyledErpWorkspaceInlineActions>
           <Button
-            title="STC / Sortie"
-            ariaLabel="Calculer le STC"
+            title="Travail"
+            ariaLabel="Attestation de travail"
             variant="secondary"
             disabled={busyId !== null}
-            onClick={() => void terminateEmployee(row)}
+            onClick={() => void downloadAttestation(row, 'travail')}
           />
-        ) : null,
+          <Button
+            title="Salaire"
+            ariaLabel="Attestation de salaire"
+            variant="secondary"
+            disabled={busyId !== null}
+            onClick={() => void downloadAttestation(row, 'salaire')}
+          />
+          {row.status === 'TERMINATED' ? (
+            <Button
+              title="Certificat"
+              ariaLabel="Certificat de travail"
+              variant="secondary"
+              disabled={busyId !== null}
+              onClick={() => void downloadAttestation(row, 'certificat')}
+            />
+          ) : null}
+          {row.status === 'ACTIVE' && canManage ? (
+            <Button
+              title="STC / Sortie"
+              ariaLabel="Calculer le STC"
+              variant="secondary"
+              disabled={busyId !== null}
+              onClick={() => void terminateEmployee(row)}
+            />
+          ) : null}
+        </StyledErpWorkspaceInlineActions>
+      ),
     },
   ];
 
@@ -453,22 +567,34 @@ export const ErpPayrollPage = () => {
     {
       key: 'action',
       header: 'Action',
-      width: '180px',
-      render: (row) =>
-        canManage && (row.status === 'DRAFT' || row.status === 'VALIDATED') ? (
+      width: '240px',
+      render: (row) => (
+        <StyledErpWorkspaceInlineActions>
           <Button
-            title={row.status === 'DRAFT' ? 'Valider' : 'Payer'}
-            ariaLabel={
-              row.status === 'DRAFT'
-                ? 'Valider le bulletin'
-                : 'Marquer le bulletin payé'
-            }
-            Icon={IconCheck}
+            title="PDF"
+            ariaLabel="Télécharger le bulletin PDF"
+            Icon={IconDownload}
             variant="secondary"
             disabled={busyId !== null}
-            onClick={() => void payslipAction(row)}
+            onClick={() => void downloadPdf(`/payroll/payslips/${row.id}/pdf`)}
           />
-        ) : null,
+          {canManage &&
+          (row.status === 'DRAFT' || row.status === 'VALIDATED') ? (
+            <Button
+              title={row.status === 'DRAFT' ? 'Valider' : 'Payer'}
+              ariaLabel={
+                row.status === 'DRAFT'
+                  ? 'Valider le bulletin'
+                  : 'Marquer le bulletin payé'
+              }
+              Icon={IconCheck}
+              variant="secondary"
+              disabled={busyId !== null}
+              onClick={() => void payslipAction(row)}
+            />
+          ) : null}
+        </StyledErpWorkspaceInlineActions>
+      ),
     },
   ];
 
@@ -624,14 +750,40 @@ export const ErpPayrollPage = () => {
           </StyledErpWorkspaceField>
         ) : null}
         {view === 'payslips' ? (
-          <Button
-            title="Exporter CNSS"
-            ariaLabel="Exporter CNSS"
-            Icon={IconDownload}
-            variant="secondary"
-            disabled={busyId !== null}
-            onClick={() => void exportCnss()}
-          />
+          <>
+            <Button
+              title="État de paie PDF"
+              ariaLabel="Télécharger l'état de paie PDF"
+              Icon={IconDownload}
+              variant="secondary"
+              disabled={busyId !== null}
+              onClick={() => void downloadPayrollStatement()}
+            />
+            <Button
+              title="CNSS CSV"
+              ariaLabel="Exporter la CNSS au format CSV"
+              Icon={IconDownload}
+              variant="secondary"
+              disabled={busyId !== null}
+              onClick={() => void exportCnss()}
+            />
+            <Button
+              title="BDS XML"
+              ariaLabel="Exporter la déclaration DAMANCOM au format XML"
+              Icon={IconDownload}
+              variant="secondary"
+              disabled={busyId !== null}
+              onClick={() => void exportCnssBds('xml')}
+            />
+            <Button
+              title="BDS TXT"
+              ariaLabel="Exporter la déclaration DAMANCOM au format texte"
+              Icon={IconDownload}
+              variant="secondary"
+              disabled={busyId !== null}
+              onClick={() => void exportCnssBds('txt')}
+            />
+          </>
         ) : null}
       </StyledErpWorkspaceToolbar>
       <StyledErpWorkspaceContent>

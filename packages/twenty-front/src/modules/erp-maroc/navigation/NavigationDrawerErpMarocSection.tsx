@@ -174,6 +174,12 @@ export const NavigationDrawerErpMarocSection = () => {
       Icon: IconBook,
     },
     {
+      label: t`Liasse PCGM`,
+      path: erpMarocPaths.liasse,
+      activePaths: [erpMarocPaths.liasse],
+      Icon: IconFileText,
+    },
+    {
       label: t`Clôture`,
       path: erpMarocPaths.closing,
       activePaths: [erpMarocPaths.closing],
@@ -184,6 +190,24 @@ export const NavigationDrawerErpMarocSection = () => {
       path: erpMarocPaths.payroll,
       activePaths: [erpMarocPaths.payroll],
       Icon: IconUsers,
+    },
+    {
+      label: t`Approbations`,
+      path: erpMarocPaths.approvals,
+      activePaths: [erpMarocPaths.approvals],
+      Icon: IconLock,
+    },
+    {
+      label: t`Assistant comptable`,
+      path: erpMarocPaths.accountingAssistant,
+      activePaths: [erpMarocPaths.accountingAssistant],
+      Icon: IconChartBar,
+    },
+    {
+      label: t`Portail client`,
+      path: erpMarocPaths.portal,
+      activePaths: [erpMarocPaths.portal],
+      Icon: IconLink,
     },
     {
       label: t`Documents`,

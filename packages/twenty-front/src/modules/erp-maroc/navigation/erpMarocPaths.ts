@@ -33,8 +33,12 @@ export const erpMarocPaths = {
   bankStatements: '/erp-maroc/bank-statements',
   inventory: '/erp-maroc/inventory',
   fiscal: '/erp-maroc/fiscal',
+  liasse: '/erp-maroc/liasse',
   closing: '/erp-maroc/closing',
   payroll: '/erp-maroc/payroll',
+  approvals: '/erp-maroc/approvals',
+  accountingAssistant: '/erp-maroc/accounting-assistant',
+  portal: '/erp-maroc/portal',
   documents: '/erp-maroc/documents',
   management: '/erp-maroc/management',
 } as const;

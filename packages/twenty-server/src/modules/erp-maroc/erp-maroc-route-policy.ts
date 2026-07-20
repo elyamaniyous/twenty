@@ -70,7 +70,11 @@ import {
   erpPayslipListSchema,
   erpPayslipSchema,
   erpPortalAccessListSchema,
+  erpPortalAccessGrantSchema,
   erpPortalAccessSchema,
+  erpRegulatoryFileSchema,
+  erpRegulatoryListSchema,
+  erpRegulatoryObjectSchema,
   erpProductListSchema,
   erpProductSchema,
   erpPurchaseOrderListSchema,
@@ -107,7 +111,7 @@ import {
 } from 'twenty-shared/erp-maroc';
 import { z, type ZodType } from 'zod';
 
-export type ErpMarocHttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+export type ErpMarocHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 export type ErpMarocRouteKind = 'json' | 'pdf';
 export type ErpMarocIdempotencyPolicy = 'forbidden' | 'required';
 export type ErpMarocQuery = Readonly<Record<string, unknown>> | URLSearchParams;
@@ -175,6 +179,9 @@ const fiscalSeedQuery = Object.freeze(['year']);
 const payrollPeriodQuery = Object.freeze(['periodKey']);
 const documentQuery = Object.freeze(['search', 'type', 'tag']);
 const recurringRunQuery = Object.freeze(['asOf']);
+const adc080fQuery = Object.freeze(['regime']);
+const regulatoryFormatQuery = Object.freeze(['format']);
+const cnssBdsQuery = Object.freeze(['periodKey', 'format']);
 const pdfSchema = z.instanceof(Uint8Array);
 
 const exact = (path: string) => new RegExp(`^${path}$`);
@@ -1820,7 +1827,7 @@ const routes: ErpMarocRoute[] = [
     'POST',
     exact('/operations/portal-access'),
     staticBuilder(erpMarocUpstreamRoutes.operations.portalAccess),
-    erpPortalAccessSchema,
+    erpPortalAccessGrantSchema,
   ),
   defineJsonRoute(
     erpMarocRouteIds.portalAccessRevoke,
@@ -1849,6 +1856,244 @@ const routes: ErpMarocRoute[] = [
     new RegExp(`^/operations/anomalies/${uuidSource}/resolve$`),
     idBuilder(erpMarocUpstreamRoutes.operations.resolveAnomaly),
     erpAccountingAnomalySchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.fiscalDeclarationAdc080f,
+    'GET',
+    new RegExp(`^/fiscal/declarations/${uuidSource}/adc080f$`),
+    idBuilder(erpMarocUpstreamRoutes.fiscal.declarationAdc080f),
+    erpRegulatoryFileSchema,
+    adc080fQuery,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.payrollCnssBds,
+    'GET',
+    exact('/payroll/cnss/bds'),
+    staticBuilder(erpMarocUpstreamRoutes.payroll.cnssBds),
+    erpRegulatoryFileSchema,
+    cnssBdsQuery,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.payrollPayslipPdf,
+    'GET',
+    new RegExp(`^/payroll/payslips/${uuidSource}/pdf$`),
+    idBuilder(erpMarocUpstreamRoutes.payroll.payslipPdf),
+    erpRegulatoryFileSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.payrollEmployeeAttestation,
+    'GET',
+    new RegExp(`^/payroll/employees/${uuidSource}/attestation$`),
+    idBuilder(erpMarocUpstreamRoutes.payroll.employeeAttestation),
+    erpRegulatoryFileSchema,
+    Object.freeze(['type']),
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.payrollFinalSettlementPdf,
+    'POST',
+    new RegExp(`^/payroll/employees/${uuidSource}/final-settlement/pdf$`),
+    idBuilder(erpMarocUpstreamRoutes.payroll.finalSettlementPdf),
+    erpRegulatoryFileSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.payrollStatementPdf,
+    'GET',
+    /^\/payroll\/statements\/(\d{4}-(?:0[1-9]|1[0-2]))\/pdf$/,
+    (match) => erpMarocUpstreamRoutes.payroll.statementPdf(match[1]),
+    erpRegulatoryFileSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.liasseDefinitions,
+    'GET',
+    exact('/liasse/definitions'),
+    staticBuilder(erpMarocUpstreamRoutes.liasse.definitions),
+    erpRegulatoryListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.liasseTables,
+    'GET',
+    new RegExp(`^/liasse/exercises/${uuidSource}/tables$`),
+    idBuilder(erpMarocUpstreamRoutes.liasse.tables),
+    erpRegulatoryListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.liasseTable,
+    'GET',
+    new RegExp(
+      `^/liasse/exercises/${uuidSource}/tables/(T(?:[1-9]|1[0-9]|20)|STOCK)$`,
+    ),
+    (match) =>
+      erpMarocUpstreamRoutes.liasse.table(uuidSchema.parse(match[1]), match[2]),
+    erpRegulatoryObjectSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.liasseRow,
+    'PUT',
+    new RegExp(
+      `^/liasse/exercises/${uuidSource}/tables/(T(?:[1-9]|1[0-9]|20)|STOCK)/rows/([A-Za-z0-9_-]{1,80})$`,
+    ),
+    (match) =>
+      erpMarocUpstreamRoutes.liasse.row(
+        uuidSchema.parse(match[1]),
+        match[2],
+        match[3],
+      ),
+    erpRegulatoryObjectSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.liasseRow,
+    'DELETE',
+    new RegExp(
+      `^/liasse/exercises/${uuidSource}/tables/(T(?:[1-9]|1[0-9]|20)|STOCK)/rows/([A-Za-z0-9_-]{1,80})$`,
+    ),
+    (match) =>
+      erpMarocUpstreamRoutes.liasse.row(
+        uuidSchema.parse(match[1]),
+        match[2],
+        match[3],
+      ),
+    erpRegulatoryObjectSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.liasseExport,
+    'GET',
+    new RegExp(`^/liasse/exercises/${uuidSource}/export$`),
+    idBuilder(erpMarocUpstreamRoutes.liasse.export),
+    erpRegulatoryFileSchema,
+    regulatoryFormatQuery,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.regulatorySubmissions,
+    'GET',
+    exact('/liasse/submissions'),
+    staticBuilder(erpMarocUpstreamRoutes.liasse.submissions),
+    erpRegulatoryListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.regulatorySubmissionValidation,
+    'PATCH',
+    new RegExp(`^/liasse/submissions/${uuidSource}/external-validation$`),
+    idBuilder(erpMarocUpstreamRoutes.liasse.validateSubmission),
+    erpRegulatoryObjectSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.portalAdminRequests,
+    'GET',
+    exact('/portal-admin/requests'),
+    staticBuilder(erpMarocUpstreamRoutes.portalAdmin.requests),
+    erpRegulatoryListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.portalAdminComment,
+    'POST',
+    new RegExp(`^/portal-admin/requests/${uuidSource}/comments$`),
+    idBuilder(erpMarocUpstreamRoutes.portalAdmin.comment),
+    erpRegulatoryObjectSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.portalAdminRequestUpdate,
+    'PATCH',
+    detail('portal-admin/requests'),
+    idBuilder(erpMarocUpstreamRoutes.portalAdmin.request),
+    erpRegulatoryObjectSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.aiAccountingStatus,
+    'GET',
+    exact('/ai-accounting/status'),
+    staticBuilder(erpMarocUpstreamRoutes.aiAccounting.status),
+    erpRegulatoryObjectSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.aiAccountingSuggestions,
+    'GET',
+    exact('/ai-accounting/suggestions'),
+    staticBuilder(erpMarocUpstreamRoutes.aiAccounting.suggestions),
+    erpRegulatoryListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.aiAccountingCategorize,
+    'POST',
+    exact('/ai-accounting/categorize'),
+    staticBuilder(erpMarocUpstreamRoutes.aiAccounting.categorize),
+    erpRegulatoryObjectSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.aiAccountingReconcile,
+    'POST',
+    exact('/ai-accounting/reconcile'),
+    staticBuilder(erpMarocUpstreamRoutes.aiAccounting.reconcile),
+    erpRegulatoryObjectSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.aiAccountingSuggestionReview,
+    'PATCH',
+    detail('ai-accounting/suggestions'),
+    idBuilder(erpMarocUpstreamRoutes.aiAccounting.reviewSuggestion),
+    erpRegulatoryObjectSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.aiAccountingSafeQuery,
+    'POST',
+    exact('/ai-accounting/safe-query'),
+    staticBuilder(erpMarocUpstreamRoutes.aiAccounting.safeQuery),
+    erpRegulatoryObjectSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.aiAccountingConversations,
+    'GET',
+    exact('/ai-accounting/conversations'),
+    staticBuilder(erpMarocUpstreamRoutes.aiAccounting.conversations),
+    erpRegulatoryListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.aiAccountingAsk,
+    'POST',
+    exact('/ai-accounting/ask'),
+    staticBuilder(erpMarocUpstreamRoutes.aiAccounting.ask),
+    erpRegulatoryObjectSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.approvalMatrices,
+    'GET',
+    exact('/approvals/matrices'),
+    staticBuilder(erpMarocUpstreamRoutes.approvals.matrices),
+    erpRegulatoryListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.approvalMatrices,
+    'POST',
+    exact('/approvals/matrices'),
+    staticBuilder(erpMarocUpstreamRoutes.approvals.matrices),
+    erpRegulatoryObjectSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.approvalMatrixActive,
+    'PATCH',
+    new RegExp(`^/approvals/matrices/${uuidSource}/active$`),
+    idBuilder(erpMarocUpstreamRoutes.approvals.matrixActive),
+    erpRegulatoryObjectSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.approvalRequests,
+    'GET',
+    exact('/approvals/requests'),
+    staticBuilder(erpMarocUpstreamRoutes.approvals.requests),
+    erpRegulatoryListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.approvalRequests,
+    'POST',
+    exact('/approvals/requests'),
+    staticBuilder(erpMarocUpstreamRoutes.approvals.requests),
+    erpRegulatoryObjectSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.approvalDecision,
+    'POST',
+    new RegExp(`^/approvals/requests/${uuidSource}/decision$`),
+    idBuilder(erpMarocUpstreamRoutes.approvals.decision),
+    erpRegulatoryObjectSchema,
   ),
 ];
 
@@ -1987,6 +2232,34 @@ const assertNormalizedQueryValue = (
   }
   if (key === 'periodKey') {
     if (!/^\d{4}-(?:0[1-9]|1[0-2])$/.test(value)) rejectRoute();
+    return;
+  }
+  if (
+    routeId === erpMarocRouteIds.fiscalDeclarationAdc080f &&
+    key === 'regime' &&
+    (value === 'DEBIT' || value === 'ENCAISSEMENT')
+  ) {
+    return;
+  }
+  if (
+    routeId === erpMarocRouteIds.liasseExport &&
+    key === 'format' &&
+    (value === 'xlsx' || value === 'json')
+  ) {
+    return;
+  }
+  if (
+    routeId === erpMarocRouteIds.payrollCnssBds &&
+    key === 'format' &&
+    (value === 'xml' || value === 'txt')
+  ) {
+    return;
+  }
+  if (
+    routeId === erpMarocRouteIds.payrollEmployeeAttestation &&
+    key === 'type' &&
+    (value === 'travail' || value === 'salaire' || value === 'certificat')
+  ) {
     return;
   }
   if (key === 'search' || key === 'tag') {

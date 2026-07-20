@@ -2504,7 +2504,10 @@ export const erpPortalAccessSchema = z
   .object({
     id: uuidSchema,
     tierId: uuidSchema,
-    twentyUserId: nonBlankStringSchema,
+    twentyUserId: nullableStringSchema,
+    email: nullableStringSchema,
+    tokenExpiresAt: nullableInstantSchema,
+    lastAuthenticatedAt: nullableInstantSchema,
     status: z.enum(['ACTIVE', 'REVOKED']),
     canViewInvoices: z.boolean(),
     canViewDocuments: z.boolean(),
@@ -2516,6 +2519,26 @@ export const erpPortalAccessSchema = z
   })
   .passthrough();
 export const erpPortalAccessListSchema = z.array(erpPortalAccessSchema);
+export const erpPortalAccessGrantSchema = z.object({
+  access: erpPortalAccessSchema,
+  token: nonBlankStringSchema,
+  portalPath: nonBlankStringSchema,
+  securityNotice: nonBlankStringSchema,
+});
+
+export const erpRegulatoryFileSchema = z
+  .object({
+    filename: nonBlankStringSchema,
+    contentType: nonBlankStringSchema,
+    content: z.string().optional(),
+    contentBase64: z.string().optional(),
+    payloadSha256: z.string().optional(),
+    submissionId: uuidSchema.optional(),
+    validation: z.unknown().optional(),
+  })
+  .passthrough();
+export const erpRegulatoryObjectSchema = z.object({}).passthrough();
+export const erpRegulatoryListSchema = z.array(erpRegulatoryObjectSchema);
 
 export const erpAccountingAnomalySchema = z
   .object({
@@ -2652,6 +2675,7 @@ export const erpMarocRouteIds = {
   fiscalIsCalculate: 'fiscal.is.calculate',
   fiscalDeclarationStatus: 'fiscal.declaration.status',
   fiscalDeclarationSimpl: 'fiscal.declaration.simpl',
+  fiscalDeclarationAdc080f: 'fiscal.declaration.adc080f',
   fiscalDeadlines: 'fiscal.deadlines',
   fiscalDeadlinesSeed: 'fiscal.deadlines.seed',
   fiscalDeadlineComplete: 'fiscal.deadline.complete',
@@ -2674,6 +2698,11 @@ export const erpMarocRouteIds = {
   payrollLeaves: 'payroll.leaves',
   payrollLeaveDecision: 'payroll.leave.decision',
   payrollCnssExport: 'payroll.cnss.export',
+  payrollCnssBds: 'payroll.cnss.bds',
+  payrollPayslipPdf: 'payroll.payslip.pdf',
+  payrollEmployeeAttestation: 'payroll.employee.attestation',
+  payrollFinalSettlementPdf: 'payroll.employee.final-settlement.pdf',
+  payrollStatementPdf: 'payroll.statement.pdf',
   documentsCollection: 'documents.collection',
   documentDetail: 'documents.detail',
   documentContent: 'documents.content',
@@ -2696,6 +2725,28 @@ export const erpMarocRouteIds = {
   accountingAnomalies: 'operations.anomalies',
   accountingAnomaliesScan: 'operations.anomalies.scan',
   accountingAnomalyResolve: 'operations.anomaly.resolve',
+  liasseDefinitions: 'liasse.definitions',
+  liasseTables: 'liasse.tables',
+  liasseTable: 'liasse.table',
+  liasseRow: 'liasse.row',
+  liasseExport: 'liasse.export',
+  regulatorySubmissions: 'regulatory.submissions',
+  regulatorySubmissionValidation: 'regulatory.submission.validation',
+  portalAdminRequests: 'portal.admin.requests',
+  portalAdminComment: 'portal.admin.comment',
+  portalAdminRequestUpdate: 'portal.admin.request.update',
+  aiAccountingStatus: 'ai-accounting.status',
+  aiAccountingSuggestions: 'ai-accounting.suggestions',
+  aiAccountingCategorize: 'ai-accounting.categorize',
+  aiAccountingReconcile: 'ai-accounting.reconcile',
+  aiAccountingSuggestionReview: 'ai-accounting.suggestion.review',
+  aiAccountingSafeQuery: 'ai-accounting.safe-query',
+  aiAccountingConversations: 'ai-accounting.conversations',
+  aiAccountingAsk: 'ai-accounting.ask',
+  approvalMatrices: 'approvals.matrices',
+  approvalMatrixActive: 'approvals.matrix.active',
+  approvalRequests: 'approvals.requests',
+  approvalDecision: 'approvals.decision',
 } as const;
 
 export const erpMarocUpstreamRoutes = {
@@ -2858,6 +2909,8 @@ export const erpMarocUpstreamRoutes = {
       `/fiscal/declarations/${encodeRouteId(id)}/status`,
     declarationSimpl: (id: string) =>
       `/fiscal/declarations/${encodeRouteId(id)}/simpl`,
+    declarationAdc080f: (id: string) =>
+      `/fiscal/declarations/${encodeRouteId(id)}/adc080f`,
     deadlines: '/fiscal/deadlines',
     seedDeadlines: '/fiscal/deadlines/seed',
     completeDeadline: (id: string) =>
@@ -2895,6 +2948,14 @@ export const erpMarocUpstreamRoutes = {
     decideLeave: (id: string) =>
       `/payroll/leaves/${encodeRouteId(id)}/decision`,
     cnssExport: '/payroll/cnss/export',
+    cnssBds: '/payroll/cnss/bds',
+    payslipPdf: (id: string) => `/payroll/payslips/${encodeRouteId(id)}/pdf`,
+    employeeAttestation: (id: string) =>
+      `/payroll/employees/${encodeRouteId(id)}/attestation`,
+    finalSettlementPdf: (id: string) =>
+      `/payroll/employees/${encodeRouteId(id)}/final-settlement/pdf`,
+    statementPdf: (periodKey: string) =>
+      `/payroll/statements/${encodeURIComponent(periodKey)}/pdf`,
   },
   documents: {
     collection: '/documents',
@@ -2928,6 +2989,45 @@ export const erpMarocUpstreamRoutes = {
     scanAnomalies: '/operations/anomalies/scan',
     resolveAnomaly: (id: string) =>
       `/operations/anomalies/${encodeRouteId(id)}/resolve`,
+  },
+  liasse: {
+    definitions: '/liasse/definitions',
+    tables: (exerciseId: string) =>
+      `/liasse/exercises/${encodeRouteId(exerciseId)}/tables`,
+    table: (exerciseId: string, tableCode: string) =>
+      `/liasse/exercises/${encodeRouteId(exerciseId)}/tables/${encodeURIComponent(tableCode)}`,
+    row: (exerciseId: string, tableCode: string, rowCode: string) =>
+      `/liasse/exercises/${encodeRouteId(exerciseId)}/tables/${encodeURIComponent(tableCode)}/rows/${encodeURIComponent(rowCode)}`,
+    export: (exerciseId: string) =>
+      `/liasse/exercises/${encodeRouteId(exerciseId)}/export`,
+    submissions: '/liasse/submissions',
+    validateSubmission: (id: string) =>
+      `/liasse/submissions/${encodeRouteId(id)}/external-validation`,
+  },
+  portalAdmin: {
+    requests: '/portal-admin/requests',
+    comment: (id: string) =>
+      `/portal-admin/requests/${encodeRouteId(id)}/comments`,
+    request: (id: string) => `/portal-admin/requests/${encodeRouteId(id)}`,
+  },
+  aiAccounting: {
+    status: '/ai-accounting/status',
+    suggestions: '/ai-accounting/suggestions',
+    categorize: '/ai-accounting/categorize',
+    reconcile: '/ai-accounting/reconcile',
+    reviewSuggestion: (id: string) =>
+      `/ai-accounting/suggestions/${encodeRouteId(id)}`,
+    safeQuery: '/ai-accounting/safe-query',
+    conversations: '/ai-accounting/conversations',
+    ask: '/ai-accounting/ask',
+  },
+  approvals: {
+    matrices: '/approvals/matrices',
+    matrixActive: (id: string) =>
+      `/approvals/matrices/${encodeRouteId(id)}/active`,
+    requests: '/approvals/requests',
+    decision: (id: string) =>
+      `/approvals/requests/${encodeRouteId(id)}/decision`,
   },
 } as const;
 
