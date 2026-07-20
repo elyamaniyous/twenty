@@ -1,6 +1,15 @@
 import {
+  erpAccountingAnomalyListSchema,
+  erpAccountingAnomalySchema,
   erpAccountingEntryPageSchema,
   erpAccountingEntrySchema,
+  erpAccountingPeriodSchema,
+  erpAccountingReviewTaskListSchema,
+  erpAccountingReviewTaskSchema,
+  erpAnalyticAllocationSchema,
+  erpAnalyticAxisListSchema,
+  erpAnalyticAxisSchema,
+  erpAnomalyScanResultSchema,
   erpBalanceReportSchema,
   erpBankAccountListSchema,
   erpBankAccountSchema,
@@ -9,6 +18,10 @@ import {
   erpBankStatementLineSchema,
   erpBankStatementListSchema,
   erpBankStatementSchema,
+  erpBudgetListSchema,
+  erpBudgetSchema,
+  erpBudgetVarianceSchema,
+  erpCnssExportSchema,
   erpCreditNotePageSchema,
   erpCreditNoteSchema,
   erpCustomerReturnEligibleLineListSchema,
@@ -17,48 +30,78 @@ import {
   erpContextSchema,
   erpDeliveryNoteListSchema,
   erpDeliveryNoteSchema,
+  erpDocumentContentSchema,
+  erpDocumentListSchema,
+  erpDocumentSchema,
   erpEligibleInvoicePageSchema,
+  erpEmployeeListSchema,
+  erpEmployeeSchema,
+  erpEmployeeTerminationResultSchema,
+  erpExchangeRateListSchema,
+  erpExchangeRateSchema,
+  erpExerciseClosingResultSchema,
+  erpExerciseListSchema,
+  erpExerciseSchema,
+  erpExpenseNoteListSchema,
+  erpExpenseNoteSchema,
+  erpFecExportSchema,
+  erpFecImportResultSchema,
+  erpFileExportSchema,
+  erpFinancialStatementsSchema,
+  erpFiscalDeadlineListSchema,
+  erpFiscalDeadlineSchema,
+  erpGrandLivreReportSchema,
+  erpGrossMarginReportSchema,
+  erpInventoryCountListSchema,
+  erpInventoryCountSchema,
+  erpInventoryThresholdListSchema,
+  erpInventoryThresholdSchema,
   erpInvoicePageSchema,
   erpInvoiceReadSchema,
   erpInvoiceSchema,
-  erpGrandLivreReportSchema,
-  erpGrossMarginReportSchema,
+  erpLeaveRequestListSchema,
+  erpLeaveRequestSchema,
   erpLettrageMatchSchema,
   erpLettrageSuggestionsSchema,
   erpMarocRouteIds,
   erpMarocUpstreamRoutes,
   erpPaymentPageSchema,
   erpPaymentSchema,
+  erpPayslipListSchema,
+  erpPayslipSchema,
+  erpPortalAccessListSchema,
+  erpPortalAccessSchema,
   erpProductListSchema,
   erpProductSchema,
   erpPurchaseOrderListSchema,
   erpPurchaseOrderSchema,
   erpPurchaseReceiptListSchema,
   erpPurchaseReceiptSchema,
-  erpSupplierInvoiceListSchema,
-  erpSupplierInvoiceSchema,
-  erpSupplierInvoiceDetailSchema,
-  erpSupplierPaymentPreparationListSchema,
-  erpSupplierPaymentPreparationSchema,
-  erpStockLevelListSchema,
-  erpStockMovementListSchema,
-  erpStockMovementSchema,
-  erpInventoryCountListSchema,
-  erpInventoryCountSchema,
-  erpInventoryThresholdListSchema,
-  erpInventoryThresholdSchema,
-  erpReplenishmentSuggestionListSchema,
-  erpWarehouseListSchema,
-  erpWarehouseSchema,
   erpQuoteListSchema,
   erpQuoteSchema,
-  erpSalesOrderListSchema,
-  erpSalesOrderSchema,
+  erpRecurringInvoiceListSchema,
+  erpRecurringInvoiceRunSchema,
+  erpRecurringInvoiceSchema,
   erpReminderPageSchema,
   erpReminderScanResultSchema,
   erpReminderSchema,
+  erpReplenishmentSuggestionListSchema,
+  erpSalesOrderListSchema,
+  erpSalesOrderSchema,
+  erpStockLevelListSchema,
+  erpStockMovementListSchema,
+  erpStockMovementSchema,
+  erpSupplierInvoiceDetailSchema,
+  erpSupplierInvoiceListSchema,
+  erpSupplierInvoiceSchema,
+  erpSupplierPaymentPreparationListSchema,
+  erpSupplierPaymentPreparationSchema,
+  erpTaxDeclarationListSchema,
+  erpTaxDeclarationSchema,
   erpTierListSchema,
   erpTierSchema,
+  erpWarehouseListSchema,
+  erpWarehouseSchema,
   uuidSchema,
   type ErpMarocRouteId,
 } from 'twenty-shared/erp-maroc';
@@ -128,6 +171,10 @@ const grandLivreQuery = Object.freeze([
   ...accountingReportQuery,
 ]);
 const lettrageQuery = Object.freeze(['accountCode']);
+const fiscalSeedQuery = Object.freeze(['year']);
+const payrollPeriodQuery = Object.freeze(['periodKey']);
+const documentQuery = Object.freeze(['search', 'type', 'tag']);
+const recurringRunQuery = Object.freeze(['asOf']);
 const pdfSchema = z.instanceof(Uint8Array);
 
 const exact = (path: string) => new RegExp(`^${path}$`);
@@ -150,6 +197,25 @@ const defineRoute = (route: ErpMarocRoute): ErpMarocRoute => {
 
   return Object.freeze(route);
 };
+
+const defineJsonRoute = (
+  routeId: ErpMarocRouteId,
+  method: ErpMarocHttpMethod,
+  pattern: RegExp,
+  build: (match: RegExpMatchArray) => string,
+  responseSchema: ZodType,
+  queryKeys: readonly string[] = noQuery,
+): ErpMarocRoute =>
+  defineRoute({
+    routeId,
+    method,
+    pattern,
+    build,
+    queryKeys,
+    responseSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  });
 
 const routes: ErpMarocRoute[] = [
   defineRoute({
@@ -1366,6 +1432,424 @@ const routes: ErpMarocRoute[] = [
     kind: 'json',
     idempotency: 'forbidden',
   }),
+  defineJsonRoute(
+    erpMarocRouteIds.fiscalDeclarations,
+    'GET',
+    exact('/fiscal/declarations'),
+    staticBuilder(erpMarocUpstreamRoutes.fiscal.declarations),
+    erpTaxDeclarationListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.fiscalTvaCalculate,
+    'POST',
+    exact('/fiscal/tva/calculate'),
+    staticBuilder(erpMarocUpstreamRoutes.fiscal.calculateTva),
+    erpTaxDeclarationSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.fiscalIsCalculate,
+    'POST',
+    exact('/fiscal/is/calculate'),
+    staticBuilder(erpMarocUpstreamRoutes.fiscal.calculateIs),
+    erpTaxDeclarationSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.fiscalDeclarationStatus,
+    'PATCH',
+    new RegExp(`^/fiscal/declarations/${uuidSource}/status$`),
+    idBuilder(erpMarocUpstreamRoutes.fiscal.declarationStatus),
+    erpTaxDeclarationSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.fiscalDeclarationSimpl,
+    'GET',
+    new RegExp(`^/fiscal/declarations/${uuidSource}/simpl$`),
+    idBuilder(erpMarocUpstreamRoutes.fiscal.declarationSimpl),
+    erpFileExportSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.fiscalDeadlines,
+    'GET',
+    exact('/fiscal/deadlines'),
+    staticBuilder(erpMarocUpstreamRoutes.fiscal.deadlines),
+    erpFiscalDeadlineListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.fiscalDeadlinesSeed,
+    'POST',
+    exact('/fiscal/deadlines/seed'),
+    staticBuilder(erpMarocUpstreamRoutes.fiscal.seedDeadlines),
+    erpFiscalDeadlineListSchema,
+    fiscalSeedQuery,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.fiscalDeadlineComplete,
+    'PATCH',
+    new RegExp(`^/fiscal/deadlines/${uuidSource}/complete$`),
+    idBuilder(erpMarocUpstreamRoutes.fiscal.completeDeadline),
+    erpFiscalDeadlineSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.complianceExercises,
+    'GET',
+    exact('/accounting-compliance/exercises'),
+    staticBuilder(erpMarocUpstreamRoutes.compliance.exercises),
+    erpExerciseListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.complianceExercises,
+    'POST',
+    exact('/accounting-compliance/exercises'),
+    staticBuilder(erpMarocUpstreamRoutes.compliance.exercises),
+    erpExerciseSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.complianceExerciseReview,
+    'POST',
+    new RegExp(`^/accounting-compliance/exercises/${uuidSource}/review$`),
+    idBuilder(erpMarocUpstreamRoutes.compliance.initializeReview),
+    erpAccountingReviewTaskListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.complianceReviewTask,
+    'PATCH',
+    new RegExp(`^/accounting-compliance/review-tasks/${uuidSource}$`),
+    idBuilder(erpMarocUpstreamRoutes.compliance.reviewTask),
+    erpAccountingReviewTaskSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.compliancePeriodClose,
+    'POST',
+    new RegExp(`^/accounting-compliance/periods/${uuidSource}/close$`),
+    idBuilder(erpMarocUpstreamRoutes.compliance.closePeriod),
+    erpAccountingPeriodSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.compliancePeriodReopen,
+    'POST',
+    new RegExp(`^/accounting-compliance/periods/${uuidSource}/reopen$`),
+    idBuilder(erpMarocUpstreamRoutes.compliance.reopenPeriod),
+    erpAccountingPeriodSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.complianceExerciseClose,
+    'POST',
+    new RegExp(`^/accounting-compliance/exercises/${uuidSource}/close$`),
+    idBuilder(erpMarocUpstreamRoutes.compliance.closeExercise),
+    erpExerciseClosingResultSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.complianceExerciseStatements,
+    'GET',
+    new RegExp(`^/accounting-compliance/exercises/${uuidSource}/statements$`),
+    idBuilder(erpMarocUpstreamRoutes.compliance.statements),
+    erpFinancialStatementsSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.complianceExerciseFec,
+    'GET',
+    new RegExp(`^/accounting-compliance/exercises/${uuidSource}/fec$`),
+    idBuilder(erpMarocUpstreamRoutes.compliance.fec),
+    erpFecExportSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.complianceFecImport,
+    'POST',
+    exact('/accounting-compliance/fec/import'),
+    staticBuilder(erpMarocUpstreamRoutes.compliance.importFec),
+    erpFecImportResultSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.payrollEmployees,
+    'GET',
+    exact('/payroll/employees'),
+    staticBuilder(erpMarocUpstreamRoutes.payroll.employees),
+    erpEmployeeListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.payrollEmployees,
+    'POST',
+    exact('/payroll/employees'),
+    staticBuilder(erpMarocUpstreamRoutes.payroll.employees),
+    erpEmployeeSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.payrollEmployeeDetail,
+    'PATCH',
+    detail('payroll/employees'),
+    idBuilder(erpMarocUpstreamRoutes.payroll.employee),
+    erpEmployeeSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.payrollEmployeeTerminate,
+    'POST',
+    new RegExp(`^/payroll/employees/${uuidSource}/terminate$`),
+    idBuilder(erpMarocUpstreamRoutes.payroll.terminateEmployee),
+    erpEmployeeTerminationResultSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.payrollPayslips,
+    'GET',
+    exact('/payroll/payslips'),
+    staticBuilder(erpMarocUpstreamRoutes.payroll.payslips),
+    erpPayslipListSchema,
+    payrollPeriodQuery,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.payrollPayslipGenerate,
+    'POST',
+    exact('/payroll/payslips/generate'),
+    staticBuilder(erpMarocUpstreamRoutes.payroll.generatePayslip),
+    erpPayslipSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.payrollPayslipValidate,
+    'POST',
+    new RegExp(`^/payroll/payslips/${uuidSource}/validate$`),
+    idBuilder(erpMarocUpstreamRoutes.payroll.validatePayslip),
+    erpPayslipSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.payrollPayslipPay,
+    'POST',
+    new RegExp(`^/payroll/payslips/${uuidSource}/pay$`),
+    idBuilder(erpMarocUpstreamRoutes.payroll.payPayslip),
+    erpPayslipSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.payrollLeaves,
+    'GET',
+    exact('/payroll/leaves'),
+    staticBuilder(erpMarocUpstreamRoutes.payroll.leaves),
+    erpLeaveRequestListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.payrollLeaves,
+    'POST',
+    exact('/payroll/leaves'),
+    staticBuilder(erpMarocUpstreamRoutes.payroll.leaves),
+    erpLeaveRequestSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.payrollLeaveDecision,
+    'PATCH',
+    new RegExp(`^/payroll/leaves/${uuidSource}/decision$`),
+    idBuilder(erpMarocUpstreamRoutes.payroll.decideLeave),
+    erpLeaveRequestSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.payrollCnssExport,
+    'GET',
+    exact('/payroll/cnss/export'),
+    staticBuilder(erpMarocUpstreamRoutes.payroll.cnssExport),
+    erpCnssExportSchema,
+    payrollPeriodQuery,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.documentsCollection,
+    'GET',
+    exact('/documents'),
+    staticBuilder(erpMarocUpstreamRoutes.documents.collection),
+    erpDocumentListSchema,
+    documentQuery,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.documentsCollection,
+    'POST',
+    exact('/documents'),
+    staticBuilder(erpMarocUpstreamRoutes.documents.collection),
+    erpDocumentSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.documentDetail,
+    'GET',
+    detail('documents'),
+    idBuilder(erpMarocUpstreamRoutes.documents.detail),
+    erpDocumentSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.documentContent,
+    'GET',
+    new RegExp(`^/documents/${uuidSource}/content$`),
+    idBuilder(erpMarocUpstreamRoutes.documents.content),
+    erpDocumentContentSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.documentOcrRetry,
+    'POST',
+    new RegExp(`^/documents/${uuidSource}/ocr/retry$`),
+    idBuilder(erpMarocUpstreamRoutes.documents.retryOcr),
+    erpDocumentSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.documentOcrValidate,
+    'POST',
+    new RegExp(`^/documents/${uuidSource}/ocr/validate$`),
+    idBuilder(erpMarocUpstreamRoutes.documents.validateOcr),
+    erpDocumentSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.documentCreateSupplierInvoice,
+    'POST',
+    new RegExp(`^/documents/${uuidSource}/create-supplier-invoice$`),
+    idBuilder(erpMarocUpstreamRoutes.documents.createSupplierInvoice),
+    erpSupplierInvoiceSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.expenseNotes,
+    'GET',
+    exact('/operations/expense-notes'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.expenseNotes),
+    erpExpenseNoteListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.expenseNotes,
+    'POST',
+    exact('/operations/expense-notes'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.expenseNotes),
+    erpExpenseNoteSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.expenseNoteSubmit,
+    'POST',
+    new RegExp(`^/operations/expense-notes/${uuidSource}/submit$`),
+    idBuilder(erpMarocUpstreamRoutes.operations.submitExpenseNote),
+    erpExpenseNoteSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.expenseNoteDecision,
+    'PATCH',
+    new RegExp(`^/operations/expense-notes/${uuidSource}/decision$`),
+    idBuilder(erpMarocUpstreamRoutes.operations.decideExpenseNote),
+    erpExpenseNoteSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.analytics,
+    'GET',
+    exact('/operations/analytics'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.analytics),
+    erpAnalyticAxisListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.analytics,
+    'POST',
+    exact('/operations/analytics'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.analytics),
+    erpAnalyticAxisSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.analyticAllocations,
+    'POST',
+    exact('/operations/analytics/allocations'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.analyticAllocations),
+    erpAnalyticAllocationSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.budgets,
+    'GET',
+    exact('/operations/budgets'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.budgets),
+    erpBudgetListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.budgets,
+    'POST',
+    exact('/operations/budgets'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.budgets),
+    erpBudgetSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.budgetApprove,
+    'POST',
+    new RegExp(`^/operations/budgets/${uuidSource}/approve$`),
+    idBuilder(erpMarocUpstreamRoutes.operations.approveBudget),
+    erpBudgetSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.budgetVariance,
+    'GET',
+    new RegExp(`^/operations/budgets/${uuidSource}/variance$`),
+    idBuilder(erpMarocUpstreamRoutes.operations.budgetVariance),
+    erpBudgetVarianceSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.recurringInvoices,
+    'GET',
+    exact('/operations/recurring-invoices'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.recurringInvoices),
+    erpRecurringInvoiceListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.recurringInvoices,
+    'POST',
+    exact('/operations/recurring-invoices'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.recurringInvoices),
+    erpRecurringInvoiceSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.recurringInvoicesRun,
+    'POST',
+    exact('/operations/recurring-invoices/run'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.runRecurringInvoices),
+    erpRecurringInvoiceRunSchema,
+    recurringRunQuery,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.exchangeRates,
+    'GET',
+    exact('/operations/exchange-rates'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.exchangeRates),
+    erpExchangeRateListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.exchangeRates,
+    'POST',
+    exact('/operations/exchange-rates'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.exchangeRates),
+    erpExchangeRateSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.portalAccess,
+    'GET',
+    exact('/operations/portal-access'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.portalAccess),
+    erpPortalAccessListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.portalAccess,
+    'POST',
+    exact('/operations/portal-access'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.portalAccess),
+    erpPortalAccessSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.portalAccessRevoke,
+    'POST',
+    new RegExp(`^/operations/portal-access/${uuidSource}/revoke$`),
+    idBuilder(erpMarocUpstreamRoutes.operations.revokePortalAccess),
+    erpPortalAccessSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.accountingAnomalies,
+    'GET',
+    exact('/operations/anomalies'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.anomalies),
+    erpAccountingAnomalyListSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.accountingAnomaliesScan,
+    'POST',
+    exact('/operations/anomalies/scan'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.scanAnomalies),
+    erpAnomalyScanResultSchema,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.accountingAnomalyResolve,
+    'POST',
+    new RegExp(`^/operations/anomalies/${uuidSource}/resolve$`),
+    idBuilder(erpMarocUpstreamRoutes.operations.resolveAnomaly),
+    erpAccountingAnomalySchema,
+  ),
 ];
 
 export const ERP_MAROC_ROUTE_POLICY: readonly ErpMarocRoute[] =
@@ -1437,8 +1921,34 @@ const reminderStatuses = new Set([
   'RECONCILIATION_REQUIRED',
 ]);
 const reminderLevels = new Set(['LEVEL_1', 'LEVEL_2', 'LEVEL_3']);
-const accountingEntryStatuses = new Set(['DRAFT', 'VALIDATED', 'REJECTED']);
-const accountingSourceTypes = new Set(['INVOICE', 'PAYMENT', 'CREDIT_NOTE']);
+const accountingEntryStatuses = new Set([
+  'DRAFT',
+  'VALIDATED',
+  'LOCKED',
+  'REJECTED',
+]);
+const accountingSourceTypes = new Set([
+  'MANUAL',
+  'INVOICE',
+  'PAYMENT',
+  'CREDIT_NOTE',
+  'SUPPLIER_INVOICE',
+  'SUPPLIER_PAYMENT',
+  'PAYROLL',
+  'EXPENSE_NOTE',
+  'CLOSING',
+  'OPENING_BALANCE',
+]);
+const documentTypes = new Set([
+  'SUPPLIER_INVOICE',
+  'CUSTOMER_INVOICE',
+  'BANK_STATEMENT',
+  'RECEIPT',
+  'CONTRACT',
+  'FISCAL',
+  'PAYROLL',
+  'OTHER',
+]);
 
 const isValidCivilDate = (value: string): boolean => {
   if (!civilDate.test(value)) return false;
@@ -1465,6 +1975,27 @@ const assertNormalizedQueryValue = (
   }
   if (key === 'from' || key === 'to') {
     if (!isValidCivilDate(value)) rejectRoute();
+    return;
+  }
+  if (key === 'asOf') {
+    if (!isValidCivilDate(value)) rejectRoute();
+    return;
+  }
+  if (key === 'year') {
+    if (!/^20\d{2}$|^21\d{2}$/.test(value)) rejectRoute();
+    return;
+  }
+  if (key === 'periodKey') {
+    if (!/^\d{4}-(?:0[1-9]|1[0-2])$/.test(value)) rejectRoute();
+    return;
+  }
+  if (key === 'search' || key === 'tag') {
+    if (value.length > 200 || /[\u0000-\u001f\u007f]/.test(value))
+      rejectRoute();
+    return;
+  }
+  if (key === 'type') {
+    if (!documentTypes.has(value)) rejectRoute();
     return;
   }
   if (

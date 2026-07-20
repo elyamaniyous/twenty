@@ -208,6 +208,36 @@ const ErpInventoryPage = lazy(() =>
   })),
 );
 
+const ErpFiscalPage = lazy(() =>
+  import('~/pages/erp-maroc/compliance/ErpFiscalPage').then((module) => ({
+    default: module.ErpFiscalPage,
+  })),
+);
+
+const ErpClosingPage = lazy(() =>
+  import('~/pages/erp-maroc/compliance/ErpClosingPage').then((module) => ({
+    default: module.ErpClosingPage,
+  })),
+);
+
+const ErpPayrollPage = lazy(() =>
+  import('~/pages/erp-maroc/compliance/ErpPayrollPage').then((module) => ({
+    default: module.ErpPayrollPage,
+  })),
+);
+
+const ErpDocumentsPage = lazy(() =>
+  import('~/pages/erp-maroc/compliance/ErpDocumentsPage').then((module) => ({
+    default: module.ErpDocumentsPage,
+  })),
+);
+
+const ErpManagementPage = lazy(() =>
+  import('~/pages/erp-maroc/compliance/ErpManagementPage').then((module) => ({
+    default: module.ErpManagementPage,
+  })),
+);
+
 const RecordIndexPage = lazy(() =>
   import('~/pages/object-record/RecordIndexPage').then((module) => ({
     default: module.RecordIndexPage,
@@ -697,6 +727,46 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpInventoryPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.fiscal}
+                element={
+                  <LazyRoute>
+                    <ErpFiscalPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.closing}
+                element={
+                  <LazyRoute>
+                    <ErpClosingPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.payroll}
+                element={
+                  <LazyRoute>
+                    <ErpPayrollPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.documents}
+                element={
+                  <LazyRoute>
+                    <ErpDocumentsPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.management}
+                element={
+                  <LazyRoute>
+                    <ErpManagementPage />
                   </LazyRoute>
                 }
               />

@@ -3,6 +3,8 @@ import { json, type RequestHandler } from 'express';
 const ERP_MAROC_PREFIX = '/erp-maroc-api';
 const ERP_MAROC_JSON_LIMIT = 1024 * 1024;
 const ERP_BANK_STATEMENT_JSON_LIMIT = 21 * 1024 * 1024;
+const ERP_DOCUMENT_JSON_LIMIT = 32 * 1024 * 1024;
+const ERP_FEC_JSON_LIMIT = 51 * 1024 * 1024;
 
 type ErpMarocEnabledConfig = Readonly<{
   get(key: 'ERP_MAROC_ENABLED'): boolean;
@@ -26,6 +28,11 @@ export const createErpMarocPreBodyParser = (
     limit: ERP_BANK_STATEMENT_JSON_LIMIT,
     strict: true,
   });
+  const documentParser = json({
+    limit: ERP_DOCUMENT_JSON_LIMIT,
+    strict: true,
+  });
+  const fecParser = json({ limit: ERP_FEC_JSON_LIMIT, strict: true });
 
   return (request, response, next) => {
     if (!isErpMarocRequest(request.originalUrl || request.url)) {
@@ -51,6 +58,21 @@ export const createErpMarocPreBodyParser = (
       pathname.toLowerCase() === `${ERP_MAROC_PREFIX}/bank-statements`
     ) {
       bankStatementParser(request, response, next);
+      return;
+    }
+    if (
+      request.method === 'POST' &&
+      pathname.toLowerCase() === `${ERP_MAROC_PREFIX}/documents`
+    ) {
+      documentParser(request, response, next);
+      return;
+    }
+    if (
+      request.method === 'POST' &&
+      pathname.toLowerCase() ===
+        `${ERP_MAROC_PREFIX}/accounting-compliance/fec/import`
+    ) {
+      fecParser(request, response, next);
       return;
     }
 

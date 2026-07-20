@@ -78,6 +78,20 @@ describe('ERP Maroc pre-body parser', () => {
       .expect({ body: { filename: 'releve.pdf', contentBase64 } });
   });
 
+  it('accepts a document upload over the standard 1 MiB limit', async () => {
+    await request(createApp())
+      .post('/erp-maroc-api/documents')
+      .send({ filename: 'facture.pdf', contentBase64: 'A'.repeat(2 * MiB) })
+      .expect(200);
+  });
+
+  it('accepts a FEC import over the standard 1 MiB limit', async () => {
+    await request(createApp())
+      .post('/erp-maroc-api/accounting-compliance/fec/import')
+      .send({ filename: 'fec.txt', contentBase64: 'A'.repeat(2 * MiB) })
+      .expect(200);
+  });
+
   it('parses an enabled body within the limit and the global parser skips it', async () => {
     await request(createApp())
       .post('/erp-maroc-api/products')

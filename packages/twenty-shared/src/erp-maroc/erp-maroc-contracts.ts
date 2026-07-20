@@ -1383,14 +1383,20 @@ export const erpReminderScanResultSchema = z.object({
 export const erpAccountingEntryStatusSchema = z.enum([
   'DRAFT',
   'VALIDATED',
+  'LOCKED',
   'REJECTED',
 ]);
 export const erpAccountingSourceTypeSchema = z.enum([
+  'MANUAL',
   'INVOICE',
   'PAYMENT',
   'CREDIT_NOTE',
   'SUPPLIER_INVOICE',
   'SUPPLIER_PAYMENT',
+  'PAYROLL',
+  'EXPENSE_NOTE',
+  'CLOSING',
+  'OPENING_BALANCE',
 ]);
 
 export const erpAccountingEntryLineSchema = z
@@ -1460,7 +1466,9 @@ export const erpAccountingEntrySchema = z
       entry.rejectionReason !== null;
     const validReviewState =
       (entry.status === 'DRAFT' && !hasValidation && !hasRejection) ||
-      (entry.status === 'VALIDATED' && hasValidation && !hasRejection) ||
+      ((entry.status === 'VALIDATED' || entry.status === 'LOCKED') &&
+        hasValidation &&
+        !hasRejection) ||
       (entry.status === 'REJECTED' && !hasValidation && hasRejection);
 
     if (!validReviewState) {
@@ -2051,6 +2059,489 @@ export const erpReplenishmentSuggestionListSchema = z.array(
   erpReplenishmentSuggestionSchema,
 );
 
+export const erpTaxDeclarationSchema = z
+  .object({
+    id: uuidSchema,
+    exerciceId: uuidSchema,
+    type: z.enum(['TVA', 'IS']),
+    periodKey: nonBlankStringSchema,
+    periodStart: civilDateHttpSchema,
+    periodEnd: civilDateHttpSchema,
+    dueDate: civilDateHttpSchema,
+    status: z.enum(['DRAFT', 'REVIEWED', 'FILED', 'PAID', 'CANCELLED']),
+    taxableBaseCents: signedCentsSchema,
+    collectedTaxCents: signedCentsSchema,
+    deductibleTaxCents: signedCentsSchema,
+    previousCreditCents: signedCentsSchema,
+    prorataBasisPoints: nonNegativeIntegerSchema,
+    taxDueCents: signedCentsSchema,
+    taxCreditCents: signedCentsSchema,
+    calculation: z.unknown(),
+    simplXml: nullableStringSchema,
+    filingReference: nullableStringSchema,
+    reviewedAt: nullableInstantSchema,
+    filedAt: nullableInstantSchema,
+    paidAt: nullableInstantSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+    exercice: z.object({ annee: nonNegativeIntegerSchema }).optional(),
+  })
+  .passthrough();
+export const erpTaxDeclarationListSchema = z.array(erpTaxDeclarationSchema);
+
+export const erpFiscalDeadlineSchema = z
+  .object({
+    id: uuidSchema,
+    code: nonBlankStringSchema,
+    label: nonBlankStringSchema,
+    category: nonBlankStringSchema,
+    dueDate: civilDateHttpSchema,
+    periodKey: nonBlankStringSchema,
+    completedAt: nullableInstantSchema,
+    notes: nullableStringSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpFiscalDeadlineListSchema = z.array(erpFiscalDeadlineSchema);
+
+export const erpFileExportSchema = z.object({
+  filename: nonBlankStringSchema,
+  contentType: nonBlankStringSchema,
+  content: z.string(),
+});
+
+export const erpAccountingPeriodSchema = z
+  .object({
+    id: uuidSchema,
+    exerciceId: uuidSchema,
+    periodNumber: positiveIntegerSchema,
+    startDate: civilDateHttpSchema,
+    endDate: civilDateHttpSchema,
+    status: z.enum(['OPEN', 'CLOSED']),
+    closedAt: nullableInstantSchema,
+    reopenedAt: nullableInstantSchema,
+    reopenReason: nullableStringSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+
+export const erpAccountingReviewTaskSchema = z
+  .object({
+    id: uuidSchema,
+    exerciceId: uuidSchema,
+    code: nonBlankStringSchema,
+    label: nonBlankStringSchema,
+    category: nonBlankStringSchema,
+    status: z.enum(['TODO', 'IN_PROGRESS', 'DONE', 'NOT_APPLICABLE']),
+    evidence: z.unknown().nullable(),
+    notes: nullableStringSchema,
+    completedAt: nullableInstantSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpAccountingReviewTaskListSchema = z.array(
+  erpAccountingReviewTaskSchema,
+);
+
+export const erpExerciseSchema = z
+  .object({
+    id: uuidSchema,
+    annee: nonNegativeIntegerSchema,
+    dateDebut: civilDateHttpSchema,
+    dateFin: civilDateHttpSchema,
+    status: z.enum(['OPEN', 'CLOSING', 'CLOSED']),
+    closingStartedAt: nullableInstantSchema,
+    closedAt: nullableInstantSchema,
+    closingEntryId: nullableUuidSchema,
+    openingEntryId: nullableUuidSchema,
+    accountingPeriods: z.array(erpAccountingPeriodSchema).optional(),
+    accountingReviewTasks: z.array(erpAccountingReviewTaskSchema).optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpExerciseListSchema = z.array(erpExerciseSchema);
+
+const erpCpcSchema = z.object({
+  operating: z.object({
+    revenueCents: signedCentsSchema,
+    expensesCents: signedCentsSchema,
+    resultCents: signedCentsSchema,
+  }),
+  financial: z.object({
+    revenueCents: signedCentsSchema,
+    expensesCents: signedCentsSchema,
+    resultCents: signedCentsSchema,
+  }),
+  nonCurrent: z.object({
+    revenueCents: signedCentsSchema,
+    expensesCents: signedCentsSchema,
+    resultCents: signedCentsSchema,
+  }),
+  incomeTaxCents: signedCentsSchema,
+  netResultCents: signedCentsSchema,
+});
+
+export const erpFinancialStatementsSchema = z
+  .object({
+    exercise: z.object({
+      id: uuidSchema,
+      year: nonNegativeIntegerSchema,
+      startDate: civilDateHttpSchema,
+      endDate: civilDateHttpSchema,
+      status: z.enum(['OPEN', 'CLOSING', 'CLOSED']),
+    }),
+    company: z
+      .object({
+        raisonSociale: nonBlankStringSchema,
+        ice: nullableStringSchema,
+        identifiantFiscal: nullableStringSchema,
+      })
+      .passthrough(),
+    bilan: z.object({
+      assets: z.object({ totalCents: signedCentsSchema }).passthrough(),
+      liabilities: z.object({ totalCents: signedCentsSchema }).passthrough(),
+      differenceCents: signedCentsSchema,
+      isBalanced: z.boolean(),
+    }),
+    cpc: erpCpcSchema,
+    esg: z
+      .object({
+        valueAddedCents: signedCentsSchema,
+        grossOperatingSurplusCents: signedCentsSchema,
+        netResultCents: signedCentsSchema,
+      })
+      .passthrough(),
+    financing: z
+      .object({
+        selfFinancingCapacityCents: signedCentsSchema,
+        netTreasuryChangeCents: signedCentsSchema,
+      })
+      .passthrough(),
+    taxDeclarations: z.array(z.unknown()),
+    annexes: z.unknown(),
+  })
+  .passthrough();
+
+export const erpFecExportSchema = erpFileExportSchema.extend({
+  entries: nonNegativeIntegerSchema,
+  lines: nonNegativeIntegerSchema,
+});
+export const erpFecImportResultSchema = z.object({
+  importedEntries: nonNegativeIntegerSchema,
+  skippedEntries: nonNegativeIntegerSchema,
+  lines: nonNegativeIntegerSchema,
+});
+export const erpExerciseClosingResultSchema = z.object({
+  closedExercise: erpExerciseSchema,
+  nextExercise: erpExerciseSchema,
+  closingEntryId: nullableUuidSchema,
+  openingEntryId: nullableUuidSchema,
+});
+
+export const erpEmployeeSchema = z
+  .object({
+    id: uuidSchema,
+    employeeNumber: nonBlankStringSchema,
+    firstName: nonBlankStringSchema,
+    lastName: nonBlankStringSchema,
+    cin: nullableStringSchema,
+    cnssNumber: nullableStringSchema,
+    email: nullableStringSchema,
+    phone: nullableStringSchema,
+    jobTitle: nonBlankStringSchema,
+    department: nullableStringSchema,
+    contractType: z.enum(['CDI', 'CDD', 'ANAPEC', 'INTERIM', 'STAGE']),
+    status: z.enum(['ACTIVE', 'INACTIVE', 'TERMINATED']),
+    hireDate: civilDateHttpSchema,
+    terminationDate: nullableCivilDateHttpSchema,
+    baseSalaryCents: centsSchema,
+    familyDependants: nonNegativeIntegerSchema,
+    bankRib: nullableStringSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpEmployeeListSchema = z.array(erpEmployeeSchema);
+
+export const erpPayslipLineSchema = z
+  .object({
+    id: uuidSchema,
+    code: nonBlankStringSchema,
+    label: nonBlankStringSchema,
+    kind: nonBlankStringSchema,
+    baseCents: signedCentsSchema,
+    rateBasisPoints: signedCentsSchema,
+    amountCents: signedCentsSchema,
+    position: nonNegativeIntegerSchema,
+  })
+  .passthrough();
+export const erpPayslipSchema = z
+  .object({
+    id: uuidSchema,
+    employeeId: uuidSchema,
+    periodKey: nonBlankStringSchema,
+    periodStart: civilDateHttpSchema,
+    periodEnd: civilDateHttpSchema,
+    status: z.enum(['DRAFT', 'VALIDATED', 'PAID', 'CANCELLED']),
+    grossSalaryCents: centsSchema,
+    cnssEmployeeCents: centsSchema,
+    amoEmployeeCents: centsSchema,
+    irCents: centsSchema,
+    netSalaryCents: centsSchema,
+    employerCostCents: centsSchema,
+    validatedAt: nullableInstantSchema,
+    paidAt: nullableInstantSchema,
+    employee: erpEmployeeSchema.optional(),
+    lines: z.array(erpPayslipLineSchema).optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpPayslipListSchema = z.array(erpPayslipSchema);
+
+export const erpLeaveRequestSchema = z
+  .object({
+    id: uuidSchema,
+    employeeId: uuidSchema,
+    type: z.enum([
+      'ANNUAL',
+      'SICK',
+      'MATERNITY',
+      'PATERNITY',
+      'UNPAID',
+      'OTHER',
+    ]),
+    status: z.enum(['REQUESTED', 'APPROVED', 'REJECTED', 'CANCELLED']),
+    startDate: civilDateHttpSchema,
+    endDate: civilDateHttpSchema,
+    workingDays: z.number().finite().nonnegative(),
+    reason: nullableStringSchema,
+    decidedAt: nullableInstantSchema,
+    employee: erpEmployeeSchema.optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpLeaveRequestListSchema = z.array(erpLeaveRequestSchema);
+export const erpEmployeeTerminationResultSchema = z.object({
+  employee: erpEmployeeSchema,
+  settlement: z.unknown(),
+});
+export const erpCnssExportSchema = erpFileExportSchema.extend({
+  employees: nonNegativeIntegerSchema,
+});
+
+export const erpDocumentSchema = z
+  .object({
+    id: uuidSchema,
+    type: z.enum([
+      'SUPPLIER_INVOICE',
+      'CUSTOMER_INVOICE',
+      'BANK_STATEMENT',
+      'RECEIPT',
+      'CONTRACT',
+      'FISCAL',
+      'PAYROLL',
+      'OTHER',
+    ]),
+    status: z.enum([
+      'UPLOADED',
+      'OCR_PENDING',
+      'OCR_PROCESSING',
+      'REVIEW_REQUIRED',
+      'VALIDATED',
+      'REJECTED',
+      'FAILED',
+    ]),
+    filename: nonBlankStringSchema,
+    mimeType: nonBlankStringSchema,
+    sizeBytes: nonNegativeIntegerSchema,
+    title: nonBlankStringSchema,
+    notes: nullableStringSchema,
+    tags: z.array(z.string()),
+    linkedEntityType: nullableStringSchema,
+    linkedEntityId: nullableUuidSchema,
+    ocrEngine: nullableStringSchema,
+    ocrConfidenceBasisPoints: nonNegativeIntegerSchema.nullable(),
+    ocrResult: z.unknown().nullable(),
+    extractedData: z.unknown().nullable(),
+    validationNotes: nullableStringSchema,
+    lastError: nullableStringSchema,
+    validatedAt: nullableInstantSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpDocumentListSchema = z.array(erpDocumentSchema);
+export const erpDocumentContentSchema = z.object({
+  filename: nonBlankStringSchema,
+  mimeType: nonBlankStringSchema,
+  contentBase64: z.string(),
+});
+
+export const erpExpenseNoteSchema = z
+  .object({
+    id: uuidSchema,
+    employeeId: nullableUuidSchema,
+    number: nonBlankStringSchema,
+    title: nonBlankStringSchema,
+    expenseDate: civilDateHttpSchema,
+    status: z.enum([
+      'DRAFT',
+      'SUBMITTED',
+      'APPROVED',
+      'REJECTED',
+      'PAID',
+      'CANCELLED',
+    ]),
+    totalHtCents: centsSchema,
+    totalTvaCents: centsSchema,
+    totalTtcCents: centsSchema,
+    currency: nonBlankStringSchema,
+    accountingEntryId: nullableUuidSchema,
+    rejectionReason: nullableStringSchema,
+    lines: z.array(z.unknown()).optional(),
+    employee: erpEmployeeSchema.nullable().optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpExpenseNoteListSchema = z.array(erpExpenseNoteSchema);
+
+export const erpAnalyticSectionSchema = z
+  .object({
+    id: uuidSchema,
+    axisId: uuidSchema,
+    code: nonBlankStringSchema,
+    label: nonBlankStringSchema,
+    isActive: z.boolean(),
+  })
+  .passthrough();
+export const erpAnalyticAxisSchema = z
+  .object({
+    id: uuidSchema,
+    code: nonBlankStringSchema,
+    label: nonBlankStringSchema,
+    isActive: z.boolean(),
+    sections: z.array(erpAnalyticSectionSchema),
+  })
+  .passthrough();
+export const erpAnalyticAxisListSchema = z.array(erpAnalyticAxisSchema);
+export const erpAnalyticAllocationSchema = z
+  .object({
+    id: uuidSchema,
+    sectionId: uuidSchema,
+    entryLineId: uuidSchema,
+    amountCents: signedCentsSchema,
+    percentageBasisPoints: nonNegativeIntegerSchema,
+  })
+  .passthrough();
+
+export const erpBudgetSchema = z
+  .object({
+    id: uuidSchema,
+    exerciceId: uuidSchema,
+    code: nonBlankStringSchema,
+    label: nonBlankStringSchema,
+    status: z.enum(['DRAFT', 'APPROVED', 'CLOSED']),
+    approvedAt: nullableInstantSchema,
+    lines: z.array(z.unknown()).optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpBudgetListSchema = z.array(erpBudgetSchema);
+export const erpBudgetVarianceSchema = z.array(
+  z.object({
+    accountCode: nonBlankStringSchema,
+    budgetCents: signedCentsSchema,
+    actualCents: signedCentsSchema,
+    varianceCents: signedCentsSchema,
+  }),
+);
+
+export const erpRecurringInvoiceSchema = z
+  .object({
+    id: uuidSchema,
+    tierId: uuidSchema,
+    label: nonBlankStringSchema,
+    status: z.enum(['ACTIVE', 'PAUSED', 'ENDED']),
+    frequencyMonths: positiveIntegerSchema,
+    nextRunDate: civilDateHttpSchema,
+    endDate: nullableCivilDateHttpSchema,
+    currency: nonBlankStringSchema,
+    paymentDelayDays: nonNegativeIntegerSchema,
+    lines: z.unknown(),
+    lastGeneratedInvoiceId: nullableUuidSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpRecurringInvoiceListSchema = z.array(erpRecurringInvoiceSchema);
+export const erpRecurringInvoiceRunSchema = z.object({
+  generated: nonNegativeIntegerSchema,
+  invoices: z.array(erpInvoiceSchema),
+});
+
+export const erpExchangeRateSchema = z
+  .object({
+    id: uuidSchema,
+    baseCurrency: nonBlankStringSchema,
+    quoteCurrency: nonBlankStringSchema,
+    rate: decimalDatabaseNumberSchema,
+    effectiveDate: civilDateHttpSchema,
+    source: nonBlankStringSchema,
+    createdAt: instantSchema,
+  })
+  .passthrough();
+export const erpExchangeRateListSchema = z.array(erpExchangeRateSchema);
+
+export const erpPortalAccessSchema = z
+  .object({
+    id: uuidSchema,
+    tierId: uuidSchema,
+    twentyUserId: nonBlankStringSchema,
+    status: z.enum(['ACTIVE', 'REVOKED']),
+    canViewInvoices: z.boolean(),
+    canViewDocuments: z.boolean(),
+    canSubmitDocuments: z.boolean(),
+    grantedAt: instantSchema,
+    revokedAt: nullableInstantSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpPortalAccessListSchema = z.array(erpPortalAccessSchema);
+
+export const erpAccountingAnomalySchema = z
+  .object({
+    id: uuidSchema,
+    accountingEntryId: nullableUuidSchema,
+    ruleCode: nonBlankStringSchema,
+    severity: nonBlankStringSchema,
+    title: nonBlankStringSchema,
+    explanation: nonBlankStringSchema,
+    evidence: z.unknown(),
+    status: z.enum(['OPEN', 'RESOLVED', 'DISMISSED']),
+    resolutionNotes: nullableStringSchema,
+    resolvedAt: nullableInstantSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpAccountingAnomalyListSchema = z.array(
+  erpAccountingAnomalySchema,
+);
+export const erpAnomalyScanResultSchema = z.object({
+  scannedEntries: nonNegativeIntegerSchema,
+  created: nonNegativeIntegerSchema,
+  anomalies: erpAccountingAnomalyListSchema,
+});
+
 const encodeRouteId = (id: string): string => {
   return encodeURIComponent(uuidSchema.parse(id));
 };
@@ -2156,6 +2647,55 @@ export const erpMarocRouteIds = {
   inventoryCountCancel: 'inventory.count.cancel',
   inventoryThresholds: 'inventory.thresholds',
   inventoryReplenishmentSuggestions: 'inventory.replenishmentSuggestions',
+  fiscalDeclarations: 'fiscal.declarations',
+  fiscalTvaCalculate: 'fiscal.tva.calculate',
+  fiscalIsCalculate: 'fiscal.is.calculate',
+  fiscalDeclarationStatus: 'fiscal.declaration.status',
+  fiscalDeclarationSimpl: 'fiscal.declaration.simpl',
+  fiscalDeadlines: 'fiscal.deadlines',
+  fiscalDeadlinesSeed: 'fiscal.deadlines.seed',
+  fiscalDeadlineComplete: 'fiscal.deadline.complete',
+  complianceExercises: 'compliance.exercises',
+  complianceExerciseReview: 'compliance.exercise.review',
+  complianceReviewTask: 'compliance.review-task',
+  compliancePeriodClose: 'compliance.period.close',
+  compliancePeriodReopen: 'compliance.period.reopen',
+  complianceExerciseClose: 'compliance.exercise.close',
+  complianceExerciseStatements: 'compliance.exercise.statements',
+  complianceExerciseFec: 'compliance.exercise.fec',
+  complianceFecImport: 'compliance.fec.import',
+  payrollEmployees: 'payroll.employees',
+  payrollEmployeeDetail: 'payroll.employee.detail',
+  payrollEmployeeTerminate: 'payroll.employee.terminate',
+  payrollPayslips: 'payroll.payslips',
+  payrollPayslipGenerate: 'payroll.payslip.generate',
+  payrollPayslipValidate: 'payroll.payslip.validate',
+  payrollPayslipPay: 'payroll.payslip.pay',
+  payrollLeaves: 'payroll.leaves',
+  payrollLeaveDecision: 'payroll.leave.decision',
+  payrollCnssExport: 'payroll.cnss.export',
+  documentsCollection: 'documents.collection',
+  documentDetail: 'documents.detail',
+  documentContent: 'documents.content',
+  documentOcrRetry: 'documents.ocr.retry',
+  documentOcrValidate: 'documents.ocr.validate',
+  documentCreateSupplierInvoice: 'documents.create-supplier-invoice',
+  expenseNotes: 'operations.expense-notes',
+  expenseNoteSubmit: 'operations.expense-note.submit',
+  expenseNoteDecision: 'operations.expense-note.decision',
+  analytics: 'operations.analytics',
+  analyticAllocations: 'operations.analytics.allocations',
+  budgets: 'operations.budgets',
+  budgetApprove: 'operations.budget.approve',
+  budgetVariance: 'operations.budget.variance',
+  recurringInvoices: 'operations.recurring-invoices',
+  recurringInvoicesRun: 'operations.recurring-invoices.run',
+  exchangeRates: 'operations.exchange-rates',
+  portalAccess: 'operations.portal-access',
+  portalAccessRevoke: 'operations.portal-access.revoke',
+  accountingAnomalies: 'operations.anomalies',
+  accountingAnomaliesScan: 'operations.anomalies.scan',
+  accountingAnomalyResolve: 'operations.anomaly.resolve',
 } as const;
 
 export const erpMarocUpstreamRoutes = {
@@ -2310,6 +2850,85 @@ export const erpMarocUpstreamRoutes = {
     thresholds: '/inventory/thresholds',
     replenishmentSuggestions: '/inventory/replenishment-suggestions',
   },
+  fiscal: {
+    declarations: '/fiscal/declarations',
+    calculateTva: '/fiscal/tva/calculate',
+    calculateIs: '/fiscal/is/calculate',
+    declarationStatus: (id: string) =>
+      `/fiscal/declarations/${encodeRouteId(id)}/status`,
+    declarationSimpl: (id: string) =>
+      `/fiscal/declarations/${encodeRouteId(id)}/simpl`,
+    deadlines: '/fiscal/deadlines',
+    seedDeadlines: '/fiscal/deadlines/seed',
+    completeDeadline: (id: string) =>
+      `/fiscal/deadlines/${encodeRouteId(id)}/complete`,
+  },
+  compliance: {
+    exercises: '/accounting-compliance/exercises',
+    initializeReview: (id: string) =>
+      `/accounting-compliance/exercises/${encodeRouteId(id)}/review`,
+    reviewTask: (id: string) =>
+      `/accounting-compliance/review-tasks/${encodeRouteId(id)}`,
+    closePeriod: (id: string) =>
+      `/accounting-compliance/periods/${encodeRouteId(id)}/close`,
+    reopenPeriod: (id: string) =>
+      `/accounting-compliance/periods/${encodeRouteId(id)}/reopen`,
+    closeExercise: (id: string) =>
+      `/accounting-compliance/exercises/${encodeRouteId(id)}/close`,
+    statements: (id: string) =>
+      `/accounting-compliance/exercises/${encodeRouteId(id)}/statements`,
+    fec: (id: string) =>
+      `/accounting-compliance/exercises/${encodeRouteId(id)}/fec`,
+    importFec: '/accounting-compliance/fec/import',
+  },
+  payroll: {
+    employees: '/payroll/employees',
+    employee: (id: string) => `/payroll/employees/${encodeRouteId(id)}`,
+    terminateEmployee: (id: string) =>
+      `/payroll/employees/${encodeRouteId(id)}/terminate`,
+    payslips: '/payroll/payslips',
+    generatePayslip: '/payroll/payslips/generate',
+    validatePayslip: (id: string) =>
+      `/payroll/payslips/${encodeRouteId(id)}/validate`,
+    payPayslip: (id: string) => `/payroll/payslips/${encodeRouteId(id)}/pay`,
+    leaves: '/payroll/leaves',
+    decideLeave: (id: string) =>
+      `/payroll/leaves/${encodeRouteId(id)}/decision`,
+    cnssExport: '/payroll/cnss/export',
+  },
+  documents: {
+    collection: '/documents',
+    detail: (id: string) => `/documents/${encodeRouteId(id)}`,
+    content: (id: string) => `/documents/${encodeRouteId(id)}/content`,
+    retryOcr: (id: string) => `/documents/${encodeRouteId(id)}/ocr/retry`,
+    validateOcr: (id: string) => `/documents/${encodeRouteId(id)}/ocr/validate`,
+    createSupplierInvoice: (id: string) =>
+      `/documents/${encodeRouteId(id)}/create-supplier-invoice`,
+  },
+  operations: {
+    expenseNotes: '/operations/expense-notes',
+    submitExpenseNote: (id: string) =>
+      `/operations/expense-notes/${encodeRouteId(id)}/submit`,
+    decideExpenseNote: (id: string) =>
+      `/operations/expense-notes/${encodeRouteId(id)}/decision`,
+    analytics: '/operations/analytics',
+    analyticAllocations: '/operations/analytics/allocations',
+    budgets: '/operations/budgets',
+    approveBudget: (id: string) =>
+      `/operations/budgets/${encodeRouteId(id)}/approve`,
+    budgetVariance: (id: string) =>
+      `/operations/budgets/${encodeRouteId(id)}/variance`,
+    recurringInvoices: '/operations/recurring-invoices',
+    runRecurringInvoices: '/operations/recurring-invoices/run',
+    exchangeRates: '/operations/exchange-rates',
+    portalAccess: '/operations/portal-access',
+    revokePortalAccess: (id: string) =>
+      `/operations/portal-access/${encodeRouteId(id)}/revoke`,
+    anomalies: '/operations/anomalies',
+    scanAnomalies: '/operations/anomalies/scan',
+    resolveAnomaly: (id: string) =>
+      `/operations/anomalies/${encodeRouteId(id)}/resolve`,
+  },
 } as const;
 
 export type ErpRole = z.infer<typeof erpRoleSchema>;
@@ -2441,5 +3060,26 @@ export type ErpReplenishmentSuggestion = z.infer<
 export type ErpReplenishmentSuggestionList = z.infer<
   typeof erpReplenishmentSuggestionListSchema
 >;
+export type ErpTaxDeclaration = z.infer<typeof erpTaxDeclarationSchema>;
+export type ErpFiscalDeadline = z.infer<typeof erpFiscalDeadlineSchema>;
+export type ErpAccountingPeriod = z.infer<typeof erpAccountingPeriodSchema>;
+export type ErpAccountingReviewTask = z.infer<
+  typeof erpAccountingReviewTaskSchema
+>;
+export type ErpExercise = z.infer<typeof erpExerciseSchema>;
+export type ErpFinancialStatements = z.infer<
+  typeof erpFinancialStatementsSchema
+>;
+export type ErpEmployee = z.infer<typeof erpEmployeeSchema>;
+export type ErpPayslip = z.infer<typeof erpPayslipSchema>;
+export type ErpLeaveRequest = z.infer<typeof erpLeaveRequestSchema>;
+export type ErpDocument = z.infer<typeof erpDocumentSchema>;
+export type ErpExpenseNote = z.infer<typeof erpExpenseNoteSchema>;
+export type ErpAnalyticAxis = z.infer<typeof erpAnalyticAxisSchema>;
+export type ErpBudget = z.infer<typeof erpBudgetSchema>;
+export type ErpRecurringInvoice = z.infer<typeof erpRecurringInvoiceSchema>;
+export type ErpExchangeRate = z.infer<typeof erpExchangeRateSchema>;
+export type ErpPortalAccess = z.infer<typeof erpPortalAccessSchema>;
+export type ErpAccountingAnomaly = z.infer<typeof erpAccountingAnomalySchema>;
 export type ErpMarocRouteId =
   (typeof erpMarocRouteIds)[keyof typeof erpMarocRouteIds];

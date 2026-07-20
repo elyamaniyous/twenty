@@ -123,6 +123,26 @@ jest.mock('~/pages/erp-maroc/payments/ErpPaymentDetailPage', () => ({
   ErpPaymentDetailPage: () => <div>Task 15 payment detail</div>,
 }));
 
+jest.mock('~/pages/erp-maroc/compliance/ErpFiscalPage', () => ({
+  ErpFiscalPage: () => <div>Fiscalité marocaine</div>,
+}));
+
+jest.mock('~/pages/erp-maroc/compliance/ErpClosingPage', () => ({
+  ErpClosingPage: () => <div>Clôture comptable</div>,
+}));
+
+jest.mock('~/pages/erp-maroc/compliance/ErpPayrollPage', () => ({
+  ErpPayrollPage: () => <div>Paie et RH</div>,
+}));
+
+jest.mock('~/pages/erp-maroc/compliance/ErpDocumentsPage', () => ({
+  ErpDocumentsPage: () => <div>GED et OCR</div>,
+}));
+
+jest.mock('~/pages/erp-maroc/compliance/ErpManagementPage', () => ({
+  ErpManagementPage: () => <div>Pilotage PME</div>,
+}));
+
 jest.mock('@/app/components/SettingsRoutes', () => ({
   SettingsRoutes: () => <div data-testid="settings-routes" />,
 }));
@@ -478,6 +498,30 @@ describe('useCreateAppRouter ERP Maroc registration', () => {
       'Task 15 payment detail',
     ],
   ])('resolves %s to its real Task 15 page module', async (path, text) => {
+    const { router, view } = renderEnabledErpRoute(
+      {
+        status: 'ready',
+        context: {} as ErpContext,
+        error: null,
+        refetch,
+        client,
+      },
+      path,
+    );
+
+    expect(await screen.findByText(text)).toBeInTheDocument();
+
+    view.unmount();
+    router.dispose();
+  });
+
+  it.each([
+    [erpMarocPaths.fiscal, 'Fiscalité marocaine'],
+    [erpMarocPaths.closing, 'Clôture comptable'],
+    [erpMarocPaths.payroll, 'Paie et RH'],
+    [erpMarocPaths.documents, 'GED et OCR'],
+    [erpMarocPaths.management, 'Pilotage PME'],
+  ])('resolves %s to its compliance page', async (path, text) => {
     const { router, view } = renderEnabledErpRoute(
       {
         status: 'ready',

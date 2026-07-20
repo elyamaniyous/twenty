@@ -113,6 +113,11 @@ const labels = [
   'Lettrage',
   'Banque',
   'Stock',
+  'Fiscalité',
+  'Clôture',
+  'Paie & RH',
+  'Documents',
+  'Pilotage',
 ];
 
 const renderWithNavigation = ({
@@ -180,6 +185,11 @@ describe('NavigationDrawerErpMarocSection', () => {
       accountingLettrage: '/erp-maroc/accounting/lettrage',
       bankStatements: '/erp-maroc/bank-statements',
       inventory: '/erp-maroc/inventory',
+      fiscal: '/erp-maroc/fiscal',
+      closing: '/erp-maroc/closing',
+      payroll: '/erp-maroc/payroll',
+      documents: '/erp-maroc/documents',
+      management: '/erp-maroc/management',
     });
   });
 
@@ -226,6 +236,11 @@ describe('NavigationDrawerErpMarocSection', () => {
     [erpMarocPaths.accountingLettrage, 'Lettrage'],
     [erpMarocPaths.bankStatements, 'Banque'],
     [erpMarocPaths.inventory, 'Stock'],
+    [erpMarocPaths.fiscal, 'Fiscalité'],
+    [erpMarocPaths.closing, 'Clôture'],
+    [erpMarocPaths.payroll, 'Paie & RH'],
+    [erpMarocPaths.documents, 'Documents'],
+    [erpMarocPaths.management, 'Pilotage'],
   ])('marks only the exact item active at %s', (path, activeLabel) => {
     renderWithNavigation({ path });
 

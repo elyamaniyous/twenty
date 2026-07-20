@@ -12,8 +12,10 @@ import {
   IconChartBar,
   IconCreditCard,
   IconFileText,
+  IconFolder,
   IconListDetails,
   IconLink,
+  IconLock,
   IconNotes,
   IconUsers,
   type IconComponent,
@@ -164,6 +166,36 @@ export const NavigationDrawerErpMarocSection = () => {
       path: erpMarocPaths.inventory,
       activePaths: [erpMarocPaths.inventory],
       Icon: IconBox,
+    },
+    {
+      label: t`Fiscalité`,
+      path: erpMarocPaths.fiscal,
+      activePaths: [erpMarocPaths.fiscal],
+      Icon: IconBook,
+    },
+    {
+      label: t`Clôture`,
+      path: erpMarocPaths.closing,
+      activePaths: [erpMarocPaths.closing],
+      Icon: IconLock,
+    },
+    {
+      label: t`Paie & RH`,
+      path: erpMarocPaths.payroll,
+      activePaths: [erpMarocPaths.payroll],
+      Icon: IconUsers,
+    },
+    {
+      label: t`Documents`,
+      path: erpMarocPaths.documents,
+      activePaths: [erpMarocPaths.documents],
+      Icon: IconFolder,
+    },
+    {
+      label: t`Pilotage`,
+      path: erpMarocPaths.management,
+      activePaths: [erpMarocPaths.management],
+      Icon: IconChartBar,
     },
   ];
 
