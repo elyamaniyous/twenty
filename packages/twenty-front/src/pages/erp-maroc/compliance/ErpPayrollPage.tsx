@@ -33,6 +33,8 @@ import {
   erpPayslipListSchema,
   erpPayslipSchema,
   erpRegulatoryFileSchema,
+  erpRegulatoryListSchema,
+  erpRegulatoryObjectSchema,
   type ErpEmployee,
   type ErpLeaveRequest,
   type ErpPayslip,
@@ -40,7 +42,23 @@ import {
 import { IconCheck, IconDownload, IconRefresh } from 'twenty-ui/display';
 import { Button, TabButton } from 'twenty-ui/input';
 
-type View = 'employees' | 'payslips' | 'leaves';
+type View = 'employees' | 'payslips' | 'leaves' | 'balances';
+
+type LeaveBalance = {
+  id: string | null;
+  employeeId: string;
+  employee: {
+    employeeNumber: string;
+    firstName: string;
+    lastName: string;
+  };
+  year: number;
+  entitledDays: number;
+  carriedDays: number;
+  adjustmentDays: number;
+  consumedDays: number;
+  availableDays: number;
+};
 
 const currentPeriod = () =>
   new Date().toLocaleDateString('en-CA', {
@@ -67,6 +85,7 @@ export const ErpPayrollPage = () => {
   const [employees, setEmployees] = useState<ErpEmployee[]>([]);
   const [payslips, setPayslips] = useState<ErpPayslip[]>([]);
   const [leaves, setLeaves] = useState<ErpLeaveRequest[]>([]);
+  const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [generation, setGeneration] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -90,6 +109,9 @@ export const ErpPayrollPage = () => {
   const [leaveStart, setLeaveStart] = useState(today);
   const [leaveEnd, setLeaveEnd] = useState(today);
   const [workingDays, setWorkingDays] = useState('1');
+  const [entitledDays, setEntitledDays] = useState('18');
+  const [carriedDays, setCarriedDays] = useState('0');
+  const [adjustmentDays, setAdjustmentDays] = useState('0');
   const canManage = context?.role !== 'COMMERCIAL';
 
   useEffect(() => {
@@ -115,20 +137,30 @@ export const ErpPayrollPage = () => {
         schema: erpLeaveRequestListSchema,
         signal: abortController.signal,
       }),
+      client.request({
+        method: 'GET',
+        path: '/payroll/leave-balances',
+        query: { year: periodKey.slice(0, 4) },
+        schema: erpRegulatoryListSchema,
+        signal: abortController.signal,
+      }),
     ])
-      .then(([loadedEmployees, loadedPayslips, loadedLeaves]) => {
-        if (abortController.signal.aborted) return;
-        setEmployees(loadedEmployees);
-        setPayslips(loadedPayslips);
-        setLeaves(loadedLeaves);
-        setEmployeeId(
-          (current) =>
-            current ||
-            loadedEmployees.find((item) => item.status === 'ACTIVE')?.id ||
-            '',
-        );
-        setState('ready');
-      })
+      .then(
+        ([loadedEmployees, loadedPayslips, loadedLeaves, loadedBalances]) => {
+          if (abortController.signal.aborted) return;
+          setEmployees(loadedEmployees);
+          setPayslips(loadedPayslips);
+          setLeaves(loadedLeaves);
+          setLeaveBalances(loadedBalances as unknown as LeaveBalance[]);
+          setEmployeeId(
+            (current) =>
+              current ||
+              loadedEmployees.find((item) => item.status === 'ACTIVE')?.id ||
+              '',
+          );
+          setState('ready');
+        },
+      )
       .catch(() => {
         if (!abortController.signal.aborted) setState('error');
       });
@@ -329,6 +361,35 @@ export const ErpPayrollPage = () => {
           .execute(),
       status === 'APPROVED' ? 'Congé approuvé' : 'Congé rejeté',
     );
+
+  const updateLeaveBalance = () => {
+    if (!employeeId) return;
+    const payload = {
+      entitledDays: Number(entitledDays),
+      carriedDays: Number(carriedDays),
+      adjustmentDays: Number(adjustmentDays),
+    };
+    if (Object.values(payload).some((value) => !Number.isFinite(value))) {
+      enqueueErrorSnackBar({ message: 'Solde de congés invalide' });
+      return;
+    }
+    return runMutation(
+      'leave-balance',
+      () =>
+        client
+          .createMutationIntent(
+            {
+              method: 'PATCH',
+              path: `/payroll/employees/${employeeId}/leave-balances/${periodKey.slice(0, 4)}`,
+              schema: erpRegulatoryObjectSchema,
+              body: payload,
+            },
+            { idempotency: 'forbidden' },
+          )
+          .execute(),
+      'Droits à congés actualisés',
+    );
+  };
 
   const exportCnss = async () => {
     setBusyId('cnss');
@@ -660,6 +721,69 @@ export const ErpPayrollPage = () => {
     },
   ];
 
+  const leaveBalanceColumns: ErpOperationalTableColumn<LeaveBalance>[] = [
+    {
+      key: 'employee',
+      header: 'Salarié',
+      width: '240px',
+      render: (row) =>
+        `${row.employee.employeeNumber} · ${row.employee.lastName} ${row.employee.firstName}`,
+    },
+    {
+      key: 'entitled',
+      header: 'Acquis',
+      width: '100px',
+      align: 'right',
+      render: (row) => row.entitledDays,
+    },
+    {
+      key: 'carried',
+      header: 'Report',
+      width: '100px',
+      align: 'right',
+      render: (row) => row.carriedDays,
+    },
+    {
+      key: 'adjustment',
+      header: 'Ajustement',
+      width: '110px',
+      align: 'right',
+      render: (row) => row.adjustmentDays,
+    },
+    {
+      key: 'consumed',
+      header: 'Consommé',
+      width: '110px',
+      align: 'right',
+      render: (row) => row.consumedDays,
+    },
+    {
+      key: 'available',
+      header: 'Disponible',
+      width: '120px',
+      align: 'right',
+      render: (row) => row.availableDays,
+    },
+    {
+      key: 'action',
+      header: 'Action',
+      width: '140px',
+      render: (row) => (
+        <Button
+          title="Modifier"
+          ariaLabel="Modifier les droits à congés"
+          variant="secondary"
+          onClick={() => {
+            setEmployeeId(row.employeeId);
+            setEntitledDays(String(row.entitledDays));
+            setCarriedDays(String(row.carriedDays));
+            setAdjustmentDays(String(row.adjustmentDays));
+          }}
+        />
+      ),
+    },
+  ];
+
   const totalNet = payslips.reduce(
     (sum, payslip) => sum + payslip.netSalaryCents,
     0,
@@ -701,6 +825,12 @@ export const ErpPayrollPage = () => {
           title="Congés"
           active={view === 'leaves'}
           onClick={() => setView('leaves')}
+        />
+        <TabButton
+          id="payroll-leave-balances"
+          title="Soldes congés"
+          active={view === 'balances'}
+          onClick={() => setView('balances')}
         />
       </StyledErpWorkspaceTabs>
       <StyledErpWorkspaceSummary>
@@ -784,6 +914,15 @@ export const ErpPayrollPage = () => {
               onClick={() => void exportCnssBds('txt')}
             />
           </>
+        ) : null}
+        {view === 'balances' ? (
+          <Button
+            title="Enregistrer les droits"
+            ariaLabel="Enregistrer les droits à congés"
+            variant="primary"
+            disabled={!canManage || !employeeId || busyId !== null}
+            onClick={() => void updateLeaveBalance()}
+          />
         ) : null}
       </StyledErpWorkspaceToolbar>
       <StyledErpWorkspaceContent>
@@ -990,6 +1129,60 @@ export const ErpPayrollPage = () => {
               rows={leaves}
               getRowKey={(row) => row.id}
               emptyLabel="Aucune demande de congé"
+            />
+          </>
+        ) : null}
+        {view === 'balances' ? (
+          <>
+            <StyledErpWorkspacePanel>
+              <StyledErpWorkspacePanelTitle>
+                Droits annuels {periodKey.slice(0, 4)}
+              </StyledErpWorkspacePanelTitle>
+              <StyledErpWorkspaceFormGrid>
+                <StyledErpWorkspaceField>
+                  Jours acquis
+                  <StyledErpWorkspaceInput
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={entitledDays}
+                    onChange={(event) => setEntitledDays(event.target.value)}
+                  />
+                </StyledErpWorkspaceField>
+                <StyledErpWorkspaceField>
+                  Report antérieur
+                  <StyledErpWorkspaceInput
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={carriedDays}
+                    onChange={(event) => setCarriedDays(event.target.value)}
+                  />
+                </StyledErpWorkspaceField>
+                <StyledErpWorkspaceField>
+                  Ajustement
+                  <StyledErpWorkspaceInput
+                    type="number"
+                    step="0.5"
+                    value={adjustmentDays}
+                    onChange={(event) => setAdjustmentDays(event.target.value)}
+                  />
+                </StyledErpWorkspaceField>
+                <Button
+                  title="Enregistrer"
+                  ariaLabel="Enregistrer le solde de congés"
+                  variant="primary"
+                  disabled={!canManage || !employeeId || busyId !== null}
+                  onClick={() => void updateLeaveBalance()}
+                />
+              </StyledErpWorkspaceFormGrid>
+            </StyledErpWorkspacePanel>
+            <ErpOperationalTable
+              ariaLabel="Soldes annuels de congés"
+              columns={leaveBalanceColumns}
+              rows={leaveBalances}
+              getRowKey={(row) => row.employeeId}
+              emptyLabel="Aucun salarié pour cet exercice"
             />
           </>
         ) : null}

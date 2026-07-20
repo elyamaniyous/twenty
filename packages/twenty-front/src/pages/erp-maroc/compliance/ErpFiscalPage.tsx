@@ -8,6 +8,8 @@ import {
   StyledErpWorkspaceField,
   StyledErpWorkspaceInlineActions,
   StyledErpWorkspaceInput,
+  StyledErpWorkspacePanel,
+  StyledErpWorkspacePanelTitle,
   StyledErpWorkspaceSelect,
   StyledErpWorkspaceSummary,
   ErpWorkspaceSummaryItem,
@@ -25,6 +27,8 @@ import {
   erpFiscalDeadlineListSchema,
   erpFiscalDeadlineSchema,
   erpRegulatoryFileSchema,
+  erpRegulatoryListSchema,
+  erpRegulatoryObjectSchema,
   erpTaxDeclarationListSchema,
   erpTaxDeclarationSchema,
   type ErpExercise,
@@ -34,7 +38,51 @@ import {
 import { IconCheck, IconDownload, IconRefresh } from 'twenty-ui/display';
 import { Button, TabButton } from 'twenty-ui/input';
 
-type View = 'declarations' | 'calendar';
+type View = 'declarations' | 'payments' | 'prorata' | 'calendar';
+
+type TvaProrataPeriod = {
+  id: string;
+  periodKey: string;
+  taxableRevenueCents: number;
+  totalRevenueCents: number;
+  inputVatBeforeProrataCents: number;
+  rateBasisPoints: number;
+  deductibleVatCents: number;
+};
+
+type AnnualTvaProrata = {
+  periods: number;
+  rateBasisPoints: number;
+  deductedVatCents: number;
+  annualDeductibleVatCents: number;
+  regularizationCents: number;
+  direction: 'ADDITIONAL_DEDUCTION' | 'REVERSAL' | 'NONE';
+};
+
+type TaxPaymentCandidate = {
+  id: string;
+  transactionDate: string;
+  description: string;
+  reference: string | null;
+  debitCents: number;
+  confidenceBasisPoints: number;
+  exactAmount: boolean;
+  dayDifference: number;
+  statementImport: { originalFilename: string };
+};
+
+type TaxPayment = {
+  id: string;
+  kind: 'TVA' | 'IS_INSTALLMENT' | 'IS_BALANCE' | 'OTHER';
+  amountCents: number;
+  paymentDate: string;
+  reference: string | null;
+  bankStatementLine: {
+    id: string;
+    description: string;
+    reference: string | null;
+  } | null;
+};
 
 const currentMonth = () =>
   new Date().toLocaleDateString('en-CA', {
@@ -71,6 +119,14 @@ export const ErpFiscalPage = () => {
   const [view, setView] = useState<View>('declarations');
   const [declarations, setDeclarations] = useState<ErpTaxDeclaration[]>([]);
   const [deadlines, setDeadlines] = useState<ErpFiscalDeadline[]>([]);
+  const [prorataPeriods, setProrataPeriods] = useState<TvaProrataPeriod[]>([]);
+  const [annualProrata, setAnnualProrata] = useState<AnnualTvaProrata | null>(
+    null,
+  );
+  const [taxPaymentCandidates, setTaxPaymentCandidates] = useState<
+    TaxPaymentCandidate[]
+  >([]);
+  const [taxPayments, setTaxPayments] = useState<TaxPayment[]>([]);
   const [exercises, setExercises] = useState<ErpExercise[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [generation, setGeneration] = useState(0);
@@ -79,6 +135,15 @@ export const ErpFiscalPage = () => {
   const [prorataPercent, setProrataPercent] = useState('100');
   const [exerciseId, setExerciseId] = useState('');
   const [filingReference, setFilingReference] = useState('');
+  const [taxableRevenueMad, setTaxableRevenueMad] = useState('0');
+  const [totalRevenueMad, setTotalRevenueMad] = useState('0');
+  const [inputVatMad, setInputVatMad] = useState('0');
+  const [reintegrationsMad, setReintegrationsMad] = useState('0');
+  const [deductionsMad, setDeductionsMad] = useState('0');
+  const [installmentsPaidMad, setInstallmentsPaidMad] = useState('0');
+  const [selectedDeclarationId, setSelectedDeclarationId] = useState('');
+  const [taxPaymentKind, setTaxPaymentKind] =
+    useState<TaxPayment['kind']>('TVA');
   const canManage = context?.role !== 'COMMERCIAL';
 
   useEffect(() => {
@@ -107,6 +172,9 @@ export const ErpFiscalPage = () => {
       .then(([loadedDeclarations, loadedDeadlines, loadedExercises]) => {
         if (abortController.signal.aborted) return;
         setDeclarations(loadedDeclarations);
+        setSelectedDeclarationId(
+          (current) => current || loadedDeclarations[0]?.id || '',
+        );
         setDeadlines(loadedDeadlines);
         setExercises(loadedExercises);
         setExerciseId(
@@ -123,6 +191,85 @@ export const ErpFiscalPage = () => {
       });
     return () => abortController.abort();
   }, [client, generation]);
+
+  useEffect(() => {
+    if (!exerciseId) return;
+    const abortController = new AbortController();
+    client
+      .request({
+        method: 'GET',
+        path: '/fiscal/tva/prorata',
+        query: { exerciceId: exerciseId },
+        schema: erpRegulatoryListSchema,
+        signal: abortController.signal,
+      })
+      .then(async (loaded) => {
+        if (abortController.signal.aborted) return;
+        const periods = loaded as unknown as TvaProrataPeriod[];
+        setProrataPeriods(periods);
+        if (periods.length === 0) {
+          setAnnualProrata(null);
+          return;
+        }
+        const annual = await client.request({
+          method: 'GET',
+          path: '/fiscal/tva/prorata/annual',
+          query: { exerciceId: exerciseId },
+          schema: erpRegulatoryObjectSchema,
+          signal: abortController.signal,
+        });
+        if (!abortController.signal.aborted) {
+          setAnnualProrata(annual as unknown as AnnualTvaProrata);
+        }
+      })
+      .catch(() => {
+        if (!abortController.signal.aborted) {
+          setProrataPeriods([]);
+          setAnnualProrata(null);
+        }
+      });
+    return () => abortController.abort();
+  }, [client, exerciseId, generation]);
+
+  useEffect(() => {
+    if (!selectedDeclarationId) {
+      setTaxPaymentCandidates([]);
+      setTaxPayments([]);
+      return;
+    }
+    const declaration = declarations.find(
+      (item) => item.id === selectedDeclarationId,
+    );
+    if (declaration) {
+      setTaxPaymentKind(declaration.type === 'TVA' ? 'TVA' : 'IS_BALANCE');
+    }
+    const abortController = new AbortController();
+    Promise.all([
+      client.request({
+        method: 'GET',
+        path: `/fiscal/declarations/${selectedDeclarationId}/payment-candidates`,
+        schema: erpRegulatoryListSchema,
+        signal: abortController.signal,
+      }),
+      client.request({
+        method: 'GET',
+        path: `/fiscal/declarations/${selectedDeclarationId}/payments`,
+        schema: erpRegulatoryListSchema,
+        signal: abortController.signal,
+      }),
+    ])
+      .then(([candidates, payments]) => {
+        if (abortController.signal.aborted) return;
+        setTaxPaymentCandidates(candidates as unknown as TaxPaymentCandidate[]);
+        setTaxPayments(payments as unknown as TaxPayment[]);
+      })
+      .catch(() => {
+        if (abortController.signal.aborted) return;
+        setTaxPaymentCandidates([]);
+        setTaxPayments([]);
+      });
+    return () => abortController.abort();
+  }, [client, declarations, generation, selectedDeclarationId]);
 
   const refresh = () => setGeneration((value) => value + 1);
 
@@ -174,7 +321,14 @@ export const ErpFiscalPage = () => {
             method: 'POST',
             path: '/fiscal/is/calculate',
             schema: erpTaxDeclarationSchema,
-            body: { exerciceId: exerciseId },
+            body: {
+              exerciceId: exerciseId,
+              reintegrationsCents: Math.round(Number(reintegrationsMad) * 100),
+              deductionsCents: Math.round(Number(deductionsMad) * 100),
+              installmentsPaidCents: Math.round(
+                Number(installmentsPaidMad) * 100,
+              ),
+            },
           },
           { idempotency: 'forbidden' },
         )
@@ -183,6 +337,73 @@ export const ErpFiscalPage = () => {
       refresh();
     } catch {
       enqueueErrorSnackBar({ message: 'Calcul IS impossible' });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const calculateProrata = async () => {
+    const taxableRevenueCents = Math.round(Number(taxableRevenueMad) * 100);
+    const totalRevenueCents = Math.round(Number(totalRevenueMad) * 100);
+    const inputVatBeforeProrataCents = Math.round(Number(inputVatMad) * 100);
+    if (
+      !exerciseId ||
+      taxableRevenueCents < 0 ||
+      totalRevenueCents <= 0 ||
+      taxableRevenueCents > totalRevenueCents ||
+      inputVatBeforeProrataCents < 0
+    ) {
+      enqueueErrorSnackBar({ message: 'Données du prorata invalides' });
+      return;
+    }
+    setBusyId('prorata');
+    try {
+      await client
+        .createMutationIntent(
+          {
+            method: 'POST',
+            path: '/fiscal/tva/prorata/calculate',
+            schema: erpRegulatoryObjectSchema,
+            body: {
+              exerciceId: exerciseId,
+              periodKey,
+              taxableRevenueCents,
+              totalRevenueCents,
+              inputVatBeforeProrataCents,
+            },
+          },
+          { idempotency: 'forbidden' },
+        )
+        .execute();
+      enqueueSuccessSnackBar({ message: 'Prorata TVA enregistré' });
+      refresh();
+    } catch {
+      enqueueErrorSnackBar({ message: 'Calcul du prorata impossible' });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const postProrataRegularization = async () => {
+    if (!exerciseId) return;
+    setBusyId('prorata-post');
+    try {
+      await client
+        .createMutationIntent(
+          {
+            method: 'POST',
+            path: '/fiscal/tva/prorata/annual/post',
+            schema: erpRegulatoryObjectSchema,
+            body: { exerciceId: exerciseId },
+          },
+          { idempotency: 'forbidden' },
+        )
+        .execute();
+      enqueueSuccessSnackBar({
+        message: 'Écriture de régularisation créée en brouillon',
+      });
+    } catch {
+      enqueueErrorSnackBar({ message: 'Régularisation impossible' });
     } finally {
       setBusyId(null);
     }
@@ -224,6 +445,33 @@ export const ErpFiscalPage = () => {
     }
   };
 
+  const reconcileTaxPayment = async (candidate: TaxPaymentCandidate) => {
+    if (!selectedDeclarationId) return;
+    setBusyId(candidate.id);
+    try {
+      await client
+        .createMutationIntent(
+          {
+            method: 'POST',
+            path: `/fiscal/declarations/${selectedDeclarationId}/payments`,
+            schema: erpRegulatoryObjectSchema,
+            body: {
+              bankStatementLineId: candidate.id,
+              kind: taxPaymentKind,
+            },
+          },
+          { idempotency: 'forbidden' },
+        )
+        .execute();
+      enqueueSuccessSnackBar({ message: 'Paiement fiscal rapproché' });
+      refresh();
+    } catch {
+      enqueueErrorSnackBar({ message: 'Rapprochement fiscal impossible' });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const exportSimpl = async (declaration: ErpTaxDeclaration) => {
     setBusyId(declaration.id);
     try {
@@ -259,6 +507,26 @@ export const ErpFiscalPage = () => {
       });
     } catch {
       enqueueErrorSnackBar({ message: 'Export ADC080F impossible' });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const exportIsXml = async (declaration: ErpTaxDeclaration) => {
+    setBusyId(declaration.id);
+    try {
+      const file = await client.request({
+        method: 'GET',
+        path: `/fiscal/declarations/${declaration.id}/is-xml`,
+        schema: erpRegulatoryFileSchema,
+      });
+      if (!file.content) throw new Error('Missing export content');
+      downloadTextContent(file.filename, file.content, file.contentType);
+      enqueueSuccessSnackBar({
+        message: 'XML IS généré, à valider sur la plateforme DGI',
+      });
+    } catch {
+      enqueueErrorSnackBar({ message: 'Export XML IS impossible' });
     } finally {
       setBusyId(null);
     }
@@ -394,10 +662,149 @@ export const ErpFiscalPage = () => {
                   onClick={() => void exportAdc080f(row)}
                 />
               </>
-            ) : null}
+            ) : (
+              <Button
+                title="XML IS"
+                ariaLabel="Télécharger la déclaration XML IS"
+                Icon={IconDownload}
+                variant="secondary"
+                disabled={busyId !== null}
+                onClick={() => void exportIsXml(row)}
+              />
+            )}
           </StyledErpWorkspaceInlineActions>
         );
       },
+    },
+  ];
+
+  const prorataColumns: ErpOperationalTableColumn<TvaProrataPeriod>[] = [
+    {
+      key: 'period',
+      header: 'Période',
+      width: '120px',
+      render: (row) => row.periodKey,
+    },
+    {
+      key: 'taxable',
+      header: 'CA taxable',
+      width: '150px',
+      align: 'right',
+      render: (row) => formatMadCents(row.taxableRevenueCents),
+    },
+    {
+      key: 'total',
+      header: 'CA total',
+      width: '150px',
+      align: 'right',
+      render: (row) => formatMadCents(row.totalRevenueCents),
+    },
+    {
+      key: 'rate',
+      header: 'Prorata',
+      width: '110px',
+      align: 'right',
+      render: (row) => `${(row.rateBasisPoints / 100).toFixed(0)} %`,
+    },
+    {
+      key: 'input-vat',
+      header: 'TVA avant prorata',
+      width: '170px',
+      align: 'right',
+      render: (row) => formatMadCents(row.inputVatBeforeProrataCents),
+    },
+    {
+      key: 'deductible',
+      header: 'TVA déduite',
+      width: '160px',
+      align: 'right',
+      render: (row) => formatMadCents(row.deductibleVatCents),
+    },
+  ];
+
+  const taxPaymentCandidateColumns: ErpOperationalTableColumn<TaxPaymentCandidate>[] =
+    [
+      {
+        key: 'date',
+        header: 'Date',
+        width: '120px',
+        render: (row) => row.transactionDate,
+      },
+      {
+        key: 'description',
+        header: 'Libellé bancaire',
+        width: '320px',
+        render: (row) => row.description,
+      },
+      {
+        key: 'amount',
+        header: 'Débit',
+        width: '140px',
+        align: 'right',
+        render: (row) => formatMadCents(row.debitCents),
+      },
+      {
+        key: 'confidence',
+        header: 'Correspondance',
+        width: '140px',
+        align: 'right',
+        render: (row) => `${(row.confidenceBasisPoints / 100).toFixed(0)} %`,
+      },
+      {
+        key: 'source',
+        header: 'Relevé',
+        width: '220px',
+        render: (row) => row.statementImport.originalFilename,
+      },
+      {
+        key: 'action',
+        header: 'Action',
+        width: '150px',
+        render: (row) =>
+          canManage ? (
+            <Button
+              title="Rapprocher"
+              ariaLabel="Rapprocher ce débit avec la déclaration fiscale"
+              Icon={IconCheck}
+              variant="secondary"
+              disabled={busyId !== null}
+              onClick={() => void reconcileTaxPayment(row)}
+            />
+          ) : null,
+      },
+    ];
+
+  const taxPaymentColumns: ErpOperationalTableColumn<TaxPayment>[] = [
+    {
+      key: 'date',
+      header: 'Date',
+      width: '120px',
+      render: (row) => row.paymentDate,
+    },
+    {
+      key: 'kind',
+      header: 'Nature',
+      width: '150px',
+      render: (row) => row.kind,
+    },
+    {
+      key: 'amount',
+      header: 'Montant',
+      width: '150px',
+      align: 'right',
+      render: (row) => formatMadCents(row.amountCents),
+    },
+    {
+      key: 'reference',
+      header: 'Référence',
+      width: '180px',
+      render: (row) => row.reference ?? '—',
+    },
+    {
+      key: 'description',
+      header: 'Ligne bancaire',
+      width: '320px',
+      render: (row) => row.bankStatementLine?.description ?? '—',
     },
   ];
 
@@ -484,6 +891,18 @@ export const ErpFiscalPage = () => {
           onClick={() => setView('declarations')}
         />
         <TabButton
+          id="fiscal-prorata"
+          title="Prorata TVA"
+          active={view === 'prorata'}
+          onClick={() => setView('prorata')}
+        />
+        <TabButton
+          id="fiscal-payments"
+          title="Paiements"
+          active={view === 'payments'}
+          onClick={() => setView('payments')}
+        />
+        <TabButton
           id="fiscal-calendar"
           title="Calendrier"
           active={view === 'calendar'}
@@ -503,6 +922,26 @@ export const ErpFiscalPage = () => {
           label="Échéances ouvertes"
           value={openDeadlines}
         />
+        {view === 'prorata' ? (
+          <>
+            <ErpWorkspaceSummaryItem
+              label="Prorata annuel"
+              value={
+                annualProrata
+                  ? `${(annualProrata.rateBasisPoints / 100).toFixed(0)} %`
+                  : '—'
+              }
+            />
+            <ErpWorkspaceSummaryItem
+              label="Régularisation"
+              value={
+                annualProrata
+                  ? formatMadCents(annualProrata.regularizationCents)
+                  : '—'
+              }
+            />
+          </>
+        ) : null}
       </StyledErpWorkspaceSummary>
       <StyledErpWorkspaceToolbar>
         <StyledErpWorkspaceField>
@@ -554,12 +993,136 @@ export const ErpFiscalPage = () => {
               onClick={() => void calculateIs()}
             />
             <StyledErpWorkspaceField>
+              Réintégrations IS
+              <StyledErpWorkspaceInput
+                type="number"
+                min="0"
+                value={reintegrationsMad}
+                onChange={(event) => setReintegrationsMad(event.target.value)}
+              />
+            </StyledErpWorkspaceField>
+            <StyledErpWorkspaceField>
+              Déductions IS
+              <StyledErpWorkspaceInput
+                type="number"
+                min="0"
+                value={deductionsMad}
+                onChange={(event) => setDeductionsMad(event.target.value)}
+              />
+            </StyledErpWorkspaceField>
+            <StyledErpWorkspaceField>
+              Acomptes versés
+              <StyledErpWorkspaceInput
+                type="number"
+                min="0"
+                value={installmentsPaidMad}
+                onChange={(event) => setInstallmentsPaidMad(event.target.value)}
+              />
+            </StyledErpWorkspaceField>
+            <StyledErpWorkspaceField>
               Référence de dépôt
               <StyledErpWorkspaceInput
                 value={filingReference}
                 onChange={(event) => setFilingReference(event.target.value)}
               />
             </StyledErpWorkspaceField>
+          </>
+        ) : view === 'payments' ? (
+          <>
+            <StyledErpWorkspaceField>
+              Déclaration
+              <StyledErpWorkspaceSelect
+                value={selectedDeclarationId}
+                onChange={(event) =>
+                  setSelectedDeclarationId(event.target.value)
+                }
+              >
+                {declarations
+                  .filter((declaration) => declaration.status !== 'CANCELLED')
+                  .map((declaration) => (
+                    <option key={declaration.id} value={declaration.id}>
+                      {declaration.type} · {declaration.periodKey} ·{' '}
+                      {formatMadCents(declaration.taxDueCents)}
+                    </option>
+                  ))}
+              </StyledErpWorkspaceSelect>
+            </StyledErpWorkspaceField>
+            <StyledErpWorkspaceField>
+              Nature du paiement
+              <StyledErpWorkspaceSelect
+                value={taxPaymentKind}
+                onChange={(event) =>
+                  setTaxPaymentKind(event.target.value as TaxPayment['kind'])
+                }
+              >
+                <option value="TVA">TVA</option>
+                <option value="IS_INSTALLMENT">Acompte IS</option>
+                <option value="IS_BALANCE">Solde IS</option>
+                <option value="OTHER">Autre impôt</option>
+              </StyledErpWorkspaceSelect>
+            </StyledErpWorkspaceField>
+          </>
+        ) : view === 'prorata' ? (
+          <>
+            <StyledErpWorkspaceField>
+              Exercice
+              <StyledErpWorkspaceSelect
+                value={exerciseId}
+                onChange={(event) => setExerciseId(event.target.value)}
+              >
+                {exercises.map((exercise) => (
+                  <option key={exercise.id} value={exercise.id}>
+                    {exercise.annee}
+                  </option>
+                ))}
+              </StyledErpWorkspaceSelect>
+            </StyledErpWorkspaceField>
+            <StyledErpWorkspaceField>
+              CA taxable
+              <StyledErpWorkspaceInput
+                type="number"
+                min="0"
+                value={taxableRevenueMad}
+                onChange={(event) => setTaxableRevenueMad(event.target.value)}
+              />
+            </StyledErpWorkspaceField>
+            <StyledErpWorkspaceField>
+              CA total
+              <StyledErpWorkspaceInput
+                type="number"
+                min="0"
+                value={totalRevenueMad}
+                onChange={(event) => setTotalRevenueMad(event.target.value)}
+              />
+            </StyledErpWorkspaceField>
+            <StyledErpWorkspaceField>
+              TVA avant prorata
+              <StyledErpWorkspaceInput
+                type="number"
+                min="0"
+                value={inputVatMad}
+                onChange={(event) => setInputVatMad(event.target.value)}
+              />
+            </StyledErpWorkspaceField>
+            <Button
+              title="Enregistrer"
+              ariaLabel="Calculer et enregistrer le prorata"
+              variant="primary"
+              disabled={!canManage || busyId !== null}
+              onClick={() => void calculateProrata()}
+            />
+            <Button
+              title="Créer l'écriture"
+              ariaLabel="Créer l'écriture annuelle de régularisation TVA"
+              variant="secondary"
+              disabled={
+                !canManage ||
+                busyId !== null ||
+                !annualProrata ||
+                annualProrata.regularizationCents === 0
+              }
+              onClick={() => void postProrataRegularization()}
+            />
           </>
         ) : (
           <Button
@@ -579,6 +1142,41 @@ export const ErpFiscalPage = () => {
             rows={declarations}
             getRowKey={(row) => row.id}
             emptyLabel="Aucune déclaration calculée"
+          />
+        ) : view === 'payments' ? (
+          <>
+            <StyledErpWorkspacePanel>
+              <StyledErpWorkspacePanelTitle>
+                Débits bancaires proposés
+              </StyledErpWorkspacePanelTitle>
+              <ErpOperationalTable
+                ariaLabel="Débits bancaires candidats"
+                columns={taxPaymentCandidateColumns}
+                rows={taxPaymentCandidates}
+                getRowKey={(row) => row.id}
+                emptyLabel="Aucun débit bancaire disponible"
+              />
+            </StyledErpWorkspacePanel>
+            <StyledErpWorkspacePanel>
+              <StyledErpWorkspacePanelTitle>
+                Paiements rapprochés
+              </StyledErpWorkspacePanelTitle>
+              <ErpOperationalTable
+                ariaLabel="Paiements fiscaux rapprochés"
+                columns={taxPaymentColumns}
+                rows={taxPayments}
+                getRowKey={(row) => row.id}
+                emptyLabel="Aucun paiement rapproché"
+              />
+            </StyledErpWorkspacePanel>
+          </>
+        ) : view === 'prorata' ? (
+          <ErpOperationalTable
+            ariaLabel="Historique du prorata TVA"
+            columns={prorataColumns}
+            rows={prorataPeriods}
+            getRowKey={(row) => row.id}
+            emptyLabel="Aucune période de prorata calculée"
           />
         ) : (
           <ErpOperationalTable

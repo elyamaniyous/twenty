@@ -8,6 +8,7 @@ import {
   StyledErpWorkspaceField,
   StyledErpWorkspaceFormGrid,
   StyledErpWorkspaceInlineActions,
+  StyledErpWorkspaceInput,
   StyledErpWorkspacePanel,
   StyledErpWorkspacePanelTitle,
   StyledErpWorkspaceSelect,
@@ -61,6 +62,19 @@ type SafeQueryResult = {
   readOnly: true;
 };
 
+type AiCategorizationRule = {
+  id: string;
+  name: string;
+  pattern: string;
+  matchMode: 'CONTAINS' | 'REGEX';
+  direction: 'BOTH' | 'DEBIT' | 'CREDIT';
+  accountCode: string;
+  category: string;
+  confidenceBasisPoints: number;
+  priority: number;
+  isActive: boolean;
+};
+
 const StyledEvidence = styled.pre`
   background: ${themeCssVariables.background.secondary};
   border: 1px solid ${themeCssVariables.border.color.light};
@@ -93,15 +107,16 @@ const proposalLabel = (proposal: unknown) => {
 };
 
 export const ErpAccountingAiPage = () => {
-  const { client } = useErpMarocContext();
+  const { client, context } = useErpMarocContext();
   const { enqueueErrorSnackBar, enqueueSuccessSnackBar } = useSnackBar();
-  const [view, setView] = useState<'assistant' | 'suggestions' | 'queries'>(
-    'assistant',
-  );
+  const [view, setView] = useState<
+    'assistant' | 'suggestions' | 'rules' | 'queries'
+  >('assistant');
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [generation, setGeneration] = useState(0);
   const [status, setStatus] = useState<AiStatus | null>(null);
   const [suggestions, setSuggestions] = useState<AiSuggestion[]>([]);
+  const [rules, setRules] = useState<AiCategorizationRule[]>([]);
   const [question, setQuestion] = useState(
     'Quelles factures clients sont en retard ?',
   );
@@ -111,6 +126,13 @@ export const ErpAccountingAiPage = () => {
   const [queryResult, setQueryResult] = useState<SafeQueryResult | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [ruleName, setRuleName] = useState('');
+  const [rulePattern, setRulePattern] = useState('');
+  const [ruleAccountCode, setRuleAccountCode] = useState('');
+  const [ruleCategory, setRuleCategory] = useState('');
+  const [ruleDirection, setRuleDirection] =
+    useState<AiCategorizationRule['direction']>('BOTH');
+  const canManage = context?.role !== 'COMMERCIAL';
 
   const refresh = () => setGeneration((value) => value + 1);
 
@@ -130,12 +152,19 @@ export const ErpAccountingAiPage = () => {
         schema: erpRegulatoryListSchema,
         signal: abortController.signal,
       }),
+      client.request({
+        method: 'GET',
+        path: '/ai-accounting/rules',
+        schema: erpRegulatoryListSchema,
+        signal: abortController.signal,
+      }),
     ])
-      .then(([loadedStatus, loadedSuggestions]) => {
+      .then(([loadedStatus, loadedSuggestions, loadedRules]) => {
         if (abortController.signal.aborted) return;
         const parsedStatus = loadedStatus as unknown as AiStatus;
         setStatus(parsedStatus);
         setSuggestions(loadedSuggestions as unknown as AiSuggestion[]);
+        setRules(loadedRules as unknown as AiCategorizationRule[]);
         setQueryId((current) =>
           parsedStatus.safeQueries.includes(current)
             ? current
@@ -245,6 +274,71 @@ export const ErpAccountingAiPage = () => {
     }
   };
 
+  const createRule = async () => {
+    if (
+      !ruleName.trim() ||
+      !rulePattern.trim() ||
+      !ruleAccountCode.trim() ||
+      !ruleCategory.trim()
+    )
+      return;
+    setBusyId('rule-create');
+    try {
+      await client
+        .createMutationIntent(
+          {
+            method: 'POST',
+            path: '/ai-accounting/rules',
+            schema: erpRegulatoryObjectSchema,
+            body: {
+              name: ruleName.trim(),
+              pattern: rulePattern.trim(),
+              matchMode: 'CONTAINS',
+              direction: ruleDirection,
+              accountCode: ruleAccountCode.trim(),
+              category: ruleCategory.trim(),
+              confidenceBasisPoints: 9500,
+            },
+          },
+          { idempotency: 'forbidden' },
+        )
+        .execute();
+      setRuleName('');
+      setRulePattern('');
+      setRuleAccountCode('');
+      setRuleCategory('');
+      enqueueSuccessSnackBar({ message: 'Règle de catégorisation créée' });
+      refresh();
+    } catch {
+      enqueueErrorSnackBar({
+        message: 'Règle impossible. Vérifiez le compte PCGM.',
+      });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const deactivateRule = async (rule: AiCategorizationRule) => {
+    setBusyId(rule.id);
+    try {
+      await client
+        .createMutationIntent(
+          {
+            method: 'POST',
+            path: `/ai-accounting/rules/${rule.id}/deactivate`,
+            schema: erpRegulatoryObjectSchema,
+          },
+          { idempotency: 'forbidden' },
+        )
+        .execute();
+      refresh();
+    } catch {
+      enqueueErrorSnackBar({ message: 'Désactivation impossible' });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const columns: ErpOperationalTableColumn<AiSuggestion>[] = [
     { key: 'type', header: 'Type', width: '160px', render: (row) => row.type },
     {
@@ -300,6 +394,63 @@ export const ErpAccountingAiPage = () => {
     },
   ];
 
+  const ruleColumns: ErpOperationalTableColumn<AiCategorizationRule>[] = [
+    { key: 'name', header: 'Règle', width: '200px', render: (row) => row.name },
+    {
+      key: 'pattern',
+      header: 'Motif',
+      width: '220px',
+      render: (row) => row.pattern,
+    },
+    {
+      key: 'direction',
+      header: 'Sens',
+      width: '100px',
+      render: (row) => row.direction,
+    },
+    {
+      key: 'account',
+      header: 'Compte PCGM',
+      width: '130px',
+      render: (row) => row.accountCode,
+    },
+    {
+      key: 'category',
+      header: 'Catégorie',
+      width: '220px',
+      render: (row) => row.category,
+    },
+    {
+      key: 'confidence',
+      header: 'Confiance',
+      width: '110px',
+      align: 'right',
+      render: (row) => `${row.confidenceBasisPoints / 100} %`,
+    },
+    {
+      key: 'status',
+      header: 'État',
+      width: '100px',
+      render: (row) => (row.isActive ? 'Active' : 'Inactive'),
+    },
+    {
+      key: 'action',
+      header: '',
+      width: '130px',
+      render: (row) =>
+        row.isActive && canManage ? (
+          <Button
+            title="Désactiver"
+            ariaLabel={`Désactiver ${row.name}`}
+            Icon={IconX}
+            variant="secondary"
+            disabled={busyId !== null}
+            onClick={() => void deactivateRule(row)}
+          />
+        ) : null,
+    },
+  ];
+
   return (
     <ErpPageShell
       title="Assistant comptable"
@@ -328,6 +479,12 @@ export const ErpAccountingAiPage = () => {
           title="Suggestions"
           active={view === 'suggestions'}
           onClick={() => setView('suggestions')}
+        />
+        <TabButton
+          id="accounting-ai-rules"
+          title="Règles"
+          active={view === 'rules'}
+          onClick={() => setView('rules')}
         />
         <TabButton
           id="accounting-ai-queries"
@@ -363,6 +520,10 @@ export const ErpAccountingAiPage = () => {
           }
         />
         <ErpWorkspaceSummaryItem label="Mode" value="Suggestion humaine" />
+        <ErpWorkspaceSummaryItem
+          label="Règles actives"
+          value={rules.filter((rule) => rule.isActive).length}
+        />
       </StyledErpWorkspaceSummary>
       <StyledErpWorkspaceContent>
         {view === 'assistant' ? (
@@ -416,6 +577,72 @@ export const ErpAccountingAiPage = () => {
               rows={suggestions}
               getRowKey={(row) => row.id}
               emptyLabel="Aucune suggestion"
+            />
+          </StyledErpWorkspacePanel>
+        ) : null}
+        {view === 'rules' ? (
+          <StyledErpWorkspacePanel>
+            <StyledErpWorkspacePanelTitle>
+              Règles métier prioritaires
+            </StyledErpWorkspacePanelTitle>
+            <StyledErpWorkspaceFormGrid>
+              <StyledErpWorkspaceField>
+                Nom
+                <StyledErpWorkspaceInput
+                  value={ruleName}
+                  onChange={(event) => setRuleName(event.target.value)}
+                />
+              </StyledErpWorkspaceField>
+              <StyledErpWorkspaceField>
+                Texte à reconnaître
+                <StyledErpWorkspaceInput
+                  value={rulePattern}
+                  onChange={(event) => setRulePattern(event.target.value)}
+                />
+              </StyledErpWorkspaceField>
+              <StyledErpWorkspaceField>
+                Sens bancaire
+                <StyledErpWorkspaceSelect
+                  value={ruleDirection}
+                  onChange={(event) =>
+                    setRuleDirection(
+                      event.target.value as AiCategorizationRule['direction'],
+                    )
+                  }
+                >
+                  <option value="BOTH">Débit et crédit</option>
+                  <option value="DEBIT">Débit</option>
+                  <option value="CREDIT">Crédit</option>
+                </StyledErpWorkspaceSelect>
+              </StyledErpWorkspaceField>
+              <StyledErpWorkspaceField>
+                Compte PCGM
+                <StyledErpWorkspaceInput
+                  value={ruleAccountCode}
+                  onChange={(event) => setRuleAccountCode(event.target.value)}
+                />
+              </StyledErpWorkspaceField>
+              <StyledErpWorkspaceField>
+                Catégorie
+                <StyledErpWorkspaceInput
+                  value={ruleCategory}
+                  onChange={(event) => setRuleCategory(event.target.value)}
+                />
+              </StyledErpWorkspaceField>
+              <Button
+                title="Ajouter la règle"
+                ariaLabel="Ajouter une règle de catégorisation"
+                variant="primary"
+                disabled={!canManage || busyId !== null}
+                onClick={() => void createRule()}
+              />
+            </StyledErpWorkspaceFormGrid>
+            <ErpOperationalTable
+              ariaLabel="Règles de catégorisation"
+              columns={ruleColumns}
+              rows={rules}
+              getRowKey={(row) => row.id}
+              emptyLabel="Aucune règle configurable"
             />
           </StyledErpWorkspacePanel>
         ) : null}
