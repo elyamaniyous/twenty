@@ -37,6 +37,7 @@ import {
   erpEmployeeListSchema,
   erpEmployeeSchema,
   erpEmployeeTerminationResultSchema,
+  erpExecutiveDashboardSchema,
   erpExchangeRateListSchema,
   erpExchangeRateSchema,
   erpExerciseClosingResultSchema,
@@ -104,6 +105,7 @@ import {
   erpTaxDeclarationSchema,
   erpTierListSchema,
   erpTierSchema,
+  erpTreasuryForecastSchema,
   erpWarehouseListSchema,
   erpWarehouseSchema,
   uuidSchema,
@@ -179,6 +181,8 @@ const fiscalSeedQuery = Object.freeze(['year']);
 const payrollPeriodQuery = Object.freeze(['periodKey']);
 const documentQuery = Object.freeze(['search', 'type', 'tag']);
 const recurringRunQuery = Object.freeze(['asOf']);
+const treasuryForecastQuery = Object.freeze(['asOf', 'weeks']);
+const executiveDashboardQuery = Object.freeze(['asOf']);
 const adc080fQuery = Object.freeze(['regime']);
 const regulatoryFormatQuery = Object.freeze(['format']);
 const cnssBdsQuery = Object.freeze(['periodKey', 'format']);
@@ -1800,6 +1804,22 @@ const routes: ErpMarocRoute[] = [
     staticBuilder(erpMarocUpstreamRoutes.operations.runRecurringInvoices),
     erpRecurringInvoiceRunSchema,
     recurringRunQuery,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.treasuryForecast,
+    'GET',
+    exact('/operations/treasury-forecast'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.treasuryForecast),
+    erpTreasuryForecastSchema,
+    treasuryForecastQuery,
+  ),
+  defineJsonRoute(
+    erpMarocRouteIds.executiveDashboard,
+    'GET',
+    exact('/operations/executive-dashboard'),
+    staticBuilder(erpMarocUpstreamRoutes.operations.executiveDashboard),
+    erpExecutiveDashboardSchema,
+    executiveDashboardQuery,
   ),
   defineJsonRoute(
     erpMarocRouteIds.exchangeRates,

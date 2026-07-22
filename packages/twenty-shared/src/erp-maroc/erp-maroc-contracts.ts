@@ -2690,6 +2690,97 @@ export const erpTreasuryForecastSchema = z.object({
   insights: z.array(nonBlankStringSchema),
 });
 
+export const erpExecutiveDashboardTargetSchema = z.enum([
+  'TREASURY',
+  'REMINDERS',
+  'BANK',
+  'PURCHASES',
+  'INVENTORY',
+  'FISCAL',
+  'APPROVALS',
+  'MANAGEMENT',
+]);
+
+export const erpExecutiveDashboardSchema = z.object({
+  asOf: civilDateSchema,
+  currency: z.literal('MAD'),
+  period: z.object({
+    currentStart: civilDateSchema,
+    currentEnd: civilDateSchema,
+    previousStart: civilDateSchema,
+    previousEnd: civilDateSchema,
+  }),
+  performance: z.object({
+    revenueCents: signedCentsSchema,
+    previousRevenueCents: signedCentsSchema,
+    revenueChangeBasisPoints: signedCentsSchema.nullable(),
+    grossMarginCents: signedCentsSchema,
+    grossMarginRateBasisPoints: signedCentsSchema.nullable(),
+    grossMarginDeliveryCount: nonNegativeIntegerSchema,
+    revenueBudgetCents: centsSchema.nullable(),
+    revenueBudgetVarianceCents: signedCentsSchema.nullable(),
+  }),
+  cash: z.object({
+    currentCashCents: signedCentsSchema,
+    forecastClosingCashCents: signedCentsSchema,
+    forecastMinimumCashCents: signedCentsSchema,
+    firstNegativeWeek: positiveIntegerSchema.nullable(),
+    receivablesCents: centsSchema,
+    overdueReceivablesCents: centsSchema,
+    payablesCents: centsSchema,
+  }),
+  operations: z.object({
+    stockValueCents: centsSchema,
+    replenishmentCount: nonNegativeIntegerSchema,
+    overdueFiscalDeadlineCount: nonNegativeIntegerSchema,
+    upcomingFiscalDeadlineCount: nonNegativeIntegerSchema,
+    pendingApprovalCount: nonNegativeIntegerSchema,
+    pendingApprovalAmountCents: centsSchema,
+    openAnomalyCount: nonNegativeIntegerSchema,
+  }),
+  queues: z.object({
+    draftQuotes: nonNegativeIntegerSchema,
+    validatedInvoices: nonNegativeIntegerSchema,
+    overdueInvoices: nonNegativeIntegerSchema,
+    pendingAllocationPayments: nonNegativeIntegerSchema,
+    proposedReminders: nonNegativeIntegerSchema,
+    reconciliationRequired: nonNegativeIntegerSchema,
+  }),
+  referenceCounts: z.object({
+    products: nonNegativeIntegerSchema,
+    tiers: nonNegativeIntegerSchema,
+  }),
+  dataQuality: z.object({
+    bankAccountCount: nonNegativeIntegerSchema,
+    confirmedBankAccountCount: nonNegativeIntegerSchema,
+    usesOpeningBalance: z.boolean(),
+    eventCount: nonNegativeIntegerSchema,
+    budgetConfigured: z.boolean(),
+    grossMarginDeliveryCount: nonNegativeIntegerSchema,
+  }),
+  alerts: z.array(
+    z.object({
+      code: nonBlankStringSchema,
+      severity: z.enum(['INFO', 'WARNING', 'CRITICAL']),
+      title: nonBlankStringSchema,
+      message: nonBlankStringSchema,
+      amountCents: centsSchema,
+      count: nonNegativeIntegerSchema,
+      target: erpExecutiveDashboardTargetSchema,
+    }),
+  ),
+  actions: z.array(
+    z.object({
+      code: nonBlankStringSchema,
+      label: nonBlankStringSchema,
+      description: nonBlankStringSchema,
+      priority: z.enum(['LOW', 'MEDIUM', 'HIGH']),
+      amountCents: centsSchema,
+      target: erpExecutiveDashboardTargetSchema,
+    }),
+  ),
+});
+
 const encodeRouteId = (id: string): string => {
   return encodeURIComponent(uuidSchema.parse(id));
 };
@@ -2850,6 +2941,8 @@ export const erpMarocRouteIds = {
   accountingAnomalies: 'operations.anomalies',
   accountingAnomaliesScan: 'operations.anomalies.scan',
   accountingAnomalyResolve: 'operations.anomaly.resolve',
+  treasuryForecast: 'operations.treasury-forecast',
+  executiveDashboard: 'operations.executive-dashboard',
   liasseDefinitions: 'liasse.definitions',
   liasseTables: 'liasse.tables',
   liasseTable: 'liasse.table',
@@ -3112,6 +3205,7 @@ export const erpMarocUpstreamRoutes = {
       `/operations/portal-access/${encodeRouteId(id)}/revoke`,
     anomalies: '/operations/anomalies',
     treasuryForecast: '/operations/treasury-forecast',
+    executiveDashboard: '/operations/executive-dashboard',
     scanAnomalies: '/operations/anomalies/scan',
     resolveAnomaly: (id: string) =>
       `/operations/anomalies/${encodeRouteId(id)}/resolve`,
@@ -3312,5 +3406,9 @@ export type ErpTreasuryScenarioCode = z.infer<
 >;
 export type ErpTreasuryEvent = z.infer<typeof erpTreasuryEventSchema>;
 export type ErpTreasuryForecast = z.infer<typeof erpTreasuryForecastSchema>;
+export type ErpExecutiveDashboardTarget = z.infer<
+  typeof erpExecutiveDashboardTargetSchema
+>;
+export type ErpExecutiveDashboard = z.infer<typeof erpExecutiveDashboardSchema>;
 export type ErpMarocRouteId =
   (typeof erpMarocRouteIds)[keyof typeof erpMarocRouteIds];

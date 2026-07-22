@@ -113,6 +113,8 @@ export type {
   ErpTreasuryScenarioCode,
   ErpTreasuryEvent,
   ErpTreasuryForecast,
+  ErpExecutiveDashboardTarget,
+  ErpExecutiveDashboard,
   ErpMarocRouteId,
 } from './erp-maroc-contracts';
 export {
@@ -317,6 +319,8 @@ export {
   erpTreasuryScenarioCodeSchema,
   erpTreasuryEventSchema,
   erpTreasuryForecastSchema,
+  erpExecutiveDashboardTargetSchema,
+  erpExecutiveDashboardSchema,
   erpMarocRouteIds,
   erpMarocUpstreamRoutes,
 } from './erp-maroc-contracts';

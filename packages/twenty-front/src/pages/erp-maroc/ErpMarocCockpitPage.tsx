@@ -1,386 +1,416 @@
+import {
+  ErpWorkspaceSummaryItem,
+  StyledErpWorkspaceContent,
+  StyledErpWorkspacePanel,
+  StyledErpWorkspacePanelTitle,
+  StyledErpWorkspaceSummary,
+} from '@/erp-maroc/components/ErpComplianceUi';
 import { ErpPageShell } from '@/erp-maroc/components/ErpPageShell';
 import { useErpMarocContext } from '@/erp-maroc/context/useErpMarocContext';
 import { erpMarocPaths } from '@/erp-maroc/navigation/erpMarocPaths';
+import { formatMadCents } from '@/erp-maroc/utils/money';
 import { styled } from '@linaria/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  erpInvoicePageSchema,
-  erpPaymentPageSchema,
-  erpProductListSchema,
-  erpQuoteListSchema,
-  erpReminderPageSchema,
-  erpTierListSchema,
-  type ErpInvoicePage,
-  type ErpPaymentPage,
-  type ErpQuoteList,
-  type ErpReminderPage,
+  erpExecutiveDashboardSchema,
+  type ErpExecutiveDashboard,
+  type ErpExecutiveDashboardTarget,
 } from 'twenty-shared/erp-maroc';
 import { IconRefresh } from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
-type CockpitData = {
-  quotes: ErpQuoteList;
-  invoices: ErpInvoicePage;
-  payments: ErpPaymentPage;
-  reminders: ErpReminderPage;
-};
-
-type CockpitState = {
-  status: 'loading' | 'ready' | 'error';
-  data: Partial<CockpitData>;
-  failedCount: number;
-  failedKeys: string[];
-};
-
-type Queue = {
-  label: string;
-  count: number;
-  available: boolean;
-  links: Array<{ label: string; to: string }>;
-};
-
-const StyledContent = styled.div`
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-height: 0;
-  overflow: auto;
-`;
-
-const StyledPartialError = styled.div`
-  align-items: center;
-  background: ${themeCssVariables.background.secondary};
-  border-bottom: 1px solid ${themeCssVariables.border.color.light};
-  color: ${themeCssVariables.font.color.secondary};
-  display: flex;
-  gap: ${themeCssVariables.spacing[3]};
-  justify-content: space-between;
-  padding: ${themeCssVariables.spacing[2]} ${themeCssVariables.spacing[4]};
-`;
-
-const StyledReferenceSources = styled.section`
+const StyledPeriod = styled.div`
   border-bottom: 1px solid ${themeCssVariables.border.color.light};
   color: ${themeCssVariables.font.color.secondary};
   display: flex;
   flex-wrap: wrap;
   font-size: ${themeCssVariables.font.size.sm};
   gap: ${themeCssVariables.spacing[4]};
-  padding: ${themeCssVariables.spacing[2]} ${themeCssVariables.spacing[4]};
+  padding: ${themeCssVariables.spacing[2]} ${themeCssVariables.spacing[3]};
 `;
 
-const StyledQueues = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  width: 100%;
-`;
-
-const StyledQueue = styled.section`
+const StyledPerformance = styled.div`
   border-bottom: 1px solid ${themeCssVariables.border.color.light};
-  border-right: 1px solid ${themeCssVariables.border.color.light};
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: ${themeCssVariables.spacing[2]};
-  min-height: 132px;
-  padding: ${themeCssVariables.spacing[4]};
-`;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 
-const StyledQueueHeader = styled.div`
-  align-items: flex-start;
-  display: flex;
-  gap: ${themeCssVariables.spacing[3]};
-  justify-content: space-between;
-`;
+  > div {
+    border-right: 1px solid ${themeCssVariables.border.color.light};
+    display: flex;
+    flex-direction: column;
+    gap: ${themeCssVariables.spacing[1]};
+    min-height: 58px;
+    padding: ${themeCssVariables.spacing[3]};
+  }
 
-const StyledQueueTitle = styled.h2`
-  font-size: ${themeCssVariables.font.size.md};
-  font-weight: ${themeCssVariables.font.weight.semiBold};
-  letter-spacing: 0;
-  line-height: 20px;
-  margin: 0;
+  span {
+    color: ${themeCssVariables.font.color.tertiary};
+    font-size: ${themeCssVariables.font.size.sm};
+  }
 
-  a {
+  strong {
     color: ${themeCssVariables.font.color.primary};
-    text-decoration: none;
+    font-size: ${themeCssVariables.font.size.md};
+    font-weight: ${themeCssVariables.font.weight.semiBold};
+    letter-spacing: 0;
   }
 `;
 
-const StyledCount = styled.span`
-  color: ${themeCssVariables.font.color.primary};
-  font-size: ${themeCssVariables.font.size.xl};
-  font-weight: ${themeCssVariables.font.weight.semiBold};
-`;
-
-const StyledLoadedLabel = styled.span`
-  color: ${themeCssVariables.font.color.tertiary};
-  font-size: ${themeCssVariables.font.size.sm};
-`;
-
-const StyledSecondaryLinks = styled.div`
+const StyledAlertList = styled.div`
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+`;
+
+const StyledAlert = styled(Link)<{
+  severity: 'INFO' | 'WARNING' | 'CRITICAL';
+}>`
+  align-items: center;
+  background: ${({ severity }) =>
+    severity === 'CRITICAL'
+      ? themeCssVariables.background.danger
+      : themeCssVariables.background.primary};
+  border-top: 1px solid ${themeCssVariables.border.color.light};
+  color: ${themeCssVariables.font.color.primary};
+  display: grid;
   gap: ${themeCssVariables.spacing[2]};
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 48px;
+  padding: ${themeCssVariables.spacing[2]} ${themeCssVariables.spacing[3]};
+  text-decoration: none;
+
+  strong {
+    display: block;
+    font-weight: ${themeCssVariables.font.weight.semiBold};
+  }
+
+  span {
+    color: ${themeCssVariables.font.color.secondary};
+    font-size: ${themeCssVariables.font.size.sm};
+  }
+
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const StyledEmpty = styled.div`
+  color: ${themeCssVariables.font.color.secondary};
+  min-height: 48px;
+  padding: ${themeCssVariables.spacing[3]};
+`;
+
+const StyledActions = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 
   a {
-    color: ${themeCssVariables.color.blue};
+    border-right: 1px solid ${themeCssVariables.border.color.light};
+    border-top: 1px solid ${themeCssVariables.border.color.light};
+    color: ${themeCssVariables.font.color.primary};
+    display: flex;
+    flex-direction: column;
+    gap: ${themeCssVariables.spacing[1]};
+    min-height: 68px;
+    padding: ${themeCssVariables.spacing[3]};
+    text-decoration: none;
+  }
+
+  span {
+    color: ${themeCssVariables.font.color.tertiary};
     font-size: ${themeCssVariables.font.size.sm};
   }
 `;
 
-const requestDefinitions = [
-  ['quotes', '/quotes', erpQuoteListSchema],
-  ['invoices', '/invoices', erpInvoicePageSchema],
-  ['payments', '/payments', erpPaymentPageSchema],
-  ['reminders', '/reminders', erpReminderPageSchema],
-  ['products', '/products', erpProductListSchema],
-  ['tiers', '/tiers', erpTierListSchema],
-] as const;
+const StyledQueues = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 
-const referenceSources = [
-  { key: 'products', label: 'Catalogue' },
-  { key: 'tiers', label: 'Tiers' },
-] as const;
+  a {
+    align-items: center;
+    border-right: 1px solid ${themeCssVariables.border.color.light};
+    border-top: 1px solid ${themeCssVariables.border.color.light};
+    color: ${themeCssVariables.font.color.primary};
+    display: flex;
+    gap: ${themeCssVariables.spacing[3]};
+    justify-content: space-between;
+    min-height: 44px;
+    padding: ${themeCssVariables.spacing[2]} ${themeCssVariables.spacing[3]};
+    text-decoration: none;
+  }
 
-const operationalSourceKeys = new Set([
-  'quotes',
-  'invoices',
-  'payments',
-  'reminders',
-]);
+  strong {
+    font-size: ${themeCssVariables.font.size.lg};
+    font-weight: ${themeCssVariables.font.weight.semiBold};
+  }
+`;
+
+const targetPaths: Record<ErpExecutiveDashboardTarget, string> = {
+  TREASURY: erpMarocPaths.treasury,
+  REMINDERS: erpMarocPaths.reminders,
+  BANK: erpMarocPaths.bankStatements,
+  PURCHASES: erpMarocPaths.purchaseOrders,
+  INVENTORY: erpMarocPaths.inventory,
+  FISCAL: erpMarocPaths.fiscal,
+  APPROVALS: erpMarocPaths.approvals,
+  MANAGEMENT: erpMarocPaths.management,
+};
+
+const formatBasisPoints = (basisPoints: number | null) => {
+  if (basisPoints === null) return 'Non comparable';
+  return new Intl.NumberFormat('fr-MA', {
+    style: 'percent',
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+    signDisplay: 'always',
+  }).format(basisPoints / 10_000);
+};
+
+const formatRate = (basisPoints: number | null) =>
+  basisPoints === null
+    ? 'Non calculée'
+    : new Intl.NumberFormat('fr-MA', {
+        style: 'percent',
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      }).format(basisPoints / 10_000);
 
 export const ErpMarocCockpitPage = () => {
   const { client } = useErpMarocContext();
+  const [dashboard, setDashboard] = useState<ErpExecutiveDashboard | null>(
+    null,
+  );
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [generation, setGeneration] = useState(0);
-  const [state, setState] = useState<CockpitState>({
-    status: 'loading',
-    data: {},
-    failedCount: 0,
-    failedKeys: [],
-  });
 
   useEffect(() => {
-    const abortController = new AbortController();
-    let isCurrent = true;
-    setState({ status: 'loading', data: {}, failedCount: 0, failedKeys: [] });
-
-    Promise.allSettled(
-      requestDefinitions.map(([, path, schema]) =>
-        client.request({
-          method: 'GET',
-          path,
-          schema,
-          signal: abortController.signal,
-        }),
-      ),
-    ).then((results) => {
-      if (!isCurrent || abortController.signal.aborted) return;
-
-      const data: Partial<CockpitData> = {};
-      let failedCount = 0;
-      const failedKeys: string[] = [];
-      results.forEach((result, index) => {
-        if (result.status === 'rejected') {
-          failedCount += 1;
-          failedKeys.push(requestDefinitions[index][0]);
-          return;
-        }
-
-        const key = requestDefinitions[index][0];
-        if (key === 'quotes') data.quotes = result.value as ErpQuoteList;
-        if (key === 'invoices') data.invoices = result.value as ErpInvoicePage;
-        if (key === 'payments') data.payments = result.value as ErpPaymentPage;
-        if (key === 'reminders')
-          data.reminders = result.value as ErpReminderPage;
+    const controller = new AbortController();
+    setState('loading');
+    client
+      .request({
+        method: 'GET',
+        path: '/operations/executive-dashboard',
+        schema: erpExecutiveDashboardSchema,
+        signal: controller.signal,
+      })
+      .then((value) => {
+        if (controller.signal.aborted) return;
+        setDashboard(value);
+        setState('ready');
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setState('error');
       });
-
-      setState({
-        status: failedCount === requestDefinitions.length ? 'error' : 'ready',
-        data,
-        failedCount,
-        failedKeys,
-      });
-    });
-
-    return () => {
-      isCurrent = false;
-      abortController.abort();
-    };
+    return () => controller.abort();
   }, [client, generation]);
 
-  const queues = useMemo<Queue[]>(() => {
-    const invoices = state.data.invoices?.items ?? [];
-    const reminders = state.data.reminders?.items ?? [];
-
-    return [
-      {
-        label: 'Brouillons à terminer',
-        available: !state.failedKeys.includes('quotes'),
-        count:
-          state.data.quotes?.filter(({ status }) => status === 'DRAFT')
-            .length ?? 0,
-        links: [
-          {
-            label: 'Brouillons à terminer',
-            to: `${erpMarocPaths.quotes}?status=DRAFT`,
-          },
-        ],
-      },
-      {
-        label: 'Factures validées à envoyer',
-        available: !state.failedKeys.includes('invoices'),
-        count: invoices.filter(({ status }) => status === 'VALIDATED').length,
-        links: [
-          {
-            label: 'Factures validées à envoyer',
-            to: `${erpMarocPaths.invoices}?status=VALIDATED`,
-          },
-        ],
-      },
-      {
-        label: 'Factures en retard ou partiellement payées',
-        available: !state.failedKeys.includes('invoices'),
-        count: invoices.filter(
-          ({ isOverdue, status }) =>
-            isOverdue || status === 'OVERDUE' || status === 'PARTIALLY_PAID',
-        ).length,
-        links: [
-          {
-            label: 'Factures en retard',
-            to: `${erpMarocPaths.invoices}?status=OVERDUE`,
-          },
-          {
-            label: 'Factures partiellement payées',
-            to: `${erpMarocPaths.invoices}?status=PARTIALLY_PAID`,
-          },
-        ],
-      },
-      {
-        label: 'Paiements à affecter',
-        available: !state.failedKeys.includes('payments'),
-        count:
-          state.data.payments?.items.filter(
-            ({ status }) => status === 'PENDING_ALLOCATION',
-          ).length ?? 0,
-        links: [
-          {
-            label: 'Paiements à affecter',
-            to: `${erpMarocPaths.payments}?status=PENDING_ALLOCATION`,
-          },
-        ],
-      },
-      {
-        label: 'Propositions de relance à approuver',
-        available: !state.failedKeys.includes('reminders'),
-        count: reminders.filter(({ status }) => status === 'PROPOSED').length,
-        links: [
-          {
-            label: 'Propositions de relance à approuver',
-            to: `${erpMarocPaths.reminders}?status=PROPOSED`,
-          },
-        ],
-      },
-      {
-        label: 'Réconciliations requises',
-        available:
-          !state.failedKeys.includes('invoices') &&
-          !state.failedKeys.includes('reminders'),
-        count:
-          invoices.filter(
-            ({ emailDelivery }) =>
-              emailDelivery?.status === 'RECONCILIATION_REQUIRED',
-          ).length +
-          reminders.filter(({ status }) => status === 'RECONCILIATION_REQUIRED')
-            .length,
-        links: [
-          {
-            label: 'Livraisons de facture à réconcilier',
-            to: `${erpMarocPaths.invoices}?delivery=RECONCILIATION_REQUIRED`,
-          },
-          {
-            label: 'Relances à réconcilier',
-            to: `${erpMarocPaths.reminders}?status=RECONCILIATION_REQUIRED`,
-          },
-        ],
-      },
-    ];
-  }, [state.data, state.failedKeys]);
-
-  const retry = () => setGeneration((current) => current + 1);
-  const hasOperationalFailure = state.failedKeys.some((key) =>
-    operationalSourceKeys.has(key),
-  );
+  const refresh = () => setGeneration((value) => value + 1);
+  const queueLinks = dashboard
+    ? [
+        {
+          label: 'Devis brouillons',
+          count: dashboard.queues.draftQuotes,
+          to: `${erpMarocPaths.quotes}?status=DRAFT`,
+        },
+        {
+          label: 'Factures à envoyer',
+          count: dashboard.queues.validatedInvoices,
+          to: `${erpMarocPaths.invoices}?status=VALIDATED`,
+        },
+        {
+          label: 'Factures en retard',
+          count: dashboard.queues.overdueInvoices,
+          to: `${erpMarocPaths.invoices}?status=OVERDUE`,
+        },
+        {
+          label: 'Paiements à affecter',
+          count: dashboard.queues.pendingAllocationPayments,
+          to: `${erpMarocPaths.payments}?status=PENDING_ALLOCATION`,
+        },
+        {
+          label: 'Relances à approuver',
+          count: dashboard.queues.proposedReminders,
+          to: `${erpMarocPaths.reminders}?status=PROPOSED`,
+        },
+        {
+          label: 'Réconciliations requises',
+          count: dashboard.queues.reconciliationRequired,
+          to: `${erpMarocPaths.invoices}?delivery=RECONCILIATION_REQUIRED`,
+        },
+      ]
+    : [];
 
   return (
     <ErpPageShell
-      title="Vue ventes"
-      description="Files opérationnelles issues des premières pages chargées"
-      state={state.status === 'ready' ? 'ready' : state.status}
-      loadingLabel="Chargement des files opérationnelles"
-      errorLabel="Les files opérationnelles sont indisponibles"
+      title="Cockpit dirigeant"
+      description="Pilotage consolidé de Zowka"
+      actions={
+        <Button
+          title="Actualiser"
+          ariaLabel="Actualiser"
+          Icon={IconRefresh}
+          variant="secondary"
+          onClick={refresh}
+        />
+      }
+      state={state}
+      loadingLabel="Calcul des indicateurs"
+      errorLabel="Le cockpit dirigeant est indisponible"
       retryLabel="Réessayer"
-      onRetry={retry}
+      onRetry={refresh}
     >
-      <StyledContent>
-        {hasOperationalFailure ? (
-          <StyledPartialError role="alert">
-            <span>Certaines files ne sont pas disponibles</span>
-            <Button
-              title="Réessayer"
-              ariaLabel="Réessayer"
-              Icon={IconRefresh}
-              variant="secondary"
-              onClick={retry}
-            />
-          </StyledPartialError>
-        ) : null}
-        <StyledReferenceSources aria-label="Sources de référence">
-          {referenceSources.map(({ key, label }) => (
-            <span key={key}>
-              {label} —{' '}
-              {state.failedKeys.includes(key) ? 'Indisponible' : 'Page chargée'}
+      {dashboard ? (
+        <StyledErpWorkspaceContent>
+          <StyledPeriod>
+            <span>
+              Période · {dashboard.period.currentStart} au{' '}
+              {dashboard.period.currentEnd}
             </span>
-          ))}
-        </StyledReferenceSources>
-        <StyledQueues>
-          {queues.map((queue) => {
-            const primaryLink =
-              queue.links.length === 1 ? queue.links[0] : null;
+            <span>
+              Référence · {dashboard.period.previousStart} au{' '}
+              {dashboard.period.previousEnd}
+            </span>
+            <span>
+              Banque confirmée ·{' '}
+              {dashboard.dataQuality.confirmedBankAccountCount}/
+              {dashboard.dataQuality.bankAccountCount}
+            </span>
+          </StyledPeriod>
 
-            return (
-              <StyledQueue key={queue.label}>
-                <StyledQueueHeader>
-                  <StyledQueueTitle>
-                    {primaryLink === null ? (
-                      queue.label
-                    ) : (
-                      <Link to={primaryLink.to} aria-label={primaryLink.label}>
-                        {queue.label}
-                      </Link>
+          <StyledErpWorkspaceSummary aria-label="Indicateurs dirigeants">
+            <ErpWorkspaceSummaryItem
+              label="Chiffre d'affaires HT net"
+              value={formatMadCents(dashboard.performance.revenueCents)}
+            />
+            <ErpWorkspaceSummaryItem
+              label="Évolution"
+              value={formatBasisPoints(
+                dashboard.performance.revenueChangeBasisPoints,
+              )}
+            />
+            <ErpWorkspaceSummaryItem
+              label="Marge brute livrée"
+              value={formatMadCents(dashboard.performance.grossMarginCents)}
+            />
+            <ErpWorkspaceSummaryItem
+              label="Taux de marge"
+              value={formatRate(
+                dashboard.performance.grossMarginRateBasisPoints,
+              )}
+            />
+            <ErpWorkspaceSummaryItem
+              label="Position bancaire"
+              value={formatMadCents(dashboard.cash.currentCashCents)}
+            />
+            <ErpWorkspaceSummaryItem
+              label="Trésorerie à 13 semaines"
+              value={formatMadCents(dashboard.cash.forecastClosingCashCents)}
+            />
+            <ErpWorkspaceSummaryItem
+              label="Créances échues"
+              value={formatMadCents(dashboard.cash.overdueReceivablesCents)}
+            />
+            <ErpWorkspaceSummaryItem
+              label="Stock valorisé"
+              value={formatMadCents(dashboard.operations.stockValueCents)}
+            />
+          </StyledErpWorkspaceSummary>
+
+          <StyledPerformance aria-label="Suivi de performance">
+            <div>
+              <span>Période précédente</span>
+              <strong>
+                {formatMadCents(dashboard.performance.previousRevenueCents)}
+              </strong>
+            </div>
+            <div>
+              <span>Objectif de chiffre d'affaires</span>
+              <strong>
+                {dashboard.performance.revenueBudgetCents === null
+                  ? 'Non configuré'
+                  : formatMadCents(dashboard.performance.revenueBudgetCents)}
+              </strong>
+            </div>
+            <div>
+              <span>Écart au budget</span>
+              <strong>
+                {dashboard.performance.revenueBudgetVarianceCents === null
+                  ? 'Non disponible'
+                  : formatMadCents(
+                      dashboard.performance.revenueBudgetVarianceCents,
                     )}
-                  </StyledQueueTitle>
-                  <StyledCount>
-                    {queue.available ? queue.count : '—'}
-                  </StyledCount>
-                </StyledQueueHeader>
-                <StyledLoadedLabel>
-                  {queue.available ? 'Page chargée' : 'Indisponible'}
-                </StyledLoadedLabel>
-                {primaryLink === null ? (
-                  <StyledSecondaryLinks>
-                    {queue.links.map((link) => (
-                      <Link key={link.to} to={link.to} aria-label={link.label}>
-                        {link.label}
-                      </Link>
-                    ))}
-                  </StyledSecondaryLinks>
-                ) : null}
-              </StyledQueue>
-            );
-          })}
-        </StyledQueues>
-      </StyledContent>
+              </strong>
+            </div>
+            <div>
+              <span>Créances / dettes identifiées</span>
+              <strong>
+                {formatMadCents(dashboard.cash.receivablesCents)} /{' '}
+                {formatMadCents(dashboard.cash.payablesCents)}
+              </strong>
+            </div>
+          </StyledPerformance>
+
+          <StyledErpWorkspacePanel>
+            <StyledErpWorkspacePanelTitle>
+              Alertes prioritaires
+            </StyledErpWorkspacePanelTitle>
+            <StyledAlertList>
+              {dashboard.alerts.length === 0 ? (
+                <StyledEmpty>Aucune alerte prioritaire</StyledEmpty>
+              ) : (
+                dashboard.alerts.map((alert) => (
+                  <StyledAlert
+                    key={alert.code}
+                    to={targetPaths[alert.target]}
+                    severity={alert.severity}
+                  >
+                    <div>
+                      <strong>{alert.title}</strong>
+                      <span>{alert.message}</span>
+                    </div>
+                    <strong>
+                      {alert.amountCents > 0
+                        ? formatMadCents(alert.amountCents)
+                        : alert.count > 0
+                          ? alert.count
+                          : alert.severity}
+                    </strong>
+                  </StyledAlert>
+                ))
+              )}
+            </StyledAlertList>
+          </StyledErpWorkspacePanel>
+
+          <StyledErpWorkspacePanel>
+            <StyledErpWorkspacePanelTitle>
+              Actions recommandées
+            </StyledErpWorkspacePanelTitle>
+            <StyledActions>
+              {dashboard.actions.map((action) => (
+                <Link key={action.code} to={targetPaths[action.target]}>
+                  <strong>{action.label}</strong>
+                  <span>{action.description}</span>
+                </Link>
+              ))}
+            </StyledActions>
+          </StyledErpWorkspacePanel>
+
+          <StyledErpWorkspacePanel>
+            <StyledErpWorkspacePanelTitle>
+              Files opérationnelles
+            </StyledErpWorkspacePanelTitle>
+            <StyledQueues>
+              {queueLinks.map((queue) => (
+                <Link key={queue.label} to={queue.to}>
+                  <span>{queue.label}</span>
+                  <strong>{queue.count}</strong>
+                </Link>
+              ))}
+            </StyledQueues>
+          </StyledErpWorkspacePanel>
+        </StyledErpWorkspaceContent>
+      ) : null}
     </ErpPageShell>
   );
 };

@@ -805,6 +805,18 @@ const approvedRoutes = [
   ],
   [
     'GET',
+    '/operations/treasury-forecast',
+    'operations.treasury-forecast',
+    undefined,
+  ],
+  [
+    'GET',
+    '/operations/executive-dashboard',
+    'operations.executive-dashboard',
+    undefined,
+  ],
+  [
+    'GET',
     `/fiscal/declarations/${id}/adc080f`,
     'fiscal.declaration.adc080f',
     erpRegulatoryFileSchema,

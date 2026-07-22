@@ -2438,6 +2438,8 @@ describe('ERP Maroc upstream routes', () => {
       accountingAnomalies: 'operations.anomalies',
       accountingAnomaliesScan: 'operations.anomalies.scan',
       accountingAnomalyResolve: 'operations.anomaly.resolve',
+      treasuryForecast: 'operations.treasury-forecast',
+      executiveDashboard: 'operations.executive-dashboard',
     });
   });
 

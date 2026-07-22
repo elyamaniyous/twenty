@@ -1,6 +1,6 @@
 import { useErpMarocContext } from '@/erp-maroc/context/useErpMarocContext';
 import { erpMarocPaths } from '@/erp-maroc/navigation/erpMarocPaths';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 import { ErpMarocCockpitPage } from '~/pages/erp-maroc/ErpMarocCockpitPage';
@@ -9,46 +9,81 @@ jest.mock('@/erp-maroc/context/useErpMarocContext', () => ({
   useErpMarocContext: jest.fn(),
 }));
 
-const emptyResponses: Record<string, unknown> = {
-  '/products': [],
-  '/tiers': [],
-  '/quotes': [],
-  '/invoices': { items: [], nextCursor: null },
-  '/payments': { items: [], nextCursor: null },
-  '/reminders': { items: [], nextCursor: null },
-};
-
-const populatedResponses: Record<string, unknown> = {
-  ...emptyResponses,
-  '/quotes': [{ id: 'quote-1', status: 'DRAFT' }],
-  '/invoices': {
-    items: [
-      {
-        id: 'invoice-1',
-        status: 'VALIDATED',
-        isOverdue: false,
-        emailDelivery: null,
-      },
-      {
-        id: 'invoice-2',
-        status: 'PARTIALLY_PAID',
-        isOverdue: true,
-        emailDelivery: { status: 'RECONCILIATION_REQUIRED' },
-      },
-    ],
-    nextCursor: null,
+const dashboard = {
+  asOf: '2026-07-22',
+  currency: 'MAD',
+  period: {
+    currentStart: '2026-07-01',
+    currentEnd: '2026-07-22',
+    previousStart: '2026-06-01',
+    previousEnd: '2026-06-22',
   },
-  '/payments': {
-    items: [{ id: 'payment-1', status: 'PENDING_ALLOCATION' }],
-    nextCursor: null,
+  performance: {
+    revenueCents: 1_200_000,
+    previousRevenueCents: 1_000_000,
+    revenueChangeBasisPoints: 2_000,
+    grossMarginCents: 300_000,
+    grossMarginRateBasisPoints: 3_750,
+    grossMarginDeliveryCount: 4,
+    revenueBudgetCents: 1_500_000,
+    revenueBudgetVarianceCents: -300_000,
   },
-  '/reminders': {
-    items: [
-      { id: 'reminder-1', status: 'PROPOSED' },
-      { id: 'reminder-2', status: 'RECONCILIATION_REQUIRED' },
-    ],
-    nextCursor: null,
+  cash: {
+    currentCashCents: 2_000_000,
+    forecastClosingCashCents: 2_400_000,
+    forecastMinimumCashCents: 1_800_000,
+    firstNegativeWeek: null,
+    receivablesCents: 900_000,
+    overdueReceivablesCents: 200_000,
+    payablesCents: 500_000,
   },
+  operations: {
+    stockValueCents: 700_000,
+    replenishmentCount: 3,
+    overdueFiscalDeadlineCount: 0,
+    upcomingFiscalDeadlineCount: 2,
+    pendingApprovalCount: 1,
+    pendingApprovalAmountCents: 250_000,
+    openAnomalyCount: 0,
+  },
+  queues: {
+    draftQuotes: 1,
+    validatedInvoices: 2,
+    overdueInvoices: 3,
+    pendingAllocationPayments: 4,
+    proposedReminders: 5,
+    reconciliationRequired: 6,
+  },
+  referenceCounts: { products: 12, tiers: 8 },
+  dataQuality: {
+    bankAccountCount: 1,
+    confirmedBankAccountCount: 1,
+    usesOpeningBalance: false,
+    eventCount: 7,
+    budgetConfigured: true,
+    grossMarginDeliveryCount: 4,
+  },
+  alerts: [
+    {
+      code: 'REPLENISHMENT_REQUIRED',
+      severity: 'WARNING',
+      title: 'Stock à réapprovisionner',
+      message: "Des articles sont passés sous leur seuil d'alerte.",
+      amountCents: 0,
+      count: 3,
+      target: 'INVENTORY',
+    },
+  ],
+  actions: [
+    {
+      code: 'REPLENISH_STOCK',
+      label: 'Préparer le réapprovisionnement',
+      description: 'Contrôler les suggestions.',
+      priority: 'HIGH',
+      amountCents: 0,
+      target: 'INVENTORY',
+    },
+  ],
 };
 
 const renderPage = (request: jest.Mock) => {
@@ -72,151 +107,41 @@ const renderPage = (request: jest.Mock) => {
 describe('ErpMarocCockpitPage', () => {
   afterEach(() => jest.clearAllMocks());
 
-  it('starts all six reads concurrently and renders loaded-page operational queues', async () => {
-    const resolvers = new Map<string, (value: unknown) => void>();
-    const request = jest.fn(
-      ({ path }: { path: string }) =>
-        new Promise((resolve) => resolvers.set(path, resolve)),
-    );
-
+  it('renders consolidated indicators, alerts, actions and queues', async () => {
+    const request = jest.fn().mockResolvedValue(dashboard);
     renderPage(request);
 
-    await waitFor(() => expect(request).toHaveBeenCalledTimes(6));
-    expect(request.mock.calls.map(([input]) => input.path)).toEqual([
-      '/quotes',
-      '/invoices',
-      '/payments',
-      '/reminders',
-      '/products',
-      '/tiers',
-    ]);
-
-    Object.entries(populatedResponses).forEach(([path, value]) =>
-      resolvers.get(path)?.(value),
-    );
-
-    expect(await screen.findByText('Brouillons à terminer')).toBeVisible();
-    expect(screen.getByText('Factures validées à envoyer')).toBeVisible();
+    expect(await screen.findByText("Chiffre d'affaires HT net")).toBeVisible();
+    expect(screen.getByText('12 000,00 MAD')).toBeVisible();
+    expect(screen.getByText('Stock à réapprovisionner')).toBeVisible();
     expect(
-      screen.getByText('Factures en retard ou partiellement payées'),
-    ).toBeVisible();
-    expect(screen.getByText('Paiements à affecter')).toBeVisible();
+      screen.getByRole('link', { name: /Stock à réapprovisionner/ }),
+    ).toHaveAttribute('href', erpMarocPaths.inventory);
     expect(
-      screen.getByText('Propositions de relance à approuver'),
-    ).toBeVisible();
-    expect(screen.getByText('Réconciliations requises')).toBeVisible();
-    expect(screen.getAllByText('Page chargée')).toHaveLength(6);
-    const referenceSources = screen.getByRole('region', {
-      name: 'Sources de référence',
-    });
-    expect(referenceSources).toHaveTextContent('Catalogue — Page chargée');
-    expect(referenceSources).toHaveTextContent('Tiers — Page chargée');
-    expect(screen.queryByText(/chiffre d'affaires|TVA|trésorerie/i)).toBeNull();
-
+      screen.getByRole('link', { name: /Préparer le réapprovisionnement/ }),
+    ).toHaveAttribute('href', erpMarocPaths.inventory);
     expect(
-      screen.getByRole('link', { name: 'Brouillons à terminer' }),
-    ).toHaveAttribute('href', `${erpMarocPaths.quotes}?status=DRAFT`);
-    expect(
-      screen.getByRole('link', { name: 'Factures validées à envoyer' }),
-    ).toHaveAttribute('href', `${erpMarocPaths.invoices}?status=VALIDATED`);
-    expect(
-      screen.getByRole('link', { name: 'Factures en retard' }),
+      screen.getByRole('link', { name: /Factures en retard/ }),
     ).toHaveAttribute('href', `${erpMarocPaths.invoices}?status=OVERDUE`);
-    expect(
-      screen.getByRole('link', { name: 'Factures partiellement payées' }),
-    ).toHaveAttribute(
-      'href',
-      `${erpMarocPaths.invoices}?status=PARTIALLY_PAID`,
-    );
-    expect(
-      screen.getByRole('link', { name: 'Paiements à affecter' }),
-    ).toHaveAttribute(
-      'href',
-      `${erpMarocPaths.payments}?status=PENDING_ALLOCATION`,
-    );
-    expect(
-      screen.getByRole('link', {
-        name: 'Propositions de relance à approuver',
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'GET',
+        path: '/operations/executive-dashboard',
       }),
-    ).toHaveAttribute('href', `${erpMarocPaths.reminders}?status=PROPOSED`);
-    expect(
-      screen.getByRole('link', { name: 'Livraisons de facture à réconcilier' }),
-    ).toHaveAttribute(
-      'href',
-      `${erpMarocPaths.invoices}?delivery=RECONCILIATION_REQUIRED`,
-    );
-    expect(
-      screen.getByRole('link', { name: 'Relances à réconcilier' }),
-    ).toHaveAttribute(
-      'href',
-      `${erpMarocPaths.reminders}?status=RECONCILIATION_REQUIRED`,
     );
   });
 
-  it.each([
-    ['/products', 'Catalogue — Indisponible', 'Tiers — Page chargée'],
-    ['/tiers', 'Tiers — Indisponible', 'Catalogue — Page chargée'],
-  ])(
-    'reports a %s reference failure without raising an operational queue alert',
-    async (failedPath, failedStatus, loadedStatus) => {
-      const request = jest.fn(({ path }: { path: string }) => {
-        if (path === failedPath) {
-          return Promise.reject(new Error('network'));
-        }
-        return Promise.resolve(populatedResponses[path]);
-      });
-
-      renderPage(request);
-
-      const referenceSources = await screen.findByRole('region', {
-        name: 'Sources de référence',
-      });
-      expect(referenceSources).toHaveTextContent(failedStatus);
-      expect(referenceSources).toHaveTextContent(loadedStatus);
-      expect(screen.queryByRole('alert')).toBeNull();
-      expect(screen.getByText('Brouillons à terminer')).toBeVisible();
-      expect(
-        within(
-          screen.getByText('Brouillons à terminer').closest('section')!,
-        ).getByText('Page chargée'),
-      ).toBeVisible();
-    },
-  );
-
-  it('marks a queue unavailable instead of presenting a failed source as loaded zero', async () => {
-    const request = jest.fn(({ path }: { path: string }) =>
-      path === '/quotes'
-        ? Promise.reject(new Error('quotes unavailable'))
-        : Promise.resolve(populatedResponses[path]),
-    );
-
-    renderPage(request);
-
-    const heading = await screen.findByText('Brouillons à terminer');
-    const queue = heading.closest('section');
-    expect(queue).not.toBeNull();
-    expect(queue).toHaveTextContent('Indisponible');
-    expect(queue).not.toHaveTextContent('Page chargée');
-    expect(
-      screen.getByText('Factures validées à envoyer').closest('section'),
-    ).toHaveTextContent('Page chargée');
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Certaines files ne sont pas disponibles',
-    );
-  });
-
-  it('aborts every in-flight request when unmounted', async () => {
-    const signals: AbortSignal[] = [];
-    const request = jest.fn(({ signal }: { signal: AbortSignal }) => {
-      signals.push(signal);
+  it('aborts the consolidated read when unmounted', async () => {
+    let signal: AbortSignal | undefined;
+    const request = jest.fn((input: { signal: AbortSignal }) => {
+      signal = input.signal;
       return new Promise(() => undefined);
     });
-
     const view = renderPage(request);
-    await waitFor(() => expect(signals).toHaveLength(6));
 
+    await waitFor(() => expect(signal).toBeDefined());
     view.unmount();
 
-    expect(signals.every((signal) => signal.aborted)).toBe(true);
+    expect(signal?.aborted).toBe(true);
   });
 });
