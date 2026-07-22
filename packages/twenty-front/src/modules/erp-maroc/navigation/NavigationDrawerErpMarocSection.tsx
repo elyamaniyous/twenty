@@ -169,6 +169,12 @@ export const NavigationDrawerErpMarocSection = () => {
       Icon: IconBuildingSkyscraper,
     },
     {
+      label: t`Trésorerie`,
+      path: erpMarocPaths.treasury,
+      activePaths: [erpMarocPaths.treasury],
+      Icon: IconChartBar,
+    },
+    {
       label: t`Stock`,
       path: erpMarocPaths.inventory,
       activePaths: [erpMarocPaths.inventory],

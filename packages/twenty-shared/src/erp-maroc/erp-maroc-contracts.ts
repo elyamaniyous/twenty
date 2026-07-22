@@ -2586,6 +2586,110 @@ export const erpAnomalyScanResultSchema = z.object({
   anomalies: erpAccountingAnomalyListSchema,
 });
 
+export const erpTreasuryScenarioCodeSchema = z.enum([
+  'PRUDENT',
+  'BASE',
+  'OPTIMISTIC',
+]);
+
+export const erpTreasuryEventSchema = z.object({
+  id: nonBlankStringSchema,
+  sourceType: z.enum([
+    'CUSTOMER_INVOICE',
+    'OPENING_RECEIVABLE',
+    'RECURRING_INVOICE',
+    'SUPPLIER_INVOICE',
+    'SUPPLIER_PAYMENT',
+    'OPENING_PAYABLE',
+    'PAYROLL',
+    'TAX',
+    'EXPENSE_NOTE',
+  ]),
+  direction: z.enum(['INFLOW', 'OUTFLOW']),
+  dueDate: civilDateSchema,
+  label: nonBlankStringSchema,
+  counterparty: nullableStringSchema,
+  amountCents: centsSchema,
+});
+
+const erpTreasuryAgingSchema = z.object({
+  totalCents: centsSchema,
+  notDueCents: centsSchema,
+  days1To30Cents: centsSchema,
+  days31To60Cents: centsSchema,
+  days61To90Cents: centsSchema,
+  over90DaysCents: centsSchema,
+});
+
+export const erpTreasuryForecastSchema = z.object({
+  asOf: civilDateSchema,
+  horizonEnd: civilDateSchema,
+  currency: z.literal('MAD'),
+  currentCashCents: signedCentsSchema,
+  dataQuality: z.object({
+    bankAccountCount: nonNegativeIntegerSchema,
+    confirmedBankAccountCount: nonNegativeIntegerSchema,
+    usesOpeningBalance: z.boolean(),
+    eventCount: nonNegativeIntegerSchema,
+  }),
+  aging: z.object({
+    receivables: erpTreasuryAgingSchema,
+    payables: erpTreasuryAgingSchema,
+  }),
+  scenarios: z.array(
+    z.object({
+      code: erpTreasuryScenarioCodeSchema,
+      label: nonBlankStringSchema,
+      assumptions: z.object({
+        inflowRateBasisPoints: nonNegativeIntegerSchema.max(10_000),
+        inflowDelayDays: nonNegativeIntegerSchema,
+        outflowRateBasisPoints: nonNegativeIntegerSchema.max(10_000),
+      }),
+      closingBalanceCents: signedCentsSchema,
+      minimumBalanceCents: signedCentsSchema,
+      firstNegativeWeek: positiveIntegerSchema.nullable(),
+      weeks: z.array(
+        z.object({
+          index: positiveIntegerSchema,
+          startDate: civilDateSchema,
+          endDate: civilDateSchema,
+          openingBalanceCents: signedCentsSchema,
+          inflowCents: centsSchema,
+          outflowCents: centsSchema,
+          netCashFlowCents: signedCentsSchema,
+          closingBalanceCents: signedCentsSchema,
+          eventCount: nonNegativeIntegerSchema,
+        }),
+      ),
+    }),
+  ),
+  events: z.array(erpTreasuryEventSchema),
+  alerts: z.array(
+    z.object({
+      code: nonBlankStringSchema,
+      severity: z.enum(['INFO', 'WARNING', 'CRITICAL']),
+      title: nonBlankStringSchema,
+      message: nonBlankStringSchema,
+      weekIndex: positiveIntegerSchema.nullable(),
+      amountCents: centsSchema,
+    }),
+  ),
+  actions: z.array(
+    z.object({
+      code: z.enum([
+        'REMIND_CUSTOMERS',
+        'PREPARE_SUPPLIER_PAYMENTS',
+        'RECONCILE_BANK',
+      ]),
+      label: nonBlankStringSchema,
+      description: nonBlankStringSchema,
+      priority: z.enum(['LOW', 'MEDIUM', 'HIGH']),
+      amountCents: centsSchema,
+    }),
+  ),
+  insights: z.array(nonBlankStringSchema),
+});
+
 const encodeRouteId = (id: string): string => {
   return encodeURIComponent(uuidSchema.parse(id));
 };
@@ -3007,6 +3111,7 @@ export const erpMarocUpstreamRoutes = {
     revokePortalAccess: (id: string) =>
       `/operations/portal-access/${encodeRouteId(id)}/revoke`,
     anomalies: '/operations/anomalies',
+    treasuryForecast: '/operations/treasury-forecast',
     scanAnomalies: '/operations/anomalies/scan',
     resolveAnomaly: (id: string) =>
       `/operations/anomalies/${encodeRouteId(id)}/resolve`,
@@ -3202,5 +3307,10 @@ export type ErpRecurringInvoice = z.infer<typeof erpRecurringInvoiceSchema>;
 export type ErpExchangeRate = z.infer<typeof erpExchangeRateSchema>;
 export type ErpPortalAccess = z.infer<typeof erpPortalAccessSchema>;
 export type ErpAccountingAnomaly = z.infer<typeof erpAccountingAnomalySchema>;
+export type ErpTreasuryScenarioCode = z.infer<
+  typeof erpTreasuryScenarioCodeSchema
+>;
+export type ErpTreasuryEvent = z.infer<typeof erpTreasuryEventSchema>;
+export type ErpTreasuryForecast = z.infer<typeof erpTreasuryForecastSchema>;
 export type ErpMarocRouteId =
   (typeof erpMarocRouteIds)[keyof typeof erpMarocRouteIds];

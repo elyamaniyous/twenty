@@ -110,6 +110,9 @@ export type {
   ErpExchangeRate,
   ErpPortalAccess,
   ErpAccountingAnomaly,
+  ErpTreasuryScenarioCode,
+  ErpTreasuryEvent,
+  ErpTreasuryForecast,
   ErpMarocRouteId,
 } from './erp-maroc-contracts';
 export {
@@ -311,6 +314,9 @@ export {
   erpAccountingAnomalySchema,
   erpAccountingAnomalyListSchema,
   erpAnomalyScanResultSchema,
+  erpTreasuryScenarioCodeSchema,
+  erpTreasuryEventSchema,
+  erpTreasuryForecastSchema,
   erpMarocRouteIds,
   erpMarocUpstreamRoutes,
 } from './erp-maroc-contracts';
