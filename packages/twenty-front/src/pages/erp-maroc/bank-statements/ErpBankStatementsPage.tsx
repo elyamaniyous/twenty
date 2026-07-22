@@ -11,10 +11,12 @@ import {
   ErpStatusBadge,
   type ErpStatusTone,
 } from '@/erp-maroc/components/ErpStatusBadge';
+import { buildBankStatementAccountingEntryPath } from '@/erp-maroc/accounting/bankStatementAccountingNavigation';
 import { useErpMarocContext } from '@/erp-maroc/context/useErpMarocContext';
 import { formatMadCents } from '@/erp-maroc/utils/money';
 import { styled } from '@linaria/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   erpBankReconciliationCandidatesSchema,
   erpBankAccountListSchema,
@@ -33,6 +35,7 @@ import {
 import {
   IconCheck,
   IconDownload,
+  IconEye,
   IconLink,
   IconPlus,
   IconUnlink,
@@ -41,6 +44,7 @@ import {
 } from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
+import { z } from 'zod';
 
 const STATUS: Record<
   ErpBankStatementStatus,
@@ -53,6 +57,29 @@ const STATUS: Record<
   CLOSED: { label: 'Clôturé', tone: 'neutral' },
   FAILED: { label: 'Échec OCR', tone: 'danger' },
 };
+
+const openingSettlementReversalSchema = z.object({
+  id: z.string(),
+  reversalRequestedAt: z.string(),
+  reversedAt: z.string().nullable(),
+  reversalReason: z.string(),
+  accountingEntry: z.object({
+    id: z.string(),
+    status: z.enum(['DRAFT', 'VALIDATED', 'LOCKED', 'REJECTED']),
+  }),
+  reversalAccountingEntry: z
+    .object({
+      id: z.string(),
+      status: z.enum(['DRAFT', 'VALIDATED', 'LOCKED', 'REJECTED']),
+    })
+    .nullable(),
+  openItem: z.object({
+    id: z.string(),
+    outstandingAmountCents: z.number(),
+    status: z.enum(['OPEN', 'SETTLED', 'CANCELLED']),
+  }),
+  bankStatementLine: z.object({ id: z.string() }),
+});
 
 const StyledFileInput = styled.input`
   display: none;
@@ -288,12 +315,36 @@ const candidateLabel = (candidate: ErpBankReconciliationCandidate) =>
     ? `${candidate.score}% · Fournisseur ${candidate.supplierName} · ${candidate.supplierInvoiceReference} · ${candidate.paymentDate} · ${formatMadCents(candidate.amountCents)}`
     : `${candidate.score}% · Client ${candidate.customerName} · ${candidate.invoiceReferences.join(', ') || 'sans affectation'} · ${candidate.paymentDate} · ${formatMadCents(candidate.amountCents)}`;
 
+const accountingEntryStatusLabel = {
+  DRAFT: 'écriture brouillon',
+  VALIDATED: 'écriture validée',
+  LOCKED: 'écriture verrouillée',
+  REJECTED: 'écriture rejetée',
+} as const;
+
 const reconciliationLabel = (line: ErpBankStatementLine) => {
   if (line.reconciliation === null) return '';
   return line.reconciliation.kind === 'SUPPLIER'
     ? `${line.reconciliation.supplierName} · ${line.reconciliation.supplierInvoiceReference}`
-    : `${line.reconciliation.customerName} · ${line.reconciliation.invoiceReferences.join(', ') || 'encaissement client'}`;
+    : line.reconciliation.kind === 'CUSTOMER'
+      ? `${line.reconciliation.customerName} · ${line.reconciliation.invoiceReferences.join(', ') || 'encaissement client'}`
+      : `${line.reconciliation.tierName} · ${line.reconciliation.openItemReference} · ${
+          line.reconciliation.reversalAccountingEntryStatus
+            ? `contrepassation ${accountingEntryStatusLabel[line.reconciliation.reversalAccountingEntryStatus].replace('écriture ', '')}`
+            : accountingEntryStatusLabel[
+                line.reconciliation.accountingEntryStatus
+              ]
+        }`;
 };
+
+const isOpeningReversalReadyForFinalization = (line: ErpBankStatementLine) =>
+  line.reconciliation?.kind === 'OPENING_ITEM' &&
+  (line.reconciliation.reversalAccountingEntryStatus === 'VALIDATED' ||
+    line.reconciliation.reversalAccountingEntryStatus === 'LOCKED');
+
+const isOpeningReversalRejected = (line: ErpBankStatementLine) =>
+  line.reconciliation?.kind === 'OPENING_ITEM' &&
+  line.reconciliation.reversalAccountingEntryStatus === 'REJECTED';
 
 const downloadCsv = (statement: ErpBankStatementDetail) => {
   const blob = new Blob([bankStatementLinesToCsv(statement.lines)], {
@@ -309,7 +360,17 @@ const downloadCsv = (statement: ErpBankStatementDetail) => {
 
 export const ErpBankStatementsPage = () => {
   const { client } = useErpMarocContext();
+  const location = useLocation();
+  const navigate = useNavigate();
   const fileInput = useRef<HTMLInputElement>(null);
+  const returnSelection = useMemo(() => {
+    const query = new URLSearchParams(location.search);
+    return {
+      statementId: query.get('statementId'),
+      lineId: query.get('lineId'),
+    };
+  }, [location.search]);
+  const [returnSelectionRestored, setReturnSelectionRestored] = useState(false);
   const [imports, setImports] = useState<ErpBankStatement[]>([]);
   const [bankAccounts, setBankAccounts] = useState<ErpBankAccount[]>([]);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState('');
@@ -341,6 +402,12 @@ export const ErpBankStatementsPage = () => {
       detail?.lines.find((line) => line.id === reconciliationLineId) ?? null,
     [detail, reconciliationLineId],
   );
+  const isFinalizingOpeningReversal =
+    reconciliationLine !== null &&
+    isOpeningReversalReadyForFinalization(reconciliationLine);
+  const isRetryingOpeningReversal =
+    reconciliationLine !== null &&
+    isOpeningReversalRejected(reconciliationLine);
 
   const loadImports = useCallback(async () => {
     const result = await client.request({
@@ -377,10 +444,31 @@ export const ErpBankStatementsPage = () => {
   );
 
   useEffect(() => {
-    void Promise.all([loadImports(), loadBankAccounts()]).catch(() =>
-      setState('error'),
-    );
-  }, [loadBankAccounts, loadImports]);
+    void Promise.all([loadImports(), loadBankAccounts()])
+      .then(([nextImports]) => {
+        const statementId = returnSelection.statementId;
+        if (
+          statementId !== null &&
+          nextImports.some((item) => item.id === statementId)
+        ) {
+          return loadDetail(statementId);
+        }
+      })
+      .catch(() => setState('error'));
+  }, [loadBankAccounts, loadDetail, loadImports, returnSelection.statementId]);
+
+  useEffect(() => {
+    if (returnSelectionRestored || detail?.id !== returnSelection.statementId) {
+      return;
+    }
+    if (
+      returnSelection.lineId !== null &&
+      detail.lines.some((line) => line.id === returnSelection.lineId)
+    ) {
+      setReconciliationLineId(returnSelection.lineId);
+    }
+    setReturnSelectionRestored(true);
+  }, [detail, returnSelection, returnSelectionRestored]);
 
   useEffect(() => {
     if (
@@ -622,6 +710,23 @@ export const ErpBankStatementsPage = () => {
     }
   };
 
+  const openReversalAccountingEntry = (line: ErpBankStatementLine) => {
+    if (
+      detail === null ||
+      line.reconciliation?.kind !== 'OPENING_ITEM' ||
+      line.reconciliation.reversalAccountingEntryId === null
+    ) {
+      return;
+    }
+    void navigate(
+      buildBankStatementAccountingEntryPath({
+        accountingEntryId: line.reconciliation.reversalAccountingEntryId,
+        statementId: detail.id,
+        lineId: line.id,
+      }),
+    );
+  };
+
   const reconcile = async () => {
     if (!reconciliationLine || !selectedCandidateId) return;
     const candidate = reconciliationCandidates.find(
@@ -659,22 +764,45 @@ export const ErpBankStatementsPage = () => {
     if (
       !reconciliationLine ||
       reconciliationLine.reconciliation === null ||
-      reconciliationReason.trim().length < 10
+      (!isFinalizingOpeningReversal && reconciliationReason.trim().length < 10)
     )
       return;
     setReconciling(true);
     setError(null);
     try {
-      const intent = client.createMutationIntent({
-        method: 'POST',
-        path:
-          reconciliationLine.reconciliation.kind === 'SUPPLIER'
-            ? `/bank-statement-lines/${reconciliationLine.id}/unreconcile-supplier-payment`
-            : `/bank-statement-lines/${reconciliationLine.id}/unreconcile-customer-payment`,
-        schema: erpBankStatementLineSchema,
-        body: { reason: reconciliationReason.trim() },
-      });
-      await intent.execute();
+      if (reconciliationLine.reconciliation.kind === 'OPENING_ITEM') {
+        const intent = isFinalizingOpeningReversal
+          ? client.createMutationIntent(
+              {
+                method: 'POST',
+                path: `/onboarding/bank-statement-lines/${reconciliationLine.id}/finalize-open-item-settlement-reversal`,
+                schema: openingSettlementReversalSchema,
+                body: { confirm: true },
+              },
+              { idempotency: 'required' },
+            )
+          : client.createMutationIntent(
+              {
+                method: 'POST',
+                path: `/onboarding/bank-statement-lines/${reconciliationLine.id}/reverse-open-item-settlement`,
+                schema: openingSettlementReversalSchema,
+                body: { reason: reconciliationReason.trim() },
+              },
+              { idempotency: 'required' },
+            );
+        await intent.execute();
+      } else {
+        const intent = client.createMutationIntent({
+          method: 'POST',
+          path:
+            reconciliationLine.reconciliation.kind === 'SUPPLIER'
+              ? `/bank-statement-lines/${reconciliationLine.id}/unreconcile-supplier-payment`
+              : `/bank-statement-lines/${reconciliationLine.id}/unreconcile-customer-payment`,
+          schema: erpBankStatementLineSchema,
+          body: { reason: reconciliationReason.trim() },
+        });
+        await intent.execute();
+      }
       if (detail) await loadDetail(detail.id);
       closeReconciliation();
     } catch (caught) {
@@ -982,24 +1110,28 @@ export const ErpBankStatementsPage = () => {
                       </StyledSelectInput>
                     </StyledReconciliationField>
                   ) : null}
-                  <StyledReconciliationField>
-                    <span>
-                      {reconciliationLine.reconciliation !== null ||
-                      reconciliationLine.review !== null
-                        ? 'Motif d’annulation'
-                        : 'Motif du contrôle manuel'}
-                    </span>
-                    <StyledInput
-                      value={reconciliationReason}
-                      minLength={10}
-                      maxLength={500}
-                      placeholder="Ex. opération vérifiée sur le justificatif"
-                      disabled={reconciling}
-                      onChange={(event) =>
-                        setReconciliationReason(event.target.value)
-                      }
-                    />
-                  </StyledReconciliationField>
+                  {!isFinalizingOpeningReversal ? (
+                    <StyledReconciliationField>
+                      <span>
+                        {isRetryingOpeningReversal
+                          ? 'Motif de la nouvelle tentative'
+                          : reconciliationLine.reconciliation !== null ||
+                              reconciliationLine.review !== null
+                            ? 'Motif d’annulation'
+                            : 'Motif du contrôle manuel'}
+                      </span>
+                      <StyledInput
+                        value={reconciliationReason}
+                        minLength={10}
+                        maxLength={500}
+                        placeholder="Ex. opération vérifiée sur le justificatif"
+                        disabled={reconciling}
+                        onChange={(event) =>
+                          setReconciliationReason(event.target.value)
+                        }
+                      />
+                    </StyledReconciliationField>
+                  ) : null}
                   {reconciliationLine.reconciliation !== null ? (
                     <StyledReconciliationField>
                       <span>Rapprochement actuel</span>
@@ -1018,12 +1150,36 @@ export const ErpBankStatementsPage = () => {
                   <StyledReconciliationActions>
                     {reconciliationLine.reconciliation !== null ? (
                       <Button
-                        title="Annuler le rapprochement"
-                        ariaLabel="Annuler le rapprochement bancaire"
+                        title={
+                          isFinalizingOpeningReversal
+                            ? 'Finaliser l’annulation'
+                            : isRetryingOpeningReversal
+                              ? 'Repréparer la contrepassation'
+                              : reconciliationLine.reconciliation.kind ===
+                                    'OPENING_ITEM' &&
+                                  reconciliationLine.reconciliation
+                                    .accountingEntryStatus !== 'DRAFT'
+                                ? 'Préparer la contrepassation'
+                                : 'Annuler le rapprochement'
+                        }
+                        ariaLabel={
+                          isFinalizingOpeningReversal
+                            ? 'Finaliser l’annulation après validation de la contrepassation'
+                            : isRetryingOpeningReversal
+                              ? 'Créer une nouvelle contrepassation après le rejet'
+                              : reconciliationLine.reconciliation.kind ===
+                                    'OPENING_ITEM' &&
+                                  reconciliationLine.reconciliation
+                                    .accountingEntryStatus !== 'DRAFT'
+                                ? 'Préparer la contrepassation comptable'
+                                : 'Annuler le rapprochement bancaire'
+                        }
                         Icon={IconUnlink}
                         accent="danger"
                         disabled={
-                          reconciliationReason.trim().length < 10 || reconciling
+                          (!isFinalizingOpeningReversal &&
+                            reconciliationReason.trim().length < 10) ||
+                          reconciling
                         }
                         isLoading={reconciling}
                         onClick={() => void unreconcile()}
@@ -1223,7 +1379,8 @@ export const ErpBankStatementsPage = () => {
                                 >
                                   Contrôlé · {line.review.reason}
                                 </StyledReconciliationText>
-                                {canResolve ? (
+                                {canResolve &&
+                                line.reconciliation?.kind !== 'OPENING_ITEM' ? (
                                   <Button
                                     title="Annuler"
                                     ariaLabel="Annuler le contrôle manuel"
@@ -1243,7 +1400,30 @@ export const ErpBankStatementsPage = () => {
                                 >
                                   {reconciliationLabel(line)}
                                 </StyledReconciliationText>
-                                {canResolve ? (
+                                {line.reconciliation?.kind === 'OPENING_ITEM' &&
+                                line.reconciliation
+                                  .reversalAccountingEntryId !== null ? (
+                                  <Button
+                                    title="Voir l’écriture"
+                                    ariaLabel="Voir l’écriture comptable de contrepassation"
+                                    Icon={IconEye}
+                                    variant="secondary"
+                                    disabled={reconciling}
+                                    onClick={() =>
+                                      openReversalAccountingEntry(line)
+                                    }
+                                  />
+                                ) : null}
+                                {canResolve &&
+                                (line.reconciliation?.kind !== 'OPENING_ITEM' ||
+                                  (line.reconciliation
+                                    .reversalAccountingEntryId === null &&
+                                    line.reconciliation
+                                      .accountingEntryStatus !== 'REJECTED') ||
+                                  isOpeningReversalRejected(line) ||
+                                  isOpeningReversalReadyForFinalization(
+                                    line,
+                                  )) ? (
                                   <Button
                                     title="Annuler"
                                     ariaLabel={`Annuler le rapprochement ${reconciliationLabel(line)}`}

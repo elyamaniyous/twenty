@@ -233,6 +233,7 @@ export {
   erpBankAccountListSchema,
   erpSupplierBankReconciliationSchema,
   erpCustomerBankReconciliationSchema,
+  erpOpeningItemBankReconciliationSchema,
   erpBankReconciliationSchema,
   erpBankReconciliationReasonSchema,
   erpSupplierBankReconciliationCandidateSchema,

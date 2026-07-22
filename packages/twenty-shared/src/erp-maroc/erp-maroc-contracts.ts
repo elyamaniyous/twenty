@@ -1788,9 +1788,30 @@ export const erpCustomerBankReconciliationSchema = z.object({
   reconciledByTwentyUserId: nonBlankStringSchema,
 });
 
+export const erpOpeningItemBankReconciliationSchema = z.object({
+  kind: z.literal('OPENING_ITEM'),
+  openingOpenItemId: uuidSchema,
+  tierId: uuidSchema,
+  tierName: nonBlankStringSchema,
+  openItemKind: z.enum(['RECEIVABLE', 'PAYABLE']),
+  openItemReference: nonBlankStringSchema,
+  settlementDate: civilDateSchema,
+  amountCents: positiveIntegerSchema,
+  remainingOutstandingCents: centsSchema,
+  accountingEntryId: uuidSchema,
+  accountingEntryStatus: z.enum(['DRAFT', 'VALIDATED', 'LOCKED', 'REJECTED']),
+  reversalAccountingEntryId: uuidSchema.nullable(),
+  reversalAccountingEntryStatus: z
+    .enum(['DRAFT', 'VALIDATED', 'LOCKED', 'REJECTED'])
+    .nullable(),
+  reconciledAt: instantSchema,
+  reconciledByTwentyUserId: nonBlankStringSchema,
+});
+
 export const erpBankReconciliationSchema = z.discriminatedUnion('kind', [
   erpSupplierBankReconciliationSchema,
   erpCustomerBankReconciliationSchema,
+  erpOpeningItemBankReconciliationSchema,
 ]);
 
 export const erpBankReconciliationReasonSchema = z.enum([

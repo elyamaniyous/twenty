@@ -1,4 +1,5 @@
 import { ErpConfirmDialog } from '@/erp-maroc/components/ErpConfirmDialog';
+import { parseBankStatementReturnPath } from '@/erp-maroc/accounting/bankStatementAccountingNavigation';
 import {
   ErpOperationalTable,
   type ErpOperationalTableColumn,
@@ -12,13 +13,18 @@ import { useErpMarocContext } from '@/erp-maroc/context/useErpMarocContext';
 import { formatMadCents } from '@/erp-maroc/utils/money';
 import { styled } from '@linaria/react';
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import {
   erpAccountingEntrySchema,
   type ErpAccountingEntry,
   type ErpAccountingEntryLine,
 } from 'twenty-shared/erp-maroc';
-import { IconCheck, IconX } from 'twenty-ui/display';
+import { IconArrowLeft, IconCheck, IconX } from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
@@ -46,6 +52,7 @@ const SOURCE: Record<ErpAccountingEntry['sourceType'], string> = {
 };
 
 const sourcePath = (entry: ErpAccountingEntry) => {
+  if (entry.label.startsWith('Contrepassation ')) return null;
   if (entry.sourceType === 'INVOICE') {
     return `/erp-maroc/invoices/${entry.sourceId}`;
   }
@@ -181,6 +188,9 @@ const StyledAlert = styled.div`
 
 export const ErpEntryDetailPage = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = parseBankStatementReturnPath(searchParams.get('returnTo'));
   const { client, context } = useErpMarocContext();
   const [entry, setEntry] = useState<ErpAccountingEntry | null>(null);
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>(
@@ -241,6 +251,9 @@ export const ErpEntryDetailPage = () => {
       setValidateDialogOpen(false);
       setRejectOpen(false);
       setRejectionReason('');
+      if (returnTo !== null) {
+        void navigate(returnTo, { replace: true });
+      }
     } catch {
       setActionError(
         action === 'validate'
@@ -276,30 +289,44 @@ export const ErpEntryDetailPage = () => {
       title={entry.label}
       description={`Exercice ${entry.exerciceYear} · Journal ${entry.journalCode}`}
       actions={
-        canReview ? (
+        returnTo !== null || canReview ? (
           <>
-            <Button
-              title="Rejeter"
-              ariaLabel="Rejeter l'écriture"
-              Icon={IconX}
-              accent="danger"
-              disabled={isSubmitting}
-              onClick={() => {
-                setActionError(null);
-                setRejectOpen(true);
-              }}
-            />
-            <Button
-              title="Valider"
-              ariaLabel="Valider l'écriture"
-              Icon={IconCheck}
-              accent="blue"
-              disabled={isSubmitting}
-              onClick={() => {
-                setActionError(null);
-                setValidateDialogOpen(true);
-              }}
-            />
+            {returnTo === null ? null : (
+              <Button
+                title="Retour au relevé"
+                ariaLabel="Retourner au rapprochement bancaire"
+                Icon={IconArrowLeft}
+                variant="secondary"
+                disabled={isSubmitting}
+                onClick={() => void navigate(returnTo, { replace: true })}
+              />
+            )}
+            {canReview ? (
+              <>
+                <Button
+                  title="Rejeter"
+                  ariaLabel="Rejeter l'écriture"
+                  Icon={IconX}
+                  accent="danger"
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    setActionError(null);
+                    setRejectOpen(true);
+                  }}
+                />
+                <Button
+                  title="Valider"
+                  ariaLabel="Valider l'écriture"
+                  Icon={IconCheck}
+                  accent="blue"
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    setActionError(null);
+                    setValidateDialogOpen(true);
+                  }}
+                />
+              </>
+            ) : null}
           </>
         ) : undefined
       }

@@ -12,6 +12,7 @@ import {
   IconChartBar,
   IconCreditCard,
   IconFileText,
+  IconFileImport,
   IconFolder,
   IconListDetails,
   IconLink,
@@ -40,6 +41,12 @@ export const NavigationDrawerErpMarocSection = () => {
       path: erpMarocPaths.cockpit,
       activePaths: [erpMarocPaths.cockpit],
       Icon: IconChartBar,
+    },
+    {
+      label: t`Mise en service`,
+      path: erpMarocPaths.onboarding,
+      activePaths: [erpMarocPaths.onboarding],
+      Icon: IconFileImport,
     },
     {
       label: t`Produits`,

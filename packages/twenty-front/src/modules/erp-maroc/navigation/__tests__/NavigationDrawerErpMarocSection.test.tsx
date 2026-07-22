@@ -97,6 +97,7 @@ const ActualNavigationDrawerItem = jest.requireActual(
 
 const labels = [
   'Vue ventes',
+  'Mise en service',
   'Produits',
   'Tiers',
   'Devis',
@@ -157,6 +158,7 @@ describe('NavigationDrawerErpMarocSection', () => {
   it('defines the canonical ERP Maroc paths', () => {
     expect(erpMarocPaths).toEqual({
       cockpit: '/erp-maroc',
+      onboarding: '/erp-maroc/onboarding',
       products: '/erp-maroc/products',
       tiers: '/erp-maroc/tiers',
       quotes: '/erp-maroc/quotes',
@@ -213,6 +215,7 @@ describe('NavigationDrawerErpMarocSection', () => {
 
   it.each([
     [erpMarocPaths.cockpit, 'Vue ventes'],
+    [erpMarocPaths.onboarding, 'Mise en service'],
     [erpMarocPaths.products, 'Produits'],
     [erpMarocPaths.tiers, 'Tiers'],
     [erpMarocPaths.quotes, 'Devis'],

@@ -1739,6 +1739,52 @@ describe('ERP Maroc response contracts', () => {
     });
   });
 
+  it('parses a bank reconciliation against an opening open item', () => {
+    expect(
+      erpBankStatementLineSchema.parse({
+        id: ids.bankStatementLine,
+        position: 0,
+        pageNumber: 1,
+        transactionDate: '2026-07-17',
+        valueDate: '2026-07-17',
+        description: 'Règlement reprise Client Atlas',
+        reference: 'FAC-2025-0042',
+        debitCents: 0,
+        creditCents: 75_000,
+        balanceCents: 475_000,
+        confidenceBasisPoints: 9_900,
+        needsReview: false,
+        sourceText: 'FAC-2025-0042 Client Atlas',
+        boundingBox: null,
+        review: null,
+        reconciliation: {
+          kind: 'OPENING_ITEM',
+          openingOpenItemId: ids.invoice,
+          tierId: ids.tier,
+          tierName: 'Client Atlas',
+          openItemKind: 'RECEIVABLE',
+          openItemReference: 'FAC-2025-0042',
+          settlementDate: '2026-07-17',
+          amountCents: 75_000,
+          remainingOutstandingCents: 25_000,
+          accountingEntryId: ids.accountingEntry,
+          accountingEntryStatus: 'DRAFT',
+          reversalAccountingEntryId: null,
+          reversalAccountingEntryStatus: null,
+          reconciledAt: '2026-07-17T10:00:00.000Z',
+          reconciledByTwentyUserId: 'twenty-user-1',
+        },
+      }),
+    ).toMatchObject({
+      reconciliation: {
+        kind: 'OPENING_ITEM',
+        openingOpenItemId: ids.invoice,
+        remainingOutstandingCents: 25_000,
+        accountingEntryStatus: 'DRAFT',
+      },
+    });
+  });
+
   it('rejects missing required response fields and malformed IDs/dates', () => {
     const { id: _id, ...productWithoutId } = productJson;
     expect(erpProductSchema.safeParse(productWithoutId).success).toBe(false);
