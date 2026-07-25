@@ -299,6 +299,7 @@ export const erpQuoteSchema = z.object({
   twentyPersonId: nullableUuidSchema,
   opportunityEstimatedAmountCents: centsSchema.nullable(),
   convertedInvoiceId: nullableUuidSchema,
+  convertedSalesOrderId: nullableUuidSchema.optional(),
   convertedAt: nullableInstantSchema,
   createdAt: instantSchema,
   updatedAt: instantSchema,
@@ -306,6 +307,202 @@ export const erpQuoteSchema = z.object({
 });
 
 export const erpQuoteListSchema = z.array(erpQuoteSchema);
+
+export const erpWarehouseSummarySchema = z.object({
+  id: uuidSchema,
+  code: z.string(),
+  name: z.string(),
+});
+
+export const erpSalesOrderStatusSchema = z.enum([
+  'DRAFT',
+  'CONFIRMED',
+  'PARTIALLY_DELIVERED',
+  'DELIVERED',
+  'INVOICED',
+  'CANCELLED',
+]);
+
+export const erpSalesOrderProductSchema = z.object({
+  id: uuidSchema,
+  code: z.string(),
+  name: z.string(),
+  type: z.string(),
+});
+
+export const erpSalesOrderAllocationSchema = z
+  .object({
+    id: uuidSchema,
+    societeId: uuidSchema,
+    salesOrderId: uuidSchema,
+    salesOrderLineId: uuidSchema,
+    warehouseId: uuidSchema,
+    quantityReserved: z.number().finite().nonnegative(),
+    quantityPrepared: z.number().finite().nonnegative(),
+    createdByTwentyUserId: nonBlankStringSchema,
+    updatedByTwentyUserId: nonBlankStringSchema,
+    preparedAt: nullableInstantSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+    warehouse: erpWarehouseSummarySchema,
+  })
+  .superRefine((allocation, context) => {
+    if (allocation.quantityPrepared > allocation.quantityReserved) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Prepared quantity cannot exceed reserved quantity',
+        path: ['quantityPrepared'],
+      });
+    }
+  });
+
+export const erpSalesOrderLineSchema = z
+  .object({
+    id: uuidSchema,
+    salesOrderId: uuidSchema,
+    productId: nullableUuidSchema,
+    description: z.string(),
+    unit: nullableStringSchema,
+    quantity: z.number().finite().positive(),
+    quantityDelivered: z.number().finite().nonnegative(),
+    unitPriceHtCents: centsSchema,
+    tvaRate: nonNegativeIntegerSchema,
+    totalHtCents: centsSchema,
+    totalTvaCents: centsSchema,
+    totalTtcCents: centsSchema,
+    position: nonNegativeIntegerSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+    product: erpSalesOrderProductSchema.nullable(),
+    allocations: z.array(erpSalesOrderAllocationSchema).default([]),
+    invoiceAllocations: z
+      .array(
+        z.object({
+          id: uuidSchema,
+          invoiceId: uuidSchema,
+          quantity: z.number().finite().positive(),
+        }),
+      )
+      .default([]),
+  })
+  .superRefine((line, context) => {
+    if (line.quantityDelivered > line.quantity) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Delivered quantity cannot exceed ordered quantity',
+        path: ['quantityDelivered'],
+      });
+    }
+    const reserved = line.allocations.reduce(
+      (total, allocation) => total + allocation.quantityReserved,
+      0,
+    );
+    if (reserved + line.quantityDelivered > line.quantity + 1e-9) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Reserved and delivered quantities cannot exceed ordered quantity',
+        path: ['allocations'],
+      });
+    }
+  });
+
+export const erpSalesOrderCustomerSchema = z.object({
+  id: uuidSchema,
+  name: z.string(),
+  email: nullableStringSchema,
+  phone: nullableStringSchema,
+  city: nullableStringSchema,
+  paymentDelayDays: nonNegativeIntegerSchema,
+});
+
+export const erpSalesOrderSourceQuoteSchema = z.object({
+  id: uuidSchema,
+  number: z.string(),
+  status: erpQuoteStatusSchema,
+});
+
+export const erpSalesOrderConvertedInvoiceSchema = z.object({
+  id: uuidSchema,
+  number: z.string().nullable(),
+  status: z.string(),
+});
+
+export const erpSalesOrderInvoiceSummarySchema =
+  erpSalesOrderConvertedInvoiceSchema.extend({
+    totalTtcCents: centsSchema,
+    createdAt: instantSchema,
+  });
+
+export const erpSalesOrderSchema = z.object({
+  id: uuidSchema,
+  societeId: uuidSchema,
+  customerId: uuidSchema,
+  number: z.string(),
+  year: nonNegativeIntegerSchema,
+  title: z.string(),
+  currency: z.literal('MAD'),
+  status: erpSalesOrderStatusSchema,
+  issueDate: civilDateHttpSchema,
+  expectedDeliveryDate: nullableCivilDateHttpSchema,
+  notes: nullableStringSchema,
+  totalHtCents: centsSchema,
+  totalTvaCents: centsSchema,
+  totalTtcCents: centsSchema,
+  confirmedAt: nullableInstantSchema,
+  confirmedByTwentyUserId: nullableStringSchema,
+  cancelledAt: nullableInstantSchema,
+  cancelledByTwentyUserId: nullableStringSchema,
+  cancellationReason: nullableStringSchema,
+  convertedInvoiceId: nullableUuidSchema,
+  invoicedAt: nullableInstantSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  customer: erpSalesOrderCustomerSchema,
+  sourceQuote: erpSalesOrderSourceQuoteSchema.nullable(),
+  convertedInvoice: erpSalesOrderConvertedInvoiceSchema.nullable(),
+  invoices: z.array(erpSalesOrderInvoiceSummarySchema).default([]),
+  lines: z.array(erpSalesOrderLineSchema),
+});
+
+export const erpSalesOrderListSchema = z.array(erpSalesOrderSchema);
+
+export const erpDeliveryNoteStatusSchema = z.enum(['POSTED', 'CANCELLED']);
+
+export const erpDeliveryNoteLineSchema = z.object({
+  id: uuidSchema,
+  deliveryNoteId: uuidSchema,
+  salesOrderLineId: uuidSchema,
+  quantity: z.number().finite().positive(),
+  position: nonNegativeIntegerSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  salesOrderLine: erpSalesOrderLineSchema,
+});
+
+export const erpDeliveryNoteSchema = z.object({
+  id: uuidSchema,
+  societeId: uuidSchema,
+  salesOrderId: uuidSchema,
+  warehouseId: uuidSchema,
+  number: z.string(),
+  year: nonNegativeIntegerSchema,
+  status: erpDeliveryNoteStatusSchema,
+  deliveryDate: civilDateHttpSchema,
+  notes: nullableStringSchema,
+  creationCommandId: nonBlankStringSchema,
+  createdByTwentyUserId: nonBlankStringSchema,
+  cancellationCommandId: nullableStringSchema,
+  cancelledAt: nullableInstantSchema,
+  cancelledByTwentyUserId: nullableStringSchema,
+  cancellationReason: nullableStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  warehouse: erpWarehouseSummarySchema,
+  lines: z.array(erpDeliveryNoteLineSchema).min(1),
+});
+
+export const erpDeliveryNoteListSchema = z.array(erpDeliveryNoteSchema);
 
 export const erpPurchaseOrderStatusSchema = z.enum([
   'DRAFT',
@@ -375,6 +572,7 @@ export const erpPurchaseOrderListSchema = z.array(erpPurchaseOrderSchema);
 
 export const erpPurchaseReceiptOrderLineSchema = z.object({
   id: uuidSchema,
+  productId: nullableUuidSchema,
   description: z.string(),
   unit: nullableStringSchema,
   quantity: z.number().finite().positive(),
@@ -395,12 +593,14 @@ export const erpPurchaseReceiptSchema = z.object({
   id: uuidSchema,
   societeId: uuidSchema,
   purchaseOrderId: uuidSchema,
+  warehouseId: uuidSchema,
   number: z.string(),
   year: nonNegativeIntegerSchema,
   receiptDate: civilDateHttpSchema,
   notes: nullableStringSchema,
   createdAt: instantSchema,
   updatedAt: instantSchema,
+  warehouse: erpWarehouseSummarySchema,
   lines: z.array(erpPurchaseReceiptLineSchema),
 });
 
@@ -559,6 +759,30 @@ export const erpSourceQuoteSummarySchema = z.object({
   status: erpQuoteStatusSchema,
 });
 
+export const erpSourceSalesOrderSummarySchema = z.object({
+  id: uuidSchema,
+  number: z.string(),
+  status: erpSalesOrderStatusSchema,
+});
+
+export const erpSalesInvoiceAllocationSchema = z.object({
+  id: uuidSchema,
+  salesOrderId: uuidSchema,
+  salesOrderLineId: uuidSchema,
+  deliveryNoteId: uuidSchema,
+  deliveryNoteLineId: uuidSchema,
+  invoiceId: uuidSchema,
+  invoiceLineId: uuidSchema,
+  quantity: z.number().finite().positive(),
+  createdAt: instantSchema,
+  deliveryNote: z.object({
+    id: uuidSchema,
+    number: z.string(),
+    status: erpDeliveryNoteStatusSchema,
+    deliveryDate: civilDateHttpSchema,
+  }),
+});
+
 const erpInvoiceEmailDeliverySchema = z.object({
   status: erpInvoiceEmailOutboxStatusSchema,
   sentAt: nullableInstantSchema,
@@ -612,6 +836,9 @@ const erpInvoiceBaseSchema = z.object({
   tier: erpInvoiceTierSummarySchema,
   societe: erpSocieteLegalSummarySchema,
   sourceQuote: erpSourceQuoteSummarySchema.nullable(),
+  sourceSalesOrderId: nullableUuidSchema.default(null),
+  sourceSalesOrder: erpSourceSalesOrderSummarySchema.nullable().default(null),
+  salesInvoiceAllocations: z.array(erpSalesInvoiceAllocationSchema).default([]),
 });
 
 const erpInvoiceWireEmailDeliverySchema = z.object({
@@ -721,6 +948,7 @@ export const erpPaymentMethodSchema = z.enum([
 
 export const erpSupplierPaymentPreparationStatusSchema = z.enum([
   'READY',
+  'EXECUTED',
   'CANCELLED',
 ]);
 
@@ -737,16 +965,34 @@ export const erpSupplierPaymentPreparationSchema = z.object({
   notes: nullableStringSchema,
   status: erpSupplierPaymentPreparationStatusSchema,
   createdByTwentyUserId: nonBlankStringSchema,
+  executedAt: nullableInstantSchema,
+  executedByTwentyUserId: nullableStringSchema,
+  paymentDate: nullableCivilDateHttpSchema,
+  treasuryAccountCode: nullableStringSchema,
   cancelledAt: nullableInstantSchema,
   cancelledByTwentyUserId: nullableStringSchema,
   cancellationReason: nullableStringSchema,
   createdAt: instantSchema,
   updatedAt: instantSchema,
+  accountingEntry: z
+    .object({
+      id: uuidSchema,
+      status: z.enum(['DRAFT', 'VALIDATED', 'REJECTED']),
+      entryDate: civilDateHttpSchema,
+      label: nonBlankStringSchema,
+      journal: z.object({
+        code: nonBlankStringSchema,
+        libelle: nonBlankStringSchema,
+      }),
+    })
+    .nullable()
+    .optional(),
 });
 
 export const erpSupplierPaymentPreparationListSchema = z.object({
   items: z.array(erpSupplierPaymentPreparationSchema),
   readyAmountCents: centsSchema,
+  executedAmountCents: centsSchema,
   cancelledAmountCents: centsSchema,
   remainingToPrepareCents: centsSchema,
 });
@@ -776,6 +1022,7 @@ export const erpSupplierInvoiceDetailSchema = erpSupplierInvoiceSchema.extend({
   accountingEntry: erpSupplierInvoiceAccountingSummarySchema.nullable(),
   paymentPreparationSummary: z.object({
     readyAmountCents: centsSchema,
+    executedAmountCents: centsSchema,
     cancelledAmountCents: centsSchema,
     remainingToPrepareCents: centsSchema,
   }),
@@ -963,6 +1210,120 @@ export const erpCreditNoteSchema = z
 
 export const erpCreditNotePageSchema = listPageSchema(erpCreditNoteSchema);
 
+export const erpCustomerReturnStatusSchema = z.enum([
+  'DRAFT',
+  'VALIDATED',
+  'CANCELLED',
+]);
+
+const erpCustomerReturnInvoiceLineSchema = z.object({
+  id: uuidSchema,
+  description: z.string(),
+  unit: nullableStringSchema,
+  quantity: z.number().finite().positive(),
+  unitPriceHtCents: centsSchema,
+  tvaRate: nonNegativeIntegerSchema,
+  totalHtCents: centsSchema,
+  totalTtcCents: centsSchema,
+});
+
+const erpCustomerReturnProductSchema = z.object({
+  id: uuidSchema,
+  code: z.string(),
+  name: z.string(),
+  type: z.string(),
+});
+
+export const erpCustomerReturnLineSchema = z.object({
+  id: uuidSchema,
+  customerReturnId: uuidSchema,
+  salesInvoiceAllocationId: uuidSchema,
+  creditNoteLineId: nullableUuidSchema,
+  quantity: z.number().finite().positive(),
+  position: nonNegativeIntegerSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  creditNoteLine: z.object({ id: uuidSchema }).nullable(),
+  salesInvoiceAllocation: z.object({
+    invoiceLine: erpCustomerReturnInvoiceLineSchema,
+    deliveryNoteLine: z.object({
+      salesOrderLine: z.object({
+        product: erpCustomerReturnProductSchema.nullable(),
+      }),
+    }),
+  }),
+});
+
+export const erpCustomerReturnSchema = z.object({
+  id: uuidSchema,
+  societeId: uuidSchema,
+  customerId: uuidSchema,
+  salesOrderId: uuidSchema,
+  deliveryNoteId: uuidSchema,
+  sourceInvoiceId: uuidSchema,
+  warehouseId: uuidSchema,
+  number: z.string(),
+  year: nonNegativeIntegerSchema,
+  status: erpCustomerReturnStatusSchema,
+  returnDate: civilDateHttpSchema,
+  reason: z.string(),
+  notes: nullableStringSchema,
+  createdByTwentyUserId: nonBlankStringSchema,
+  validatedAt: nullableInstantSchema,
+  validatedByTwentyUserId: nullableStringSchema,
+  cancelledAt: nullableInstantSchema,
+  cancelledByTwentyUserId: nullableStringSchema,
+  cancellationReason: nullableStringSchema,
+  creditNoteId: nullableUuidSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  customer: z.object({ id: uuidSchema, name: z.string() }),
+  salesOrder: z.object({ id: uuidSchema, number: z.string() }),
+  deliveryNote: z.object({
+    id: uuidSchema,
+    number: z.string(),
+    deliveryDate: civilDateHttpSchema,
+  }),
+  sourceInvoice: z.object({
+    id: uuidSchema,
+    number: nullableStringSchema,
+    status: erpInvoiceStatusSchema,
+  }),
+  warehouse: erpWarehouseSummarySchema,
+  creditNote: z
+    .object({
+      id: uuidSchema,
+      number: nullableStringSchema,
+      status: erpCreditNoteStatusSchema,
+      totalTtcCents: centsSchema,
+    })
+    .nullable(),
+  lines: z.array(erpCustomerReturnLineSchema).min(1),
+});
+
+export const erpCustomerReturnListSchema = z.array(erpCustomerReturnSchema);
+
+export const erpCustomerReturnEligibleLineSchema = z.object({
+  salesInvoiceAllocationId: uuidSchema,
+  invoiceId: uuidSchema,
+  invoiceLineId: uuidSchema,
+  deliveryNoteId: uuidSchema,
+  deliveryNoteNumber: z.string(),
+  warehouse: erpWarehouseSummarySchema,
+  product: erpCustomerReturnProductSchema,
+  description: z.string(),
+  unit: nullableStringSchema,
+  quantityInvoiced: z.number().finite().positive(),
+  quantityReturned: z.number().finite().nonnegative(),
+  quantityAvailable: z.number().finite().positive(),
+  unitPriceHtCents: centsSchema,
+  tvaRate: nonNegativeIntegerSchema,
+});
+
+export const erpCustomerReturnEligibleLineListSchema = z.array(
+  erpCustomerReturnEligibleLineSchema,
+);
+
 export const erpReminderLevelSchema = z.enum(['LEVEL_1', 'LEVEL_2', 'LEVEL_3']);
 export const erpReminderStatusSchema = z.enum([
   'PROPOSED',
@@ -1024,13 +1385,20 @@ export const erpReminderScanResultSchema = z.object({
 export const erpAccountingEntryStatusSchema = z.enum([
   'DRAFT',
   'VALIDATED',
+  'LOCKED',
   'REJECTED',
 ]);
 export const erpAccountingSourceTypeSchema = z.enum([
+  'MANUAL',
   'INVOICE',
   'PAYMENT',
   'CREDIT_NOTE',
   'SUPPLIER_INVOICE',
+  'SUPPLIER_PAYMENT',
+  'PAYROLL',
+  'EXPENSE_NOTE',
+  'CLOSING',
+  'OPENING_BALANCE',
 ]);
 
 export const erpAccountingEntryLineSchema = z
@@ -1100,7 +1468,9 @@ export const erpAccountingEntrySchema = z
       entry.rejectionReason !== null;
     const validReviewState =
       (entry.status === 'DRAFT' && !hasValidation && !hasRejection) ||
-      (entry.status === 'VALIDATED' && hasValidation && !hasRejection) ||
+      ((entry.status === 'VALIDATED' || entry.status === 'LOCKED') &&
+        hasValidation &&
+        !hasRejection) ||
       (entry.status === 'REJECTED' && !hasValidation && hasRejection);
 
     if (!validReviewState) {
@@ -1367,12 +1737,998 @@ export const erpLettrageSuggestionsSchema = z
     });
   });
 
+export const erpBankStatementStatusSchema = z.enum([
+  'PENDING_OCR',
+  'PROCESSING',
+  'READY_FOR_REVIEW',
+  'CONFIRMED',
+  'CLOSED',
+  'FAILED',
+]);
+
+export const erpBankAccountSchema = z.object({
+  id: uuidSchema,
+  name: nonBlankStringSchema,
+  bankName: nonBlankStringSchema,
+  rib: z.string().regex(/^\d{24}$/),
+  currency: z.literal('MAD'),
+  accountingAccountCode: z.string().regex(/^\d{4,8}$/),
+  openingBalanceCents: signedCentsSchema,
+  isActive: z.boolean(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+
+export const erpBankAccountListSchema = z.array(erpBankAccountSchema);
+
+export const erpSupplierBankReconciliationSchema = z.object({
+  kind: z.literal('SUPPLIER'),
+  supplierPaymentPreparationId: uuidSchema,
+  supplierId: uuidSchema,
+  supplierName: nonBlankStringSchema,
+  supplierInvoiceId: uuidSchema,
+  supplierInvoiceReference: nonBlankStringSchema,
+  paymentReference: nullableStringSchema,
+  paymentDate: civilDateSchema,
+  amountCents: positiveIntegerSchema,
+  method: erpPaymentMethodSchema,
+  reconciledAt: instantSchema,
+  reconciledByTwentyUserId: nonBlankStringSchema,
+});
+
+export const erpCustomerBankReconciliationSchema = z.object({
+  kind: z.literal('CUSTOMER'),
+  customerPaymentId: uuidSchema,
+  customerId: uuidSchema,
+  customerName: nonBlankStringSchema,
+  invoiceReferences: z.array(nonBlankStringSchema),
+  paymentReference: nullableStringSchema,
+  paymentDate: civilDateSchema,
+  amountCents: positiveIntegerSchema,
+  method: erpPaymentMethodSchema,
+  reconciledAt: instantSchema,
+  reconciledByTwentyUserId: nonBlankStringSchema,
+});
+
+export const erpOpeningItemBankReconciliationSchema = z.object({
+  kind: z.literal('OPENING_ITEM'),
+  openingOpenItemId: uuidSchema,
+  tierId: uuidSchema,
+  tierName: nonBlankStringSchema,
+  openItemKind: z.enum(['RECEIVABLE', 'PAYABLE']),
+  openItemReference: nonBlankStringSchema,
+  settlementDate: civilDateSchema,
+  amountCents: positiveIntegerSchema,
+  remainingOutstandingCents: centsSchema,
+  accountingEntryId: uuidSchema,
+  accountingEntryStatus: z.enum(['DRAFT', 'VALIDATED', 'LOCKED', 'REJECTED']),
+  reversalAccountingEntryId: uuidSchema.nullable(),
+  reversalAccountingEntryStatus: z
+    .enum(['DRAFT', 'VALIDATED', 'LOCKED', 'REJECTED'])
+    .nullable(),
+  reconciledAt: instantSchema,
+  reconciledByTwentyUserId: nonBlankStringSchema,
+});
+
+export const erpBankReconciliationSchema = z.discriminatedUnion('kind', [
+  erpSupplierBankReconciliationSchema,
+  erpCustomerBankReconciliationSchema,
+  erpOpeningItemBankReconciliationSchema,
+]);
+
+export const erpBankReconciliationReasonSchema = z.enum([
+  'AMOUNT_EXACT',
+  'DATE_EXACT',
+  'DATE_NEAR',
+  'REFERENCE_MATCH',
+]);
+
+export const erpSupplierBankReconciliationCandidateSchema = z.object({
+  kind: z.literal('SUPPLIER'),
+  supplierPaymentPreparationId: uuidSchema,
+  supplierId: uuidSchema,
+  supplierName: nonBlankStringSchema,
+  supplierInvoiceId: uuidSchema,
+  supplierInvoiceReference: nonBlankStringSchema,
+  paymentReference: nullableStringSchema,
+  paymentDate: civilDateSchema,
+  amountCents: positiveIntegerSchema,
+  method: erpPaymentMethodSchema,
+  score: nonNegativeIntegerSchema.max(100),
+  dateDistanceDays: nonNegativeIntegerSchema,
+  reasons: z.array(erpBankReconciliationReasonSchema).min(1),
+});
+
+export const erpCustomerBankReconciliationCandidateSchema = z.object({
+  kind: z.literal('CUSTOMER'),
+  customerPaymentId: uuidSchema,
+  customerId: uuidSchema,
+  customerName: nonBlankStringSchema,
+  invoiceReferences: z.array(nonBlankStringSchema),
+  paymentReference: nullableStringSchema,
+  paymentDate: civilDateSchema,
+  amountCents: positiveIntegerSchema,
+  method: erpPaymentMethodSchema,
+  score: nonNegativeIntegerSchema.max(100),
+  dateDistanceDays: nonNegativeIntegerSchema,
+  reasons: z.array(erpBankReconciliationReasonSchema).min(1),
+});
+
+export const erpBankReconciliationCandidateSchema = z.discriminatedUnion(
+  'kind',
+  [
+    erpSupplierBankReconciliationCandidateSchema,
+    erpCustomerBankReconciliationCandidateSchema,
+  ],
+);
+
+export const erpBankReconciliationCandidatesSchema = z.object({
+  lineId: uuidSchema,
+  candidates: z.array(erpBankReconciliationCandidateSchema),
+});
+
+export const erpBankStatementLineSchema = z.object({
+  id: uuidSchema,
+  position: nonNegativeIntegerSchema,
+  pageNumber: positiveIntegerSchema,
+  transactionDate: civilDateSchema,
+  valueDate: nullableCivilDateSchema,
+  description: nonBlankStringSchema,
+  reference: nullableStringSchema,
+  debitCents: centsSchema,
+  creditCents: centsSchema,
+  balanceCents: signedCentsSchema.nullable(),
+  confidenceBasisPoints: nonNegativeIntegerSchema.max(10_000),
+  needsReview: z.boolean(),
+  sourceText: z.string(),
+  boundingBox: z.array(z.number().finite()).length(4).nullable(),
+  review: z
+    .object({
+      reason: nullableStringSchema,
+      reviewedAt: instantSchema,
+      reviewedByTwentyUserId: nonBlankStringSchema,
+    })
+    .nullable(),
+  reconciliation: erpBankReconciliationSchema.nullable(),
+});
+
+export const erpBankStatementSchema = z.object({
+  id: uuidSchema,
+  originalFilename: nonBlankStringSchema,
+  contentSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  status: erpBankStatementStatusSchema,
+  bankAccount: erpBankAccountSchema.nullable(),
+  ocrEngine: nullableStringSchema,
+  pageCount: positiveIntegerSchema.nullable(),
+  lineCount: nonNegativeIntegerSchema,
+  openingBalanceCents: signedCentsSchema.nullable(),
+  closingBalanceCents: signedCentsSchema.nullable(),
+  balanceCheckPassed: z.boolean().nullable(),
+  lastError: nullableStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  confirmedAt: nullableInstantSchema,
+  closedAt: nullableInstantSchema,
+});
+
+export const erpBankStatementListSchema = z.array(erpBankStatementSchema);
+export const erpBankStatementDetailSchema = erpBankStatementSchema.extend({
+  resolvedLineCount: nonNegativeIntegerSchema,
+  unresolvedLineCount: nonNegativeIntegerSchema,
+  reconciliationRateBasisPoints: nonNegativeIntegerSchema.max(10_000),
+  lines: z.array(erpBankStatementLineSchema),
+});
+
+export const erpWarehouseSchema = erpWarehouseSummarySchema.extend({
+  societeId: uuidSchema,
+  address: nullableStringSchema,
+  isDefault: z.boolean(),
+  isActive: z.boolean(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+export const erpWarehouseListSchema = z.array(erpWarehouseSchema);
+
+export const erpStockProductSchema = z.object({
+  id: uuidSchema,
+  code: z.string(),
+  name: z.string(),
+  unit: z.string(),
+});
+
+export const erpStockLevelSchema = z.object({
+  warehouse: erpWarehouseSummarySchema.extend({ isDefault: z.boolean() }),
+  product: erpStockProductSchema,
+  quantity: z.number().finite().nonnegative(),
+  averageUnitCostCents: z.number().finite().nonnegative(),
+  inventoryValueCents: centsSchema,
+  reservedQuantity: z.number().finite().nonnegative(),
+  preparedQuantity: z.number().finite().nonnegative(),
+  availableQuantity: z.number().finite().nonnegative(),
+  updatedAt: nullableInstantSchema,
+});
+export const erpStockLevelListSchema = z.array(erpStockLevelSchema);
+
+export const erpStockMovementTypeSchema = z.enum([
+  'PURCHASE_RECEIPT',
+  'SALES_DELIVERY',
+  'SALES_DELIVERY_CANCEL',
+  'CUSTOMER_RETURN',
+  'ADJUSTMENT_IN',
+  'ADJUSTMENT_OUT',
+  'TRANSFER_IN',
+  'TRANSFER_OUT',
+  'INVENTORY_CORRECTION_IN',
+  'INVENTORY_CORRECTION_OUT',
+]);
+
+export const erpStockMovementSchema = z.object({
+  id: uuidSchema,
+  warehouseId: uuidSchema,
+  productId: uuidSchema,
+  type: erpStockMovementTypeSchema,
+  quantityDelta: z.number().finite(),
+  quantityAfter: z.number().finite().nonnegative(),
+  unitCostCents: z.number().finite().nonnegative(),
+  valueDeltaCents: signedCentsSchema,
+  inventoryValueAfterCents: centsSchema,
+  reference: nullableStringSchema,
+  notes: nullableStringSchema,
+  transferGroupId: nullableUuidSchema,
+  purchaseReceiptLineId: nullableUuidSchema,
+  inventoryCountLineId: nullableUuidSchema,
+  deliveryNoteLineId: nullableUuidSchema,
+  customerReturnLineId: nullableUuidSchema,
+  occurredAt: civilDateHttpSchema,
+  createdByTwentyUserId: nonBlankStringSchema,
+  createdAt: instantSchema,
+  warehouse: erpWarehouseSummarySchema,
+  product: erpStockProductSchema,
+});
+export const erpStockMovementListSchema = z.array(erpStockMovementSchema);
+
+const erpGrossMarginAmountsSchema = z.object({
+  grossRevenueHtCents: centsSchema,
+  returnedRevenueHtCents: centsSchema,
+  deliveredCostCents: centsSchema,
+  returnedCostCents: centsSchema,
+  netRevenueHtCents: centsSchema,
+  netCostCents: centsSchema,
+  grossMarginCents: signedCentsSchema,
+  marginRateBasisPoints: signedCentsSchema.nullable(),
+});
+
+export const erpGrossMarginDeliverySchema = erpGrossMarginAmountsSchema.extend({
+  deliveryNoteId: uuidSchema,
+  deliveryNumber: nonBlankStringSchema,
+  deliveryDate: civilDateHttpSchema,
+  salesOrderId: uuidSchema,
+  salesOrderNumber: nonBlankStringSchema,
+  customerId: uuidSchema,
+  customerName: nonBlankStringSchema,
+});
+
+export const erpGrossMarginReportSchema = z.object({
+  summary: erpGrossMarginAmountsSchema.extend({
+    deliveryCount: nonNegativeIntegerSchema,
+  }),
+  deliveries: z.array(erpGrossMarginDeliverySchema),
+});
+
+export const erpInventoryCountStatusSchema = z.enum([
+  'DRAFT',
+  'VALIDATED',
+  'CANCELLED',
+]);
+
+export const erpInventoryCountLineSchema = z.object({
+  id: uuidSchema,
+  productId: uuidSchema,
+  expectedQuantity: z.number().finite().nonnegative(),
+  countedQuantity: z.number().finite().nonnegative(),
+  quantityBeforeValidation: z.number().finite().nonnegative().nullable(),
+  varianceQuantity: z.number().finite().nullable(),
+  position: z.number().int().nonnegative(),
+  product: erpStockProductSchema,
+  stockMovement: z.object({ id: uuidSchema }).nullable(),
+});
+
+export const erpInventoryCountSchema = z.object({
+  id: uuidSchema,
+  warehouseId: uuidSchema,
+  number: z.string(),
+  year: z.number().int(),
+  status: erpInventoryCountStatusSchema,
+  countedAt: civilDateHttpSchema,
+  notes: nullableStringSchema,
+  validatedAt: nullableInstantSchema,
+  cancelledAt: nullableInstantSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  warehouse: erpWarehouseSummarySchema,
+  lines: z.array(erpInventoryCountLineSchema),
+});
+export const erpInventoryCountListSchema = z.array(erpInventoryCountSchema);
+
+export const erpInventoryThresholdSchema = z.object({
+  id: uuidSchema,
+  warehouseId: uuidSchema,
+  productId: uuidSchema,
+  minimumQuantity: z.number().finite().nonnegative(),
+  targetQuantity: z.number().finite().nonnegative(),
+  reorderEnabled: z.boolean(),
+  updatedAt: instantSchema,
+  warehouse: erpWarehouseSummarySchema,
+  product: erpStockProductSchema,
+});
+export const erpInventoryThresholdListSchema = z.array(
+  erpInventoryThresholdSchema,
+);
+
+export const erpReplenishmentSuggestionSchema = z.object({
+  thresholdId: uuidSchema,
+  warehouse: erpWarehouseSummarySchema,
+  product: erpStockProductSchema,
+  currentQuantity: z.number().finite().nonnegative(),
+  physicalQuantity: z.number().finite().nonnegative(),
+  reservedQuantity: z.number().finite().nonnegative(),
+  preparedQuantity: z.number().finite().nonnegative(),
+  availableQuantity: z.number().finite().nonnegative(),
+  minimumQuantity: z.number().finite().nonnegative(),
+  targetQuantity: z.number().finite().nonnegative(),
+  suggestedQuantity: z.number().finite().positive(),
+});
+export const erpReplenishmentSuggestionListSchema = z.array(
+  erpReplenishmentSuggestionSchema,
+);
+
+export const erpTaxDeclarationSchema = z
+  .object({
+    id: uuidSchema,
+    exerciceId: uuidSchema,
+    type: z.enum(['TVA', 'IS']),
+    periodKey: nonBlankStringSchema,
+    periodStart: civilDateHttpSchema,
+    periodEnd: civilDateHttpSchema,
+    dueDate: civilDateHttpSchema,
+    status: z.enum(['DRAFT', 'REVIEWED', 'FILED', 'PAID', 'CANCELLED']),
+    taxableBaseCents: signedCentsSchema,
+    collectedTaxCents: signedCentsSchema,
+    deductibleTaxCents: signedCentsSchema,
+    previousCreditCents: signedCentsSchema,
+    prorataBasisPoints: nonNegativeIntegerSchema,
+    taxDueCents: signedCentsSchema,
+    taxCreditCents: signedCentsSchema,
+    calculation: z.unknown(),
+    simplXml: nullableStringSchema,
+    filingReference: nullableStringSchema,
+    reviewedAt: nullableInstantSchema,
+    filedAt: nullableInstantSchema,
+    paidAt: nullableInstantSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+    exercice: z.object({ annee: nonNegativeIntegerSchema }).optional(),
+  })
+  .passthrough();
+export const erpTaxDeclarationListSchema = z.array(erpTaxDeclarationSchema);
+
+export const erpFiscalDeadlineSchema = z
+  .object({
+    id: uuidSchema,
+    code: nonBlankStringSchema,
+    label: nonBlankStringSchema,
+    category: nonBlankStringSchema,
+    dueDate: civilDateHttpSchema,
+    periodKey: nonBlankStringSchema,
+    completedAt: nullableInstantSchema,
+    notes: nullableStringSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpFiscalDeadlineListSchema = z.array(erpFiscalDeadlineSchema);
+
+export const erpFileExportSchema = z.object({
+  filename: nonBlankStringSchema,
+  contentType: nonBlankStringSchema,
+  content: z.string(),
+});
+
+export const erpAccountingPeriodSchema = z
+  .object({
+    id: uuidSchema,
+    exerciceId: uuidSchema,
+    periodNumber: positiveIntegerSchema,
+    startDate: civilDateHttpSchema,
+    endDate: civilDateHttpSchema,
+    status: z.enum(['OPEN', 'CLOSED']),
+    closedAt: nullableInstantSchema,
+    reopenedAt: nullableInstantSchema,
+    reopenReason: nullableStringSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+
+export const erpAccountingReviewTaskSchema = z
+  .object({
+    id: uuidSchema,
+    exerciceId: uuidSchema,
+    code: nonBlankStringSchema,
+    label: nonBlankStringSchema,
+    category: nonBlankStringSchema,
+    status: z.enum(['TODO', 'IN_PROGRESS', 'DONE', 'NOT_APPLICABLE']),
+    evidence: z.unknown().nullable(),
+    notes: nullableStringSchema,
+    completedAt: nullableInstantSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpAccountingReviewTaskListSchema = z.array(
+  erpAccountingReviewTaskSchema,
+);
+
+export const erpExerciseSchema = z
+  .object({
+    id: uuidSchema,
+    annee: nonNegativeIntegerSchema,
+    dateDebut: civilDateHttpSchema,
+    dateFin: civilDateHttpSchema,
+    status: z.enum(['OPEN', 'CLOSING', 'CLOSED']),
+    closingStartedAt: nullableInstantSchema,
+    closedAt: nullableInstantSchema,
+    closingEntryId: nullableUuidSchema,
+    openingEntryId: nullableUuidSchema,
+    accountingPeriods: z.array(erpAccountingPeriodSchema).optional(),
+    accountingReviewTasks: z.array(erpAccountingReviewTaskSchema).optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpExerciseListSchema = z.array(erpExerciseSchema);
+
+const erpCpcSchema = z.object({
+  operating: z.object({
+    revenueCents: signedCentsSchema,
+    expensesCents: signedCentsSchema,
+    resultCents: signedCentsSchema,
+  }),
+  financial: z.object({
+    revenueCents: signedCentsSchema,
+    expensesCents: signedCentsSchema,
+    resultCents: signedCentsSchema,
+  }),
+  nonCurrent: z.object({
+    revenueCents: signedCentsSchema,
+    expensesCents: signedCentsSchema,
+    resultCents: signedCentsSchema,
+  }),
+  incomeTaxCents: signedCentsSchema,
+  netResultCents: signedCentsSchema,
+});
+
+export const erpFinancialStatementsSchema = z
+  .object({
+    exercise: z.object({
+      id: uuidSchema,
+      year: nonNegativeIntegerSchema,
+      startDate: civilDateHttpSchema,
+      endDate: civilDateHttpSchema,
+      status: z.enum(['OPEN', 'CLOSING', 'CLOSED']),
+    }),
+    company: z
+      .object({
+        raisonSociale: nonBlankStringSchema,
+        ice: nullableStringSchema,
+        identifiantFiscal: nullableStringSchema,
+      })
+      .passthrough(),
+    bilan: z.object({
+      assets: z.object({ totalCents: signedCentsSchema }).passthrough(),
+      liabilities: z.object({ totalCents: signedCentsSchema }).passthrough(),
+      differenceCents: signedCentsSchema,
+      isBalanced: z.boolean(),
+    }),
+    cpc: erpCpcSchema,
+    esg: z
+      .object({
+        valueAddedCents: signedCentsSchema,
+        grossOperatingSurplusCents: signedCentsSchema,
+        netResultCents: signedCentsSchema,
+      })
+      .passthrough(),
+    financing: z
+      .object({
+        selfFinancingCapacityCents: signedCentsSchema,
+        netTreasuryChangeCents: signedCentsSchema,
+      })
+      .passthrough(),
+    taxDeclarations: z.array(z.unknown()),
+    annexes: z.unknown(),
+  })
+  .passthrough();
+
+export const erpFecExportSchema = erpFileExportSchema.extend({
+  entries: nonNegativeIntegerSchema,
+  lines: nonNegativeIntegerSchema,
+});
+export const erpFecImportResultSchema = z.object({
+  importedEntries: nonNegativeIntegerSchema,
+  skippedEntries: nonNegativeIntegerSchema,
+  lines: nonNegativeIntegerSchema,
+});
+export const erpExerciseClosingResultSchema = z.object({
+  closedExercise: erpExerciseSchema,
+  nextExercise: erpExerciseSchema,
+  closingEntryId: nullableUuidSchema,
+  openingEntryId: nullableUuidSchema,
+});
+
+export const erpEmployeeSchema = z
+  .object({
+    id: uuidSchema,
+    employeeNumber: nonBlankStringSchema,
+    firstName: nonBlankStringSchema,
+    lastName: nonBlankStringSchema,
+    cin: nullableStringSchema,
+    cnssNumber: nullableStringSchema,
+    email: nullableStringSchema,
+    phone: nullableStringSchema,
+    jobTitle: nonBlankStringSchema,
+    department: nullableStringSchema,
+    contractType: z.enum(['CDI', 'CDD', 'ANAPEC', 'INTERIM', 'STAGE']),
+    status: z.enum(['ACTIVE', 'INACTIVE', 'TERMINATED']),
+    hireDate: civilDateHttpSchema,
+    terminationDate: nullableCivilDateHttpSchema,
+    baseSalaryCents: centsSchema,
+    familyDependants: nonNegativeIntegerSchema,
+    bankRib: nullableStringSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpEmployeeListSchema = z.array(erpEmployeeSchema);
+
+export const erpPayslipLineSchema = z
+  .object({
+    id: uuidSchema,
+    code: nonBlankStringSchema,
+    label: nonBlankStringSchema,
+    kind: nonBlankStringSchema,
+    baseCents: signedCentsSchema,
+    rateBasisPoints: signedCentsSchema,
+    amountCents: signedCentsSchema,
+    position: nonNegativeIntegerSchema,
+  })
+  .passthrough();
+export const erpPayslipSchema = z
+  .object({
+    id: uuidSchema,
+    employeeId: uuidSchema,
+    periodKey: nonBlankStringSchema,
+    periodStart: civilDateHttpSchema,
+    periodEnd: civilDateHttpSchema,
+    status: z.enum(['DRAFT', 'VALIDATED', 'PAID', 'CANCELLED']),
+    grossSalaryCents: centsSchema,
+    cnssEmployeeCents: centsSchema,
+    amoEmployeeCents: centsSchema,
+    irCents: centsSchema,
+    netSalaryCents: centsSchema,
+    employerCostCents: centsSchema,
+    validatedAt: nullableInstantSchema,
+    paidAt: nullableInstantSchema,
+    employee: erpEmployeeSchema.optional(),
+    lines: z.array(erpPayslipLineSchema).optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpPayslipListSchema = z.array(erpPayslipSchema);
+
+export const erpLeaveRequestSchema = z
+  .object({
+    id: uuidSchema,
+    employeeId: uuidSchema,
+    type: z.enum([
+      'ANNUAL',
+      'SICK',
+      'MATERNITY',
+      'PATERNITY',
+      'UNPAID',
+      'OTHER',
+    ]),
+    status: z.enum(['REQUESTED', 'APPROVED', 'REJECTED', 'CANCELLED']),
+    startDate: civilDateHttpSchema,
+    endDate: civilDateHttpSchema,
+    workingDays: z.number().finite().nonnegative(),
+    reason: nullableStringSchema,
+    decidedAt: nullableInstantSchema,
+    employee: erpEmployeeSchema.optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpLeaveRequestListSchema = z.array(erpLeaveRequestSchema);
+export const erpLeaveBalanceSchema = z
+  .object({
+    id: nullableUuidSchema,
+    employeeId: uuidSchema,
+    employee: z.object({
+      id: uuidSchema,
+      employeeNumber: nonBlankStringSchema,
+      firstName: nonBlankStringSchema,
+      lastName: nonBlankStringSchema,
+    }),
+    year: nonNegativeIntegerSchema,
+    entitledDays: z.number().finite().nonnegative(),
+    carriedDays: z.number().finite(),
+    adjustmentDays: z.number().finite(),
+    consumedDays: z.number().finite().nonnegative(),
+    availableDays: z.number().finite(),
+    notes: nullableStringSchema.optional(),
+  })
+  .passthrough();
+export const erpLeaveBalanceListSchema = z.array(erpLeaveBalanceSchema);
+export const erpEmployeeTerminationResultSchema = z.object({
+  employee: erpEmployeeSchema,
+  settlement: z.unknown(),
+});
+export const erpCnssExportSchema = erpFileExportSchema.extend({
+  employees: nonNegativeIntegerSchema,
+});
+
+export const erpDocumentSchema = z
+  .object({
+    id: uuidSchema,
+    type: z.enum([
+      'SUPPLIER_INVOICE',
+      'CUSTOMER_INVOICE',
+      'BANK_STATEMENT',
+      'RECEIPT',
+      'CONTRACT',
+      'FISCAL',
+      'PAYROLL',
+      'OTHER',
+    ]),
+    status: z.enum([
+      'UPLOADED',
+      'OCR_PENDING',
+      'OCR_PROCESSING',
+      'REVIEW_REQUIRED',
+      'VALIDATED',
+      'REJECTED',
+      'FAILED',
+    ]),
+    filename: nonBlankStringSchema,
+    mimeType: nonBlankStringSchema,
+    sizeBytes: nonNegativeIntegerSchema,
+    title: nonBlankStringSchema,
+    notes: nullableStringSchema,
+    tags: z.array(z.string()),
+    linkedEntityType: nullableStringSchema,
+    linkedEntityId: nullableUuidSchema,
+    ocrEngine: nullableStringSchema,
+    ocrConfidenceBasisPoints: nonNegativeIntegerSchema.nullable(),
+    ocrResult: z.unknown().nullable(),
+    extractedData: z.unknown().nullable(),
+    validationNotes: nullableStringSchema,
+    lastError: nullableStringSchema,
+    validatedAt: nullableInstantSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpDocumentListSchema = z.array(erpDocumentSchema);
+export const erpDocumentContentSchema = z.object({
+  filename: nonBlankStringSchema,
+  mimeType: nonBlankStringSchema,
+  contentBase64: z.string(),
+});
+
+export const erpExpenseNoteSchema = z
+  .object({
+    id: uuidSchema,
+    employeeId: nullableUuidSchema,
+    number: nonBlankStringSchema,
+    title: nonBlankStringSchema,
+    expenseDate: civilDateHttpSchema,
+    status: z.enum([
+      'DRAFT',
+      'SUBMITTED',
+      'APPROVED',
+      'REJECTED',
+      'PAID',
+      'CANCELLED',
+    ]),
+    totalHtCents: centsSchema,
+    totalTvaCents: centsSchema,
+    totalTtcCents: centsSchema,
+    currency: nonBlankStringSchema,
+    accountingEntryId: nullableUuidSchema,
+    rejectionReason: nullableStringSchema,
+    lines: z.array(z.unknown()).optional(),
+    employee: erpEmployeeSchema.nullable().optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpExpenseNoteListSchema = z.array(erpExpenseNoteSchema);
+
+export const erpAnalyticSectionSchema = z
+  .object({
+    id: uuidSchema,
+    axisId: uuidSchema,
+    code: nonBlankStringSchema,
+    label: nonBlankStringSchema,
+    isActive: z.boolean(),
+  })
+  .passthrough();
+export const erpAnalyticAxisSchema = z
+  .object({
+    id: uuidSchema,
+    code: nonBlankStringSchema,
+    label: nonBlankStringSchema,
+    isActive: z.boolean(),
+    sections: z.array(erpAnalyticSectionSchema),
+  })
+  .passthrough();
+export const erpAnalyticAxisListSchema = z.array(erpAnalyticAxisSchema);
+export const erpAnalyticAllocationSchema = z
+  .object({
+    id: uuidSchema,
+    sectionId: uuidSchema,
+    entryLineId: uuidSchema,
+    amountCents: signedCentsSchema,
+    percentageBasisPoints: nonNegativeIntegerSchema,
+  })
+  .passthrough();
+
+export const erpBudgetSchema = z
+  .object({
+    id: uuidSchema,
+    exerciceId: uuidSchema,
+    code: nonBlankStringSchema,
+    label: nonBlankStringSchema,
+    status: z.enum(['DRAFT', 'APPROVED', 'CLOSED']),
+    approvedAt: nullableInstantSchema,
+    lines: z.array(z.unknown()).optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpBudgetListSchema = z.array(erpBudgetSchema);
+export const erpBudgetVarianceSchema = z.array(
+  z.object({
+    accountCode: nonBlankStringSchema,
+    budgetCents: signedCentsSchema,
+    actualCents: signedCentsSchema,
+    varianceCents: signedCentsSchema,
+  }),
+);
+
+export const erpRecurringInvoiceSchema = z
+  .object({
+    id: uuidSchema,
+    tierId: uuidSchema,
+    label: nonBlankStringSchema,
+    status: z.enum(['ACTIVE', 'PAUSED', 'ENDED']),
+    frequencyMonths: positiveIntegerSchema,
+    nextRunDate: civilDateHttpSchema,
+    endDate: nullableCivilDateHttpSchema,
+    currency: nonBlankStringSchema,
+    paymentDelayDays: nonNegativeIntegerSchema,
+    lines: z.unknown(),
+    lastGeneratedInvoiceId: nullableUuidSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpRecurringInvoiceListSchema = z.array(erpRecurringInvoiceSchema);
+export const erpRecurringInvoiceRunSchema = z.object({
+  generated: nonNegativeIntegerSchema,
+  invoices: z.array(erpInvoiceSchema),
+});
+
+export const erpExchangeRateSchema = z
+  .object({
+    id: uuidSchema,
+    baseCurrency: nonBlankStringSchema,
+    quoteCurrency: nonBlankStringSchema,
+    rate: decimalDatabaseNumberSchema,
+    effectiveDate: civilDateHttpSchema,
+    source: nonBlankStringSchema,
+    createdAt: instantSchema,
+  })
+  .passthrough();
+export const erpExchangeRateListSchema = z.array(erpExchangeRateSchema);
+
+export const erpPortalAccessSchema = z
+  .object({
+    id: uuidSchema,
+    tierId: uuidSchema,
+    twentyUserId: nullableStringSchema,
+    email: nullableStringSchema,
+    tokenExpiresAt: nullableInstantSchema,
+    lastAuthenticatedAt: nullableInstantSchema,
+    status: z.enum(['ACTIVE', 'REVOKED']),
+    canViewInvoices: z.boolean(),
+    canViewDocuments: z.boolean(),
+    canSubmitDocuments: z.boolean(),
+    grantedAt: instantSchema,
+    revokedAt: nullableInstantSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpPortalAccessListSchema = z.array(erpPortalAccessSchema);
+export const erpPortalAccessGrantSchema = z.object({
+  access: erpPortalAccessSchema,
+  token: nonBlankStringSchema,
+  portalPath: nonBlankStringSchema,
+  securityNotice: nonBlankStringSchema,
+});
+
+export const erpRegulatoryFileSchema = z
+  .object({
+    filename: nonBlankStringSchema,
+    contentType: nonBlankStringSchema,
+    content: z.string().optional(),
+    contentBase64: z.string().optional(),
+    payloadSha256: z.string().optional(),
+    submissionId: uuidSchema.optional(),
+    validation: z.unknown().optional(),
+  })
+  .passthrough();
+export const erpRegulatoryObjectSchema = z.object({}).passthrough();
+export const erpRegulatoryListSchema = z.array(erpRegulatoryObjectSchema);
+
+export const erpAccountingAnomalySchema = z
+  .object({
+    id: uuidSchema,
+    accountingEntryId: nullableUuidSchema,
+    ruleCode: nonBlankStringSchema,
+    severity: nonBlankStringSchema,
+    title: nonBlankStringSchema,
+    explanation: nonBlankStringSchema,
+    evidence: z.unknown(),
+    status: z.enum(['OPEN', 'RESOLVED', 'DISMISSED']),
+    resolutionNotes: nullableStringSchema,
+    resolvedAt: nullableInstantSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpAccountingAnomalyListSchema = z.array(
+  erpAccountingAnomalySchema,
+);
+export const erpAnomalyScanResultSchema = z.object({
+  scannedEntries: nonNegativeIntegerSchema,
+  created: nonNegativeIntegerSchema,
+  anomalies: erpAccountingAnomalyListSchema,
+});
+
+export const erpTreasuryScenarioCodeSchema = z.enum([
+  'PRUDENT',
+  'BASE',
+  'OPTIMISTIC',
+]);
+
+export const erpTreasuryEventSchema = z.object({
+  id: nonBlankStringSchema,
+  sourceType: z.enum([
+    'CUSTOMER_INVOICE',
+    'OPENING_RECEIVABLE',
+    'RECURRING_INVOICE',
+    'SUPPLIER_INVOICE',
+    'SUPPLIER_PAYMENT',
+    'OPENING_PAYABLE',
+    'PAYROLL',
+    'TAX',
+    'EXPENSE_NOTE',
+  ]),
+  direction: z.enum(['INFLOW', 'OUTFLOW']),
+  dueDate: civilDateSchema,
+  label: nonBlankStringSchema,
+  counterparty: nullableStringSchema,
+  amountCents: centsSchema,
+});
+
+const erpTreasuryAgingSchema = z.object({
+  totalCents: centsSchema,
+  notDueCents: centsSchema,
+  days1To30Cents: centsSchema,
+  days31To60Cents: centsSchema,
+  days61To90Cents: centsSchema,
+  over90DaysCents: centsSchema,
+});
+
+export const erpTreasuryForecastSchema = z.object({
+  asOf: civilDateSchema,
+  horizonEnd: civilDateSchema,
+  currency: z.literal('MAD'),
+  currentCashCents: signedCentsSchema,
+  dataQuality: z.object({
+    bankAccountCount: nonNegativeIntegerSchema,
+    confirmedBankAccountCount: nonNegativeIntegerSchema,
+    usesOpeningBalance: z.boolean(),
+    eventCount: nonNegativeIntegerSchema,
+  }),
+  aging: z.object({
+    receivables: erpTreasuryAgingSchema,
+    payables: erpTreasuryAgingSchema,
+  }),
+  scenarios: z.array(
+    z.object({
+      code: erpTreasuryScenarioCodeSchema,
+      label: nonBlankStringSchema,
+      assumptions: z.object({
+        inflowRateBasisPoints: nonNegativeIntegerSchema.max(10_000),
+        inflowDelayDays: nonNegativeIntegerSchema,
+        outflowRateBasisPoints: nonNegativeIntegerSchema.max(10_000),
+      }),
+      closingBalanceCents: signedCentsSchema,
+      minimumBalanceCents: signedCentsSchema,
+      firstNegativeWeek: positiveIntegerSchema.nullable(),
+      weeks: z.array(
+        z.object({
+          index: positiveIntegerSchema,
+          startDate: civilDateSchema,
+          endDate: civilDateSchema,
+          openingBalanceCents: signedCentsSchema,
+          inflowCents: centsSchema,
+          outflowCents: centsSchema,
+          netCashFlowCents: signedCentsSchema,
+          closingBalanceCents: signedCentsSchema,
+          eventCount: nonNegativeIntegerSchema,
+        }),
+      ),
+    }),
+  ),
+  events: z.array(erpTreasuryEventSchema),
+  alerts: z.array(
+    z.object({
+      code: nonBlankStringSchema,
+      severity: z.enum(['INFO', 'WARNING', 'CRITICAL']),
+      title: nonBlankStringSchema,
+      message: nonBlankStringSchema,
+      weekIndex: positiveIntegerSchema.nullable(),
+      amountCents: centsSchema,
+    }),
+  ),
+  actions: z.array(
+    z.object({
+      code: z.enum([
+        'REMIND_CUSTOMERS',
+        'PREPARE_SUPPLIER_PAYMENTS',
+        'RECONCILE_BANK',
+      ]),
+      label: nonBlankStringSchema,
+      description: nonBlankStringSchema,
+      priority: z.enum(['LOW', 'MEDIUM', 'HIGH']),
+      amountCents: centsSchema,
+    }),
+  ),
+  insights: z.array(nonBlankStringSchema),
+});
+
 const encodeRouteId = (id: string): string => {
   return encodeURIComponent(uuidSchema.parse(id));
 };
 
 export const erpMarocRouteIds = {
   context: 'context',
+  onboardingReadiness: 'onboarding.readiness',
+  onboardingOpenItems: 'onboarding.open-items',
+  onboardingOpenItemSettlementCandidates:
+    'onboarding.open-item.settlement-candidates',
+  onboardingOpenItemSettle: 'onboarding.open-item.settle',
+  onboardingReverseOpenItemSettlement:
+    'onboarding.open-item-settlement.reverse',
+  onboardingFinalizeOpenItemSettlementReversal:
+    'onboarding.open-item-settlement-reversal.finalize',
+  onboardingImportPreview: 'onboarding.import.preview',
+  onboardingImportApply: 'onboarding.import.apply',
   productsCollection: 'products.collection',
   productDetail: 'products.detail',
   tiersCollection: 'tiers.collection',
@@ -1384,6 +2740,15 @@ export const erpMarocRouteIds = {
   quoteSend: 'quotes.send',
   quoteAccept: 'quotes.accept',
   quoteReject: 'quotes.reject',
+  salesOrdersCollection: 'sales-orders.collection',
+  salesOrderFromQuote: 'sales-orders.fromQuote',
+  salesOrderDetail: 'sales-orders.detail',
+  salesOrderConfirm: 'sales-orders.confirm',
+  salesOrderReserve: 'sales-orders.reserve',
+  salesOrderPrepare: 'sales-orders.prepare',
+  salesOrderCancel: 'sales-orders.cancel',
+  salesOrderDeliveries: 'sales-orders.deliveries',
+  salesOrderDeliveryCancel: 'sales-orders.delivery.cancel',
   purchaseOrdersCollection: 'purchase-orders.collection',
   purchaseOrderDetail: 'purchase-orders.detail',
   purchaseOrderConfirm: 'purchase-orders.confirm',
@@ -1395,8 +2760,10 @@ export const erpMarocRouteIds = {
   supplierInvoiceCancel: 'supplier-invoices.cancel',
   supplierInvoicePaymentPreparations: 'supplier-invoices.paymentPreparations',
   supplierPaymentPreparationCancel: 'supplier-payment-preparations.cancel',
+  supplierPaymentPreparationExecute: 'supplier-payment-preparations.execute',
   invoicesCollection: 'invoices.collection',
   invoiceFromQuote: 'invoices.fromQuote',
+  invoiceFromSalesOrder: 'invoices.fromSalesOrder',
   invoiceDetail: 'invoices.detail',
   invoiceValidate: 'invoices.validate',
   invoiceSend: 'invoices.send',
@@ -1412,6 +2779,11 @@ export const erpMarocRouteIds = {
   creditNoteEligibleInvoices: 'credit-notes.eligibleInvoices',
   creditNoteAllocate: 'credit-notes.allocate',
   creditNoteCancel: 'credit-notes.cancel',
+  customerReturnsCollection: 'customer-returns.collection',
+  customerReturnEligibleLines: 'customer-returns.eligibleLines',
+  customerReturnDetail: 'customer-returns.detail',
+  customerReturnValidate: 'customer-returns.validate',
+  customerReturnCancel: 'customer-returns.cancel',
   remindersCollection: 'reminders.collection',
   remindersScan: 'reminders.scan',
   reminderDetail: 'reminders.detail',
@@ -1426,6 +2798,126 @@ export const erpMarocRouteIds = {
   accountingLettrageSuggestions: 'accounting.lettrage.suggestions',
   accountingLettrageMatch: 'accounting.lettrage.match',
   accountingLettrageUnmatch: 'accounting.lettrage.unmatch',
+  bankAccountsCollection: 'bank-accounts.collection',
+  bankAccountDetail: 'bank-accounts.detail',
+  bankStatementsCollection: 'bank-statements.collection',
+  bankStatementDetail: 'bank-statements.detail',
+  bankStatementConfirm: 'bank-statements.confirm',
+  bankStatementAssignBankAccount: 'bank-statements.assignBankAccount',
+  bankStatementClose: 'bank-statements.close',
+  bankStatementLineReconciliationCandidates:
+    'bank-statement-lines.reconciliationCandidates',
+  bankStatementLineReconcileSupplierPayment:
+    'bank-statement-lines.reconcileSupplierPayment',
+  bankStatementLineUnreconcileSupplierPayment:
+    'bank-statement-lines.unreconcileSupplierPayment',
+  bankStatementLineReconcileCustomerPayment:
+    'bank-statement-lines.reconcileCustomerPayment',
+  bankStatementLineUnreconcileCustomerPayment:
+    'bank-statement-lines.unreconcileCustomerPayment',
+  bankStatementLineReview: 'bank-statement-lines.review',
+  bankStatementLineUnreview: 'bank-statement-lines.unreview',
+  warehousesCollection: 'warehouses.collection',
+  inventoryLevels: 'inventory.levels',
+  inventoryMovements: 'inventory.movements',
+  inventoryGrossMargins: 'inventory.grossMargins',
+  inventoryAdjustments: 'inventory.adjustments',
+  inventoryTransfers: 'inventory.transfers',
+  inventoryCounts: 'inventory.counts',
+  inventoryCountValidate: 'inventory.count.validate',
+  inventoryCountCancel: 'inventory.count.cancel',
+  inventoryThresholds: 'inventory.thresholds',
+  inventoryReplenishmentSuggestions: 'inventory.replenishmentSuggestions',
+  fiscalDeclarations: 'fiscal.declarations',
+  fiscalTvaCalculate: 'fiscal.tva.calculate',
+  fiscalTvaProrata: 'fiscal.tva.prorata',
+  fiscalTvaProrataCalculate: 'fiscal.tva.prorata.calculate',
+  fiscalTvaProrataAnnual: 'fiscal.tva.prorata.annual',
+  fiscalTvaProrataAnnualPost: 'fiscal.tva.prorata.annual.post',
+  fiscalIsCalculate: 'fiscal.is.calculate',
+  fiscalDeclarationStatus: 'fiscal.declaration.status',
+  fiscalDeclarationSimpl: 'fiscal.declaration.simpl',
+  fiscalDeclarationAdc080f: 'fiscal.declaration.adc080f',
+  fiscalDeclarationIsXml: 'fiscal.declaration.is-xml',
+  fiscalDeclarationPayments: 'fiscal.declaration.payments',
+  fiscalDeclarationPaymentCandidates:
+    'fiscal.declaration.payment-candidates',
+  fiscalDeadlines: 'fiscal.deadlines',
+  fiscalDeadlinesSeed: 'fiscal.deadlines.seed',
+  fiscalDeadlineComplete: 'fiscal.deadline.complete',
+  complianceExercises: 'compliance.exercises',
+  complianceExerciseReview: 'compliance.exercise.review',
+  complianceReviewTask: 'compliance.review-task',
+  compliancePeriodClose: 'compliance.period.close',
+  compliancePeriodReopen: 'compliance.period.reopen',
+  complianceExerciseClose: 'compliance.exercise.close',
+  complianceExerciseStatements: 'compliance.exercise.statements',
+  complianceExerciseFec: 'compliance.exercise.fec',
+  complianceFecImport: 'compliance.fec.import',
+  payrollEmployees: 'payroll.employees',
+  payrollEmployeeDetail: 'payroll.employee.detail',
+  payrollEmployeeTerminate: 'payroll.employee.terminate',
+  payrollPayslips: 'payroll.payslips',
+  payrollPayslipGenerate: 'payroll.payslip.generate',
+  payrollPayslipValidate: 'payroll.payslip.validate',
+  payrollPayslipPay: 'payroll.payslip.pay',
+  payrollLeaves: 'payroll.leaves',
+  payrollLeaveDecision: 'payroll.leave.decision',
+  payrollLeaveBalances: 'payroll.leave-balances',
+  payrollLeaveBalanceUpdate: 'payroll.leave-balance.update',
+  payrollCnssExport: 'payroll.cnss.export',
+  payrollCnssBds: 'payroll.cnss.bds',
+  payrollPayslipPdf: 'payroll.payslip.pdf',
+  payrollEmployeeAttestation: 'payroll.employee.attestation',
+  payrollFinalSettlementPdf: 'payroll.employee.final-settlement.pdf',
+  payrollStatementPdf: 'payroll.statement.pdf',
+  documentsCollection: 'documents.collection',
+  documentDetail: 'documents.detail',
+  documentContent: 'documents.content',
+  documentOcrRetry: 'documents.ocr.retry',
+  documentOcrValidate: 'documents.ocr.validate',
+  documentCreateSupplierInvoice: 'documents.create-supplier-invoice',
+  expenseNotes: 'operations.expense-notes',
+  expenseNoteSubmit: 'operations.expense-note.submit',
+  expenseNoteDecision: 'operations.expense-note.decision',
+  analytics: 'operations.analytics',
+  analyticAllocations: 'operations.analytics.allocations',
+  budgets: 'operations.budgets',
+  budgetApprove: 'operations.budget.approve',
+  budgetVariance: 'operations.budget.variance',
+  recurringInvoices: 'operations.recurring-invoices',
+  recurringInvoicesRun: 'operations.recurring-invoices.run',
+  exchangeRates: 'operations.exchange-rates',
+  portalAccess: 'operations.portal-access',
+  portalAccessRevoke: 'operations.portal-access.revoke',
+  accountingAnomalies: 'operations.anomalies',
+  accountingAnomaliesScan: 'operations.anomalies.scan',
+  accountingAnomalyResolve: 'operations.anomaly.resolve',
+  liasseDefinitions: 'liasse.definitions',
+  liasseTables: 'liasse.tables',
+  liasseTable: 'liasse.table',
+  liasseRow: 'liasse.row',
+  liasseExport: 'liasse.export',
+  regulatorySubmissions: 'regulatory.submissions',
+  regulatorySubmissionValidation: 'regulatory.submission.validation',
+  portalAdminRequests: 'portal.admin.requests',
+  portalAdminComment: 'portal.admin.comment',
+  portalAdminRequestUpdate: 'portal.admin.request.update',
+  aiAccountingStatus: 'ai-accounting.status',
+  aiAccountingSuggestions: 'ai-accounting.suggestions',
+  aiAccountingRules: 'ai-accounting.rules',
+  aiAccountingRuleUpdate: 'ai-accounting.rule.update',
+  aiAccountingRuleDeactivate: 'ai-accounting.rule.deactivate',
+  aiAccountingCategorize: 'ai-accounting.categorize',
+  aiAccountingReconcile: 'ai-accounting.reconcile',
+  aiAccountingSuggestionReview: 'ai-accounting.suggestion.review',
+  aiAccountingSafeQuery: 'ai-accounting.safe-query',
+  aiAccountingConversations: 'ai-accounting.conversations',
+  aiAccountingAsk: 'ai-accounting.ask',
+  approvalMatrices: 'approvals.matrices',
+  approvalMatrixActive: 'approvals.matrix.active',
+  approvalRequests: 'approvals.requests',
+  approvalDecision: 'approvals.decision',
   marketingOverview: 'marketing.overview',
   marketingContactsCollection: 'marketing.contacts.collection',
   marketingContactsImportTiers: 'marketing.contacts.importTiers',
@@ -1442,6 +2934,20 @@ export const erpMarocRouteIds = {
 
 export const erpMarocUpstreamRoutes = {
   context: '/context',
+  onboarding: {
+    readiness: '/onboarding/readiness',
+    openItems: '/onboarding/open-items',
+    settlementCandidates: (id: string) =>
+      `/onboarding/open-items/${encodeRouteId(id)}/settlement-candidates`,
+    settle: (id: string) =>
+      `/onboarding/open-items/${encodeRouteId(id)}/settle`,
+    reverseOpenItemSettlement: (id: string) =>
+      `/onboarding/bank-statement-lines/${encodeRouteId(id)}/reverse-open-item-settlement`,
+    finalizeOpenItemSettlementReversal: (id: string) =>
+      `/onboarding/bank-statement-lines/${encodeRouteId(id)}/finalize-open-item-settlement-reversal`,
+    importPreview: '/onboarding/imports/preview',
+    importApply: '/onboarding/imports/apply',
+  },
   products: {
     collection: '/products',
     detail: (id: string) => `/products/${encodeRouteId(id)}`,
@@ -1458,6 +2964,19 @@ export const erpMarocUpstreamRoutes = {
     send: (id: string) => `/quotes/${encodeRouteId(id)}/send`,
     accept: (id: string) => `/quotes/${encodeRouteId(id)}/accept`,
     reject: (id: string) => `/quotes/${encodeRouteId(id)}/reject`,
+  },
+  salesOrders: {
+    collection: '/sales-orders',
+    fromQuote: (quoteId: string) =>
+      `/sales-orders/from-quote/${encodeRouteId(quoteId)}`,
+    detail: (id: string) => `/sales-orders/${encodeRouteId(id)}`,
+    confirm: (id: string) => `/sales-orders/${encodeRouteId(id)}/confirm`,
+    reserve: (id: string) => `/sales-orders/${encodeRouteId(id)}/reservations`,
+    prepare: (id: string) => `/sales-orders/${encodeRouteId(id)}/preparation`,
+    cancel: (id: string) => `/sales-orders/${encodeRouteId(id)}/cancel`,
+    deliveries: (id: string) => `/sales-orders/${encodeRouteId(id)}/deliveries`,
+    cancelDelivery: (id: string, deliveryId: string) =>
+      `/sales-orders/${encodeRouteId(id)}/deliveries/${encodeRouteId(deliveryId)}/cancel`,
   },
   purchaseOrders: {
     collection: '/purchase-orders',
@@ -1478,11 +2997,15 @@ export const erpMarocUpstreamRoutes = {
   supplierPaymentPreparations: {
     cancel: (id: string) =>
       `/supplier-payment-preparations/${encodeRouteId(id)}/cancel`,
+    execute: (id: string) =>
+      `/supplier-payment-preparations/${encodeRouteId(id)}/execute`,
   },
   invoices: {
     collection: '/invoices',
     fromQuote: (quoteId: string) =>
       `/invoices/from-quote/${encodeRouteId(quoteId)}`,
+    fromSalesOrder: (salesOrderId: string) =>
+      `/invoices/from-sales-order/${encodeRouteId(salesOrderId)}`,
     detail: (id: string) => `/invoices/${encodeRouteId(id)}`,
     validate: (id: string) => `/invoices/${encodeRouteId(id)}/validate`,
     send: (id: string) => `/invoices/${encodeRouteId(id)}/send`,
@@ -1505,6 +3028,13 @@ export const erpMarocUpstreamRoutes = {
     allocate: (id: string) => `/credit-notes/${encodeRouteId(id)}/allocate`,
     cancel: (id: string) => `/credit-notes/${encodeRouteId(id)}/cancel`,
   },
+  customerReturns: {
+    collection: '/customer-returns',
+    eligibleLines: '/customer-returns/eligible-lines',
+    detail: (id: string) => `/customer-returns/${encodeRouteId(id)}`,
+    validate: (id: string) => `/customer-returns/${encodeRouteId(id)}/validate`,
+    cancel: (id: string) => `/customer-returns/${encodeRouteId(id)}/cancel`,
+  },
   reminders: {
     collection: '/reminders',
     scan: '/reminders/scan',
@@ -1523,6 +3053,196 @@ export const erpMarocUpstreamRoutes = {
     lettrageSuggestions: '/accounting/lettrage/suggestions',
     lettrageMatch: '/accounting/lettrage/match',
     lettrageUnmatch: '/accounting/lettrage/unmatch',
+  },
+  bankAccounts: {
+    collection: '/bank-accounts',
+    detail: (id: string) => `/bank-accounts/${encodeRouteId(id)}`,
+  },
+  bankStatements: {
+    collection: '/bank-statements',
+    detail: (id: string) => `/bank-statements/${encodeRouteId(id)}`,
+    confirm: (id: string) => `/bank-statements/${encodeRouteId(id)}/confirm`,
+    assignBankAccount: (id: string) =>
+      `/bank-statements/${encodeRouteId(id)}/bank-account`,
+    close: (id: string) => `/bank-statements/${encodeRouteId(id)}/close`,
+  },
+  bankStatementLines: {
+    reconciliationCandidates: (id: string) =>
+      `/bank-statement-lines/${encodeRouteId(id)}/reconciliation-candidates`,
+    reconcileSupplierPayment: (id: string) =>
+      `/bank-statement-lines/${encodeRouteId(id)}/reconcile-supplier-payment`,
+    unreconcileSupplierPayment: (id: string) =>
+      `/bank-statement-lines/${encodeRouteId(id)}/unreconcile-supplier-payment`,
+    reconcileCustomerPayment: (id: string) =>
+      `/bank-statement-lines/${encodeRouteId(id)}/reconcile-customer-payment`,
+    unreconcileCustomerPayment: (id: string) =>
+      `/bank-statement-lines/${encodeRouteId(id)}/unreconcile-customer-payment`,
+    review: (id: string) => `/bank-statement-lines/${encodeRouteId(id)}/review`,
+    unreview: (id: string) =>
+      `/bank-statement-lines/${encodeRouteId(id)}/unreview`,
+  },
+  warehouses: {
+    collection: '/warehouses',
+  },
+  inventory: {
+    levels: '/inventory/levels',
+    movements: '/inventory/movements',
+    grossMargins: '/inventory/gross-margins',
+    adjustments: '/inventory/adjustments',
+    transfers: '/inventory/transfers',
+    counts: '/inventory/counts',
+    countValidate: (id: string) =>
+      `/inventory/counts/${encodeRouteId(id)}/validate`,
+    countCancel: (id: string) =>
+      `/inventory/counts/${encodeRouteId(id)}/cancel`,
+    thresholds: '/inventory/thresholds',
+    replenishmentSuggestions: '/inventory/replenishment-suggestions',
+  },
+  fiscal: {
+    declarations: '/fiscal/declarations',
+    calculateTva: '/fiscal/tva/calculate',
+    tvaProrata: '/fiscal/tva/prorata',
+    calculateTvaProrata: '/fiscal/tva/prorata/calculate',
+    annualTvaProrata: '/fiscal/tva/prorata/annual',
+    postAnnualTvaProrata: '/fiscal/tva/prorata/annual/post',
+    calculateIs: '/fiscal/is/calculate',
+    declarationStatus: (id: string) =>
+      `/fiscal/declarations/${encodeRouteId(id)}/status`,
+    declarationSimpl: (id: string) =>
+      `/fiscal/declarations/${encodeRouteId(id)}/simpl`,
+    declarationAdc080f: (id: string) =>
+      `/fiscal/declarations/${encodeRouteId(id)}/adc080f`,
+    declarationIsXml: (id: string) =>
+      `/fiscal/declarations/${encodeRouteId(id)}/is-xml`,
+    declarationPayments: (id: string) =>
+      `/fiscal/declarations/${encodeRouteId(id)}/payments`,
+    declarationPaymentCandidates: (id: string) =>
+      `/fiscal/declarations/${encodeRouteId(id)}/payment-candidates`,
+    deadlines: '/fiscal/deadlines',
+    seedDeadlines: '/fiscal/deadlines/seed',
+    completeDeadline: (id: string) =>
+      `/fiscal/deadlines/${encodeRouteId(id)}/complete`,
+  },
+  compliance: {
+    exercises: '/accounting-compliance/exercises',
+    initializeReview: (id: string) =>
+      `/accounting-compliance/exercises/${encodeRouteId(id)}/review`,
+    reviewTask: (id: string) =>
+      `/accounting-compliance/review-tasks/${encodeRouteId(id)}`,
+    closePeriod: (id: string) =>
+      `/accounting-compliance/periods/${encodeRouteId(id)}/close`,
+    reopenPeriod: (id: string) =>
+      `/accounting-compliance/periods/${encodeRouteId(id)}/reopen`,
+    closeExercise: (id: string) =>
+      `/accounting-compliance/exercises/${encodeRouteId(id)}/close`,
+    statements: (id: string) =>
+      `/accounting-compliance/exercises/${encodeRouteId(id)}/statements`,
+    fec: (id: string) =>
+      `/accounting-compliance/exercises/${encodeRouteId(id)}/fec`,
+    importFec: '/accounting-compliance/fec/import',
+  },
+  payroll: {
+    employees: '/payroll/employees',
+    employee: (id: string) => `/payroll/employees/${encodeRouteId(id)}`,
+    terminateEmployee: (id: string) =>
+      `/payroll/employees/${encodeRouteId(id)}/terminate`,
+    payslips: '/payroll/payslips',
+    generatePayslip: '/payroll/payslips/generate',
+    validatePayslip: (id: string) =>
+      `/payroll/payslips/${encodeRouteId(id)}/validate`,
+    payPayslip: (id: string) => `/payroll/payslips/${encodeRouteId(id)}/pay`,
+    leaves: '/payroll/leaves',
+    decideLeave: (id: string) =>
+      `/payroll/leaves/${encodeRouteId(id)}/decision`,
+    leaveBalances: '/payroll/leave-balances',
+    updateLeaveBalance: (id: string, year: string) =>
+      `/payroll/employees/${encodeRouteId(id)}/leave-balances/${encodeURIComponent(year)}`,
+    cnssExport: '/payroll/cnss/export',
+    cnssBds: '/payroll/cnss/bds',
+    payslipPdf: (id: string) => `/payroll/payslips/${encodeRouteId(id)}/pdf`,
+    employeeAttestation: (id: string) =>
+      `/payroll/employees/${encodeRouteId(id)}/attestation`,
+    finalSettlementPdf: (id: string) =>
+      `/payroll/employees/${encodeRouteId(id)}/final-settlement/pdf`,
+    statementPdf: (periodKey: string) =>
+      `/payroll/statements/${encodeURIComponent(periodKey)}/pdf`,
+  },
+  documents: {
+    collection: '/documents',
+    detail: (id: string) => `/documents/${encodeRouteId(id)}`,
+    content: (id: string) => `/documents/${encodeRouteId(id)}/content`,
+    retryOcr: (id: string) => `/documents/${encodeRouteId(id)}/ocr/retry`,
+    validateOcr: (id: string) => `/documents/${encodeRouteId(id)}/ocr/validate`,
+    createSupplierInvoice: (id: string) =>
+      `/documents/${encodeRouteId(id)}/create-supplier-invoice`,
+  },
+  operations: {
+    expenseNotes: '/operations/expense-notes',
+    submitExpenseNote: (id: string) =>
+      `/operations/expense-notes/${encodeRouteId(id)}/submit`,
+    decideExpenseNote: (id: string) =>
+      `/operations/expense-notes/${encodeRouteId(id)}/decision`,
+    analytics: '/operations/analytics',
+    analyticAllocations: '/operations/analytics/allocations',
+    budgets: '/operations/budgets',
+    approveBudget: (id: string) =>
+      `/operations/budgets/${encodeRouteId(id)}/approve`,
+    budgetVariance: (id: string) =>
+      `/operations/budgets/${encodeRouteId(id)}/variance`,
+    recurringInvoices: '/operations/recurring-invoices',
+    runRecurringInvoices: '/operations/recurring-invoices/run',
+    exchangeRates: '/operations/exchange-rates',
+    portalAccess: '/operations/portal-access',
+    revokePortalAccess: (id: string) =>
+      `/operations/portal-access/${encodeRouteId(id)}/revoke`,
+    anomalies: '/operations/anomalies',
+    treasuryForecast: '/operations/treasury-forecast',
+    scanAnomalies: '/operations/anomalies/scan',
+    resolveAnomaly: (id: string) =>
+      `/operations/anomalies/${encodeRouteId(id)}/resolve`,
+  },
+  liasse: {
+    definitions: '/liasse/definitions',
+    tables: (exerciseId: string) =>
+      `/liasse/exercises/${encodeRouteId(exerciseId)}/tables`,
+    table: (exerciseId: string, tableCode: string) =>
+      `/liasse/exercises/${encodeRouteId(exerciseId)}/tables/${encodeURIComponent(tableCode)}`,
+    row: (exerciseId: string, tableCode: string, rowCode: string) =>
+      `/liasse/exercises/${encodeRouteId(exerciseId)}/tables/${encodeURIComponent(tableCode)}/rows/${encodeURIComponent(rowCode)}`,
+    export: (exerciseId: string) =>
+      `/liasse/exercises/${encodeRouteId(exerciseId)}/export`,
+    submissions: '/liasse/submissions',
+    validateSubmission: (id: string) =>
+      `/liasse/submissions/${encodeRouteId(id)}/external-validation`,
+  },
+  portalAdmin: {
+    requests: '/portal-admin/requests',
+    comment: (id: string) =>
+      `/portal-admin/requests/${encodeRouteId(id)}/comments`,
+    request: (id: string) => `/portal-admin/requests/${encodeRouteId(id)}`,
+  },
+  aiAccounting: {
+    status: '/ai-accounting/status',
+    suggestions: '/ai-accounting/suggestions',
+    rules: '/ai-accounting/rules',
+    rule: (id: string) => `/ai-accounting/rules/${encodeRouteId(id)}`,
+    deactivateRule: (id: string) =>
+      `/ai-accounting/rules/${encodeRouteId(id)}/deactivate`,
+    categorize: '/ai-accounting/categorize',
+    reconcile: '/ai-accounting/reconcile',
+    reviewSuggestion: (id: string) =>
+      `/ai-accounting/suggestions/${encodeRouteId(id)}`,
+    safeQuery: '/ai-accounting/safe-query',
+    conversations: '/ai-accounting/conversations',
+    ask: '/ai-accounting/ask',
+  },
+  approvals: {
+    matrices: '/approvals/matrices',
+    matrixActive: (id: string) =>
+      `/approvals/matrices/${encodeRouteId(id)}/active`,
+    requests: '/approvals/requests',
+    decision: (id: string) =>
+      `/approvals/requests/${encodeRouteId(id)}/decision`,
   },
   marketing: {
     overview: '/marketing/overview',
@@ -1557,6 +3277,15 @@ export type ErpTierList = z.infer<typeof erpTierListSchema>;
 export type ErpQuoteLine = z.infer<typeof erpQuoteLineSchema>;
 export type ErpQuote = z.infer<typeof erpQuoteSchema>;
 export type ErpQuoteList = z.infer<typeof erpQuoteListSchema>;
+export type ErpSalesOrderAllocation = z.infer<
+  typeof erpSalesOrderAllocationSchema
+>;
+export type ErpSalesOrderLine = z.infer<typeof erpSalesOrderLineSchema>;
+export type ErpSalesOrder = z.infer<typeof erpSalesOrderSchema>;
+export type ErpSalesOrderList = z.infer<typeof erpSalesOrderListSchema>;
+export type ErpDeliveryNoteLine = z.infer<typeof erpDeliveryNoteLineSchema>;
+export type ErpDeliveryNote = z.infer<typeof erpDeliveryNoteSchema>;
+export type ErpDeliveryNoteList = z.infer<typeof erpDeliveryNoteListSchema>;
 export type ErpPurchaseOrderLine = z.infer<typeof erpPurchaseOrderLineSchema>;
 export type ErpPurchaseOrder = z.infer<typeof erpPurchaseOrderSchema>;
 export type ErpPurchaseOrderList = z.infer<typeof erpPurchaseOrderListSchema>;
@@ -1598,6 +3327,15 @@ export type ErpCreditNoteLine = z.infer<typeof erpCreditNoteLineSchema>;
 export type ErpCreditAllocation = z.infer<typeof erpCreditAllocationSchema>;
 export type ErpCreditNote = z.infer<typeof erpCreditNoteSchema>;
 export type ErpCreditNotePage = z.infer<typeof erpCreditNotePageSchema>;
+export type ErpCustomerReturnLine = z.infer<typeof erpCustomerReturnLineSchema>;
+export type ErpCustomerReturn = z.infer<typeof erpCustomerReturnSchema>;
+export type ErpCustomerReturnList = z.infer<typeof erpCustomerReturnListSchema>;
+export type ErpCustomerReturnEligibleLine = z.infer<
+  typeof erpCustomerReturnEligibleLineSchema
+>;
+export type ErpCustomerReturnEligibleLineList = z.infer<
+  typeof erpCustomerReturnEligibleLineListSchema
+>;
 export type ErpReminder = z.infer<typeof erpReminderSchema>;
 export type ErpReminderPage = z.infer<typeof erpReminderPageSchema>;
 export type ErpReminderScanResult = z.infer<typeof erpReminderScanResultSchema>;
@@ -1618,5 +3356,71 @@ export type ErpLettrageSuggestion = z.infer<typeof erpLettrageSuggestionSchema>;
 export type ErpLettrageSuggestions = z.infer<
   typeof erpLettrageSuggestionsSchema
 >;
+export type ErpBankStatementStatus = z.infer<
+  typeof erpBankStatementStatusSchema
+>;
+export type ErpBankAccount = z.infer<typeof erpBankAccountSchema>;
+export type ErpBankAccountList = z.infer<typeof erpBankAccountListSchema>;
+export type ErpBankReconciliation = z.infer<typeof erpBankReconciliationSchema>;
+export type ErpBankReconciliationCandidate = z.infer<
+  typeof erpBankReconciliationCandidateSchema
+>;
+export type ErpBankReconciliationCandidates = z.infer<
+  typeof erpBankReconciliationCandidatesSchema
+>;
+export type ErpBankStatementLine = z.infer<typeof erpBankStatementLineSchema>;
+export type ErpBankStatement = z.infer<typeof erpBankStatementSchema>;
+export type ErpBankStatementDetail = z.infer<
+  typeof erpBankStatementDetailSchema
+>;
+export type ErpWarehouse = z.infer<typeof erpWarehouseSchema>;
+export type ErpWarehouseList = z.infer<typeof erpWarehouseListSchema>;
+export type ErpStockLevel = z.infer<typeof erpStockLevelSchema>;
+export type ErpStockLevelList = z.infer<typeof erpStockLevelListSchema>;
+export type ErpStockMovement = z.infer<typeof erpStockMovementSchema>;
+export type ErpStockMovementList = z.infer<typeof erpStockMovementListSchema>;
+export type ErpGrossMarginDelivery = z.infer<
+  typeof erpGrossMarginDeliverySchema
+>;
+export type ErpGrossMarginReport = z.infer<typeof erpGrossMarginReportSchema>;
+export type ErpInventoryCount = z.infer<typeof erpInventoryCountSchema>;
+export type ErpInventoryCountList = z.infer<typeof erpInventoryCountListSchema>;
+export type ErpInventoryThreshold = z.infer<typeof erpInventoryThresholdSchema>;
+export type ErpInventoryThresholdList = z.infer<
+  typeof erpInventoryThresholdListSchema
+>;
+export type ErpReplenishmentSuggestion = z.infer<
+  typeof erpReplenishmentSuggestionSchema
+>;
+export type ErpReplenishmentSuggestionList = z.infer<
+  typeof erpReplenishmentSuggestionListSchema
+>;
+export type ErpTaxDeclaration = z.infer<typeof erpTaxDeclarationSchema>;
+export type ErpFiscalDeadline = z.infer<typeof erpFiscalDeadlineSchema>;
+export type ErpAccountingPeriod = z.infer<typeof erpAccountingPeriodSchema>;
+export type ErpAccountingReviewTask = z.infer<
+  typeof erpAccountingReviewTaskSchema
+>;
+export type ErpExercise = z.infer<typeof erpExerciseSchema>;
+export type ErpFinancialStatements = z.infer<
+  typeof erpFinancialStatementsSchema
+>;
+export type ErpEmployee = z.infer<typeof erpEmployeeSchema>;
+export type ErpPayslip = z.infer<typeof erpPayslipSchema>;
+export type ErpLeaveRequest = z.infer<typeof erpLeaveRequestSchema>;
+export type ErpLeaveBalance = z.infer<typeof erpLeaveBalanceSchema>;
+export type ErpDocument = z.infer<typeof erpDocumentSchema>;
+export type ErpExpenseNote = z.infer<typeof erpExpenseNoteSchema>;
+export type ErpAnalyticAxis = z.infer<typeof erpAnalyticAxisSchema>;
+export type ErpBudget = z.infer<typeof erpBudgetSchema>;
+export type ErpRecurringInvoice = z.infer<typeof erpRecurringInvoiceSchema>;
+export type ErpExchangeRate = z.infer<typeof erpExchangeRateSchema>;
+export type ErpPortalAccess = z.infer<typeof erpPortalAccessSchema>;
+export type ErpAccountingAnomaly = z.infer<typeof erpAccountingAnomalySchema>;
+export type ErpTreasuryScenarioCode = z.infer<
+  typeof erpTreasuryScenarioCodeSchema
+>;
+export type ErpTreasuryEvent = z.infer<typeof erpTreasuryEventSchema>;
+export type ErpTreasuryForecast = z.infer<typeof erpTreasuryForecastSchema>;
 export type ErpMarocRouteId =
   (typeof erpMarocRouteIds)[keyof typeof erpMarocRouteIds];
