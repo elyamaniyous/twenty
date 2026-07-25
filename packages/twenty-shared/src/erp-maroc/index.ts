@@ -156,3 +156,31 @@ export {
   erpMarocRouteIds,
   erpMarocUpstreamRoutes,
 } from './erp-maroc-contracts';
+export type {
+  MarketingContact,
+  MarketingSegment,
+  MarketingCampaign,
+  MarketingAutomation,
+  MarketingOverview,
+} from './marketing-contracts';
+export {
+  marketingConsentStatusSchema,
+  marketingLifecycleStageSchema,
+  marketingSegmentStatusSchema,
+  marketingCampaignStatusSchema,
+  marketingAutomationStatusSchema,
+  marketingAutomationTriggerSchema,
+  marketingAutomationRunStatusSchema,
+  marketingContactSchema,
+  marketingContactListSchema,
+  marketingSegmentSchema,
+  marketingSegmentListSchema,
+  marketingCampaignSchema,
+  marketingCampaignListSchema,
+  marketingAutomationSchema,
+  marketingAutomationListSchema,
+  marketingAutomationRunSchema,
+  marketingOverviewSchema,
+  marketingTierImportResultSchema,
+  marketingSegmentSyncResultSchema,
+} from './marketing-contracts';

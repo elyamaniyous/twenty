@@ -194,6 +194,8 @@ export const erpContextSchema = z.object({
     manageCreditNotes: z.boolean(),
     allocateCustomerCredit: z.boolean(),
     manageSupplierAccounting: z.boolean(),
+    manageInventory: z.boolean(),
+    manageMarketing: z.boolean(),
   }),
   features: z.object({
     salesUi: z.boolean(),
@@ -202,6 +204,7 @@ export const erpContextSchema = z.object({
     invoiceEmail: z.boolean(),
     reminderManagement: z.boolean(),
     reminderDelivery: z.boolean(),
+    marketingAutomation: z.boolean(),
     whatsappDelivery: z.literal(false),
   }),
 });
@@ -1423,6 +1426,18 @@ export const erpMarocRouteIds = {
   accountingLettrageSuggestions: 'accounting.lettrage.suggestions',
   accountingLettrageMatch: 'accounting.lettrage.match',
   accountingLettrageUnmatch: 'accounting.lettrage.unmatch',
+  marketingOverview: 'marketing.overview',
+  marketingContactsCollection: 'marketing.contacts.collection',
+  marketingContactsImportTiers: 'marketing.contacts.importTiers',
+  marketingContactConsent: 'marketing.contacts.consent',
+  marketingSegmentsCollection: 'marketing.segments.collection',
+  marketingSegmentSync: 'marketing.segments.sync',
+  marketingCampaignsCollection: 'marketing.campaigns.collection',
+  marketingCampaignSend: 'marketing.campaigns.send',
+  marketingCampaignRefresh: 'marketing.campaigns.refresh',
+  marketingAutomationsCollection: 'marketing.automations.collection',
+  marketingAutomationActivate: 'marketing.automations.activate',
+  marketingAutomationPause: 'marketing.automations.pause',
 } as const;
 
 export const erpMarocUpstreamRoutes = {
@@ -1508,6 +1523,26 @@ export const erpMarocUpstreamRoutes = {
     lettrageSuggestions: '/accounting/lettrage/suggestions',
     lettrageMatch: '/accounting/lettrage/match',
     lettrageUnmatch: '/accounting/lettrage/unmatch',
+  },
+  marketing: {
+    overview: '/marketing/overview',
+    contacts: '/marketing/contacts',
+    importTiers: '/marketing/contacts/import-tiers',
+    contactConsent: (id: string) =>
+      `/marketing/contacts/${encodeRouteId(id)}/consent`,
+    segments: '/marketing/segments',
+    segmentSync: (id: string) =>
+      `/marketing/segments/${encodeRouteId(id)}/sync`,
+    campaigns: '/marketing/campaigns',
+    campaignSend: (id: string) =>
+      `/marketing/campaigns/${encodeRouteId(id)}/send`,
+    campaignRefresh: (id: string) =>
+      `/marketing/campaigns/${encodeRouteId(id)}/refresh`,
+    automations: '/marketing/automations',
+    automationActivate: (id: string) =>
+      `/marketing/automations/${encodeRouteId(id)}/activate`,
+    automationPause: (id: string) =>
+      `/marketing/automations/${encodeRouteId(id)}/pause`,
   },
 } as const;
 

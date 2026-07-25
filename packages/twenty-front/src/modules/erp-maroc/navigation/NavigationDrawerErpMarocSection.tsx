@@ -13,6 +13,7 @@ import {
   IconFileText,
   IconListDetails,
   IconLink,
+  IconMail,
   IconNotes,
   IconUsers,
   type IconComponent,
@@ -108,6 +109,12 @@ export const NavigationDrawerErpMarocSection = () => {
       path: erpMarocPaths.reminders,
       activePaths: [erpMarocPaths.reminders],
       Icon: IconBell,
+    },
+    {
+      label: t`Marketing`,
+      path: erpMarocPaths.marketing,
+      activePaths: [erpMarocPaths.marketing],
+      Icon: IconMail,
     },
     {
       label: t`Écritures`,

@@ -142,6 +142,12 @@ const ErpMarocRemindersPage = lazy(() =>
   })),
 );
 
+const ErpMarketingPage = lazy(() =>
+  import('~/pages/erp-maroc/marketing/ErpMarketingPage').then((module) => ({
+    default: module.ErpMarketingPage,
+  })),
+);
+
 const ErpEntriesPage = lazy(() =>
   import('~/pages/erp-maroc/accounting/ErpEntriesPage').then((module) => ({
     default: module.ErpEntriesPage,
@@ -573,6 +579,14 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpMarocRemindersPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.marketing}
+                element={
+                  <LazyRoute>
+                    <ErpMarketingPage />
                   </LazyRoute>
                 }
               />
