@@ -58,6 +58,7 @@ export const marketingEventTypeSchema = z.enum([
   'PAGE_VISITED',
   'EMAIL_OPENED',
   'EMAIL_CLICKED',
+  'EMAIL_BOUNCED',
   'OPPORTUNITY_CREATED',
   'PURCHASE_COMPLETED',
   'UNSUBSCRIBED',

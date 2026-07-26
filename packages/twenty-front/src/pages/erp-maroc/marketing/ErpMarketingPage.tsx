@@ -291,6 +291,7 @@ const eventTypeLabels: Record<MarketingEvent['eventType'], string> = {
   PAGE_VISITED: 'Page visitée',
   EMAIL_OPENED: 'Email ouvert',
   EMAIL_CLICKED: 'Lien cliqué',
+  EMAIL_BOUNCED: 'Email en rebond',
   OPPORTUNITY_CREATED: 'Opportunité créée',
   PURCHASE_COMPLETED: 'Achat réalisé',
   UNSUBSCRIBED: 'Désinscription',
