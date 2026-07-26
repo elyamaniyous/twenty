@@ -191,7 +191,7 @@ export const marketingEventSchema = z.object({
   pointsApplied: z.number().int(),
   scoreBefore: z.number().int(),
   scoreAfter: z.number().int(),
-  metadata: z.record(z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
   occurredAt: instantSchema,
   triggeredByTwentyUserId: z.string(),
   createdAt: instantSchema,
