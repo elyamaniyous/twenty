@@ -2840,8 +2840,7 @@ export const erpMarocRouteIds = {
   fiscalDeclarationAdc080f: 'fiscal.declaration.adc080f',
   fiscalDeclarationIsXml: 'fiscal.declaration.is-xml',
   fiscalDeclarationPayments: 'fiscal.declaration.payments',
-  fiscalDeclarationPaymentCandidates:
-    'fiscal.declaration.payment-candidates',
+  fiscalDeclarationPaymentCandidates: 'fiscal.declaration.payment-candidates',
   fiscalDeadlines: 'fiscal.deadlines',
   fiscalDeadlinesSeed: 'fiscal.deadlines.seed',
   fiscalDeadlineComplete: 'fiscal.deadline.complete',
@@ -2930,6 +2929,9 @@ export const erpMarocRouteIds = {
   marketingAutomationsCollection: 'marketing.automations.collection',
   marketingAutomationActivate: 'marketing.automations.activate',
   marketingAutomationPause: 'marketing.automations.pause',
+  marketingScoringRulesCollection: 'marketing.scoringRules.collection',
+  marketingScoringRuleToggle: 'marketing.scoringRules.toggle',
+  marketingEventsCollection: 'marketing.events.collection',
 } as const;
 
 export const erpMarocUpstreamRoutes = {
@@ -3263,6 +3265,10 @@ export const erpMarocUpstreamRoutes = {
       `/marketing/automations/${encodeRouteId(id)}/activate`,
     automationPause: (id: string) =>
       `/marketing/automations/${encodeRouteId(id)}/pause`,
+    scoringRules: '/marketing/scoring-rules',
+    scoringRuleToggle: (id: string) =>
+      `/marketing/scoring-rules/${encodeRouteId(id)}/toggle`,
+    events: '/marketing/events',
   },
 } as const;
 

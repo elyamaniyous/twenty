@@ -328,6 +328,8 @@ export type {
   MarketingSegment,
   MarketingCampaign,
   MarketingAutomation,
+  MarketingScoringRule,
+  MarketingEvent,
   MarketingOverview,
 } from './marketing-contracts';
 export {
@@ -338,6 +340,7 @@ export {
   marketingAutomationStatusSchema,
   marketingAutomationTriggerSchema,
   marketingAutomationRunStatusSchema,
+  marketingEventTypeSchema,
   marketingContactSchema,
   marketingContactListSchema,
   marketingSegmentSchema,
@@ -347,6 +350,10 @@ export {
   marketingAutomationSchema,
   marketingAutomationListSchema,
   marketingAutomationRunSchema,
+  marketingScoringRuleSchema,
+  marketingScoringRuleListSchema,
+  marketingEventSchema,
+  marketingEventListSchema,
   marketingOverviewSchema,
   marketingTierImportResultSchema,
   marketingSegmentSyncResultSchema,

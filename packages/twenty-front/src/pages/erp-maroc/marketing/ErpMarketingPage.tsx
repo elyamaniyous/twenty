@@ -25,7 +25,10 @@ import {
   marketingCampaignSchema,
   marketingContactListSchema,
   marketingContactSchema,
+  marketingEventListSchema,
   marketingOverviewSchema,
+  marketingScoringRuleListSchema,
+  marketingScoringRuleSchema,
   marketingSegmentListSchema,
   marketingSegmentSchema,
   marketingSegmentSyncResultSchema,
@@ -33,7 +36,9 @@ import {
   type MarketingAutomation,
   type MarketingCampaign,
   type MarketingContact,
+  type MarketingEvent,
   type MarketingOverview,
+  type MarketingScoringRule,
   type MarketingSegment,
 } from 'twenty-shared/erp-maroc';
 import {
@@ -49,8 +54,14 @@ import {
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
-type View = 'contacts' | 'segments' | 'campaigns' | 'automations';
-type Drawer = Exclude<View, 'contacts'> | null;
+type View =
+  | 'contacts'
+  | 'segments'
+  | 'campaigns'
+  | 'automations'
+  | 'scoring'
+  | 'events';
+type Drawer = Exclude<View, 'contacts' | 'events'> | null;
 type PendingConfirmation =
   | { kind: 'contact'; contact: MarketingContact; optIn: boolean }
   | { kind: 'campaign'; campaign: MarketingCampaign }
@@ -65,7 +76,10 @@ const EMPTY_OVERVIEW: MarketingOverview = {
     segments: 0,
     campaigns: 0,
     activeAutomations: 0,
+    activeScoringRules: 0,
+    events30d: 0,
   },
+  averageScore: 0,
   recentRuns: [],
 };
 
@@ -73,7 +87,7 @@ const StyledMetrics = styled.section`
   border-bottom: 1px solid ${themeCssVariables.border.color.light};
   display: grid;
   flex: 0 0 auto;
-  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  grid-template-columns: repeat(8, minmax(120px, 1fr));
   overflow-x: auto;
 `;
 
@@ -271,6 +285,17 @@ const automationStatus: Record<
   ARCHIVED: { label: 'Archivée', tone: 'neutral' },
 };
 
+const eventTypeLabels: Record<MarketingEvent['eventType'], string> = {
+  CONTACT_OPTED_IN: 'Consentement',
+  FORM_SUBMITTED: 'Formulaire envoyé',
+  PAGE_VISITED: 'Page visitée',
+  EMAIL_OPENED: 'Email ouvert',
+  EMAIL_CLICKED: 'Lien cliqué',
+  OPPORTUNITY_CREATED: 'Opportunité créée',
+  PURCHASE_COMPLETED: 'Achat réalisé',
+  UNSUBSCRIBED: 'Désinscription',
+};
+
 export const ErpMarketingPage = () => {
   const { client, context } = useErpMarocContext();
   const formRef = useRef<HTMLFormElement>(null);
@@ -282,6 +307,8 @@ export const ErpMarketingPage = () => {
   const [segments, setSegments] = useState<MarketingSegment[]>([]);
   const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
   const [automations, setAutomations] = useState<MarketingAutomation[]>([]);
+  const [scoringRules, setScoringRules] = useState<MarketingScoringRule[]>([]);
+  const [events, setEvents] = useState<MarketingEvent[]>([]);
   const [pending, setPending] = useState<PendingConfirmation>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -290,6 +317,8 @@ export const ErpMarketingPage = () => {
     name: '',
     description: '',
     lifecycleStage: '',
+    minScore: '',
+    maxScore: '',
   });
   const [campaignForm, setCampaignForm] = useState({
     segmentId: '',
@@ -302,9 +331,16 @@ export const ErpMarketingPage = () => {
   const [automationForm, setAutomationForm] = useState({
     segmentId: '',
     name: '',
+    trigger: 'CONTACT_OPTED_IN',
+    minimumScore: '',
     emailSubject: 'Bienvenue chez Zowka',
     emailHtmlContent:
       '<h1>Bienvenue</h1><p>Merci pour votre inscription à nos communications.</p>',
+  });
+  const [scoringForm, setScoringForm] = useState({
+    name: '',
+    eventType: 'FORM_SUBMITTED',
+    points: '10',
   });
 
   const canManage =
@@ -320,6 +356,8 @@ export const ErpMarketingPage = () => {
         nextSegments,
         nextCampaigns,
         nextAutomations,
+        nextScoringRules,
+        nextEvents,
       ] = await Promise.all([
         client.request({
           method: 'GET',
@@ -346,12 +384,24 @@ export const ErpMarketingPage = () => {
           path: '/marketing/automations',
           schema: marketingAutomationListSchema,
         }),
+        client.request({
+          method: 'GET',
+          path: '/marketing/scoring-rules',
+          schema: marketingScoringRuleListSchema,
+        }),
+        client.request({
+          method: 'GET',
+          path: '/marketing/events',
+          schema: marketingEventListSchema,
+        }),
       ]);
       setOverview(nextOverview);
       setContacts(nextContacts);
       setSegments(nextSegments);
       setCampaigns(nextCampaigns);
       setAutomations(nextAutomations);
+      setScoringRules(nextScoringRules);
+      setEvents(nextEvents);
       setLoadState('ready');
     } catch {
       setLoadState('error');
@@ -413,6 +463,14 @@ export const ErpMarketingPage = () => {
                 name: segmentForm.name,
                 description: segmentForm.description || null,
                 lifecycleStage: segmentForm.lifecycleStage || null,
+                minScore:
+                  segmentForm.minScore === ''
+                    ? null
+                    : Number(segmentForm.minScore),
+                maxScore:
+                  segmentForm.maxScore === ''
+                    ? null
+                    : Number(segmentForm.maxScore),
               },
             })
             .execute(),
@@ -449,11 +507,33 @@ export const ErpMarketingPage = () => {
               body: {
                 ...automationForm,
                 segmentId: automationForm.segmentId || null,
-                trigger: 'CONTACT_OPTED_IN',
+                minimumScore:
+                  automationForm.trigger === 'SCORE_THRESHOLD_REACHED'
+                    ? Number(automationForm.minimumScore)
+                    : null,
               },
             })
             .execute(),
         "L'automatisation a été créée en brouillon.",
+      );
+      return;
+    }
+    if (drawer === 'scoring') {
+      void executeMutation(
+        () =>
+          client
+            .createMutationIntent({
+              method: 'POST',
+              path: '/marketing/scoring-rules',
+              schema: marketingScoringRuleSchema,
+              body: {
+                name: scoringForm.name,
+                eventType: scoringForm.eventType,
+                points: Number(scoringForm.points),
+              },
+            })
+            .execute(),
+        'La règle de scoring est active.',
       );
     }
   };
@@ -541,6 +621,21 @@ export const ErpMarketingPage = () => {
         : "L'automatisation est en pause.",
     );
 
+  const toggleScoringRule = (scoringRule: MarketingScoringRule) =>
+    executeMutation(
+      () =>
+        client
+          .createMutationIntent({
+            method: 'POST',
+            path: `/marketing/scoring-rules/${scoringRule.id}/toggle`,
+            schema: marketingScoringRuleSchema,
+          })
+          .execute(),
+      scoringRule.isActive
+        ? 'La règle de scoring est désactivée.'
+        : 'La règle de scoring est active.',
+    );
+
   const contactColumns: ErpOperationalTableColumn<MarketingContact>[] = [
     {
       key: 'contact',
@@ -562,6 +657,13 @@ export const ErpMarketingPage = () => {
       header: 'Cycle',
       width: '130px',
       render: (row) => row.lifecycleStage,
+    },
+    {
+      key: 'score',
+      header: 'Score',
+      width: '90px',
+      align: 'right',
+      render: (row) => row.score,
     },
     {
       key: 'consent',
@@ -612,9 +714,16 @@ export const ErpMarketingPage = () => {
     },
     {
       key: 'filter',
-      header: 'Cycle ciblé',
-      width: '160px',
-      render: (row) => row.lifecycleStage ?? 'Tous',
+      header: 'Filtres',
+      width: '220px',
+      render: (row) => {
+        const filters = [
+          row.lifecycleStage ?? null,
+          row.minScore !== null ? `score ≥ ${row.minScore}` : null,
+          row.maxScore !== null ? `score ≤ ${row.maxScore}` : null,
+        ].filter(Boolean);
+        return filters.length > 0 ? filters.join(' · ') : 'Tous';
+      },
     },
     {
       key: 'members',
@@ -719,8 +828,13 @@ export const ErpMarketingPage = () => {
     {
       key: 'trigger',
       header: 'Déclencheur',
-      width: '190px',
-      render: () => 'Consentement marketing',
+      width: '220px',
+      render: (row) =>
+        row.trigger === 'SCORE_THRESHOLD_REACHED'
+          ? `Score atteint ${row.minimumScore ?? 0}`
+          : row.trigger === 'CONTACT_OPTED_IN'
+            ? 'Consentement marketing'
+            : 'Manuel',
     },
     {
       key: 'segment',
@@ -773,17 +887,112 @@ export const ErpMarketingPage = () => {
     },
   ];
 
+  const scoringColumns: ErpOperationalTableColumn<MarketingScoringRule>[] = [
+    {
+      key: 'name',
+      header: 'Règle',
+      width: '240px',
+      render: (row) => row.name,
+    },
+    {
+      key: 'event',
+      header: 'Événement',
+      width: '220px',
+      render: (row) => eventTypeLabels[row.eventType],
+    },
+    {
+      key: 'points',
+      header: 'Points',
+      width: '100px',
+      align: 'right',
+      render: (row) => (row.points > 0 ? `+${row.points}` : row.points),
+    },
+    {
+      key: 'status',
+      header: 'Statut',
+      width: '120px',
+      render: (row) => (
+        <ErpStatusBadge
+          label={row.isActive ? 'Active' : 'Inactive'}
+          tone={row.isActive ? 'success' : 'neutral'}
+        />
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      width: '140px',
+      render: (row) => (
+        <Button
+          title={row.isActive ? 'Désactiver' : 'Activer'}
+          ariaLabel={`${row.isActive ? 'Désactiver' : 'Activer'} ${row.name}`}
+          Icon={row.isActive ? IconPlayerPause : IconPlayerPlay}
+          variant="secondary"
+          disabled={busy || !canManage}
+          onClick={() => void toggleScoringRule(row)}
+        />
+      ),
+    },
+  ];
+
+  const eventColumns: ErpOperationalTableColumn<MarketingEvent>[] = [
+    {
+      key: 'date',
+      header: 'Date',
+      width: '180px',
+      render: (row) => new Date(row.occurredAt).toLocaleString('fr-MA'),
+    },
+    {
+      key: 'contact',
+      header: 'Contact',
+      width: '240px',
+      render: (row) =>
+        [row.contact.firstName, row.contact.lastName]
+          .filter(Boolean)
+          .join(' ') || row.contact.email,
+    },
+    {
+      key: 'event',
+      header: 'Événement',
+      width: '210px',
+      render: (row) => eventTypeLabels[row.eventType],
+    },
+    {
+      key: 'source',
+      header: 'Source',
+      width: '180px',
+      render: (row) => row.source,
+    },
+    {
+      key: 'points',
+      header: 'Points',
+      width: '100px',
+      align: 'right',
+      render: (row) =>
+        row.pointsApplied > 0 ? `+${row.pointsApplied}` : row.pointsApplied,
+    },
+    {
+      key: 'score',
+      header: 'Score après',
+      width: '120px',
+      align: 'right',
+      render: (row) => row.scoreAfter,
+    },
+  ];
+
   const formTitle =
     drawer === 'segments'
       ? 'Nouveau segment'
       : drawer === 'campaigns'
         ? 'Nouvelle campagne'
-        : 'Nouvelle automatisation';
+        : drawer === 'automations'
+          ? 'Nouvelle automatisation'
+          : 'Nouvelle règle de scoring';
 
   return (
     <ErpPageShell
       title="Marketing"
-      description="Segments, campagnes et parcours automatisés avec Brevo"
+      description="Scoring, segments, campagnes et parcours automatisés avec Brevo"
       state={loadState}
       errorLabel="Impossible de charger le marketing"
       onRetry={() => void load()}
@@ -805,6 +1014,9 @@ export const ErpMarketingPage = () => {
           ['Segments', overview.counts.segments],
           ['Campagnes', overview.counts.campaigns],
           ['Automatisations actives', overview.counts.activeAutomations],
+          ['Règles actives', overview.counts.activeScoringRules],
+          ['Événements 30 j', overview.counts.events30d],
+          ['Score moyen', overview.averageScore],
         ].map(([label, value]) => (
           <StyledMetric key={label}>
             <StyledMetricLabel>{label}</StyledMetricLabel>
@@ -820,6 +1032,8 @@ export const ErpMarketingPage = () => {
               ['segments', 'Segments'],
               ['campaigns', 'Campagnes'],
               ['automations', 'Automatisations'],
+              ['scoring', 'Scoring'],
+              ['events', 'Événements'],
             ] as const
           ).map(([key, label]) => (
             <StyledTab
@@ -844,28 +1058,34 @@ export const ErpMarketingPage = () => {
               disabled={busy || !canManage}
               onClick={() => void importContacts()}
             />
-          ) : (
+          ) : view === 'events' ? null : (
             <Button
               title={
                 view === 'segments'
                   ? 'Nouveau segment'
                   : view === 'campaigns'
                     ? 'Nouvelle campagne'
-                    : 'Nouvelle automatisation'
+                    : view === 'automations'
+                      ? 'Nouvelle automatisation'
+                      : 'Nouvelle règle'
               }
               ariaLabel="Créer"
               Icon={IconPlus}
               accent="blue"
               disabled={busy || !canManage}
-              onClick={() => setDrawer(view)}
+              onClick={() => {
+                if (view !== 'contacts' && view !== 'events') {
+                  setDrawer(view);
+                }
+              }}
             />
           )}
         </StyledToolbarActions>
       </StyledToolbar>
       {!overview.connectorConfigured ? (
         <StyledNotice danger>
-          Le connecteur Brevo n’est pas opérationnel. Les consultations restent
-          disponibles, mais les actions marketing sont bloquées.
+          Le connecteur Brevo n’est pas opérationnel. Le scoring reste
+          disponible, mais les synchronisations et envois sont bloqués.
         </StyledNotice>
       ) : null}
       {message ? (
@@ -895,13 +1115,29 @@ export const ErpMarketingPage = () => {
           getRowKey={(row) => row.id}
           emptyLabel="Aucune campagne"
         />
-      ) : (
+      ) : view === 'automations' ? (
         <ErpOperationalTable
           ariaLabel="Automatisations marketing"
           columns={automationColumns}
           rows={automations}
           getRowKey={(row) => row.id}
           emptyLabel="Aucune automatisation"
+        />
+      ) : view === 'scoring' ? (
+        <ErpOperationalTable
+          ariaLabel="Règles de scoring marketing"
+          columns={scoringColumns}
+          rows={scoringRules}
+          getRowKey={(row) => row.id}
+          emptyLabel="Aucune règle de scoring"
+        />
+      ) : (
+        <ErpOperationalTable
+          ariaLabel="Événements marketing"
+          columns={eventColumns}
+          rows={events}
+          getRowKey={(row) => row.id}
+          emptyLabel="Aucun événement marketing"
         />
       )}
       <ErpFormDrawer
@@ -977,6 +1213,36 @@ export const ErpMarketingPage = () => {
                     setSegmentForm((form) => ({
                       ...form,
                       description: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                Score minimum
+                <StyledInput
+                  type="number"
+                  min={-1000}
+                  max={1000}
+                  value={segmentForm.minScore}
+                  onChange={(event) =>
+                    setSegmentForm((form) => ({
+                      ...form,
+                      minScore: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                Score maximum
+                <StyledInput
+                  type="number"
+                  min={-1000}
+                  max={1000}
+                  value={segmentForm.maxScore}
+                  onChange={(event) =>
+                    setSegmentForm((form) => ({
+                      ...form,
+                      maxScore: event.target.value,
                     }))
                   }
                 />
@@ -1064,7 +1330,7 @@ export const ErpMarketingPage = () => {
                 />
               </StyledField>
             </>
-          ) : (
+          ) : drawer === 'automations' ? (
             <>
               <StyledField>
                 Nom
@@ -1081,6 +1347,43 @@ export const ErpMarketingPage = () => {
                   }
                 />
               </StyledField>
+              <StyledField>
+                Déclencheur
+                <StyledSelect
+                  value={automationForm.trigger}
+                  onChange={(event) =>
+                    setAutomationForm((form) => ({
+                      ...form,
+                      trigger: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="CONTACT_OPTED_IN">
+                    Consentement marketing
+                  </option>
+                  <option value="SCORE_THRESHOLD_REACHED">
+                    Seuil de score atteint
+                  </option>
+                </StyledSelect>
+              </StyledField>
+              {automationForm.trigger === 'SCORE_THRESHOLD_REACHED' ? (
+                <StyledField>
+                  Score minimum
+                  <StyledInput
+                    required
+                    type="number"
+                    min={0}
+                    max={1000}
+                    value={automationForm.minimumScore}
+                    onChange={(event) =>
+                      setAutomationForm((form) => ({
+                        ...form,
+                        minimumScore: event.target.value,
+                      }))
+                    }
+                  />
+                </StyledField>
+              ) : null}
               <StyledField>
                 Segment à alimenter
                 <StyledSelect
@@ -1127,6 +1430,58 @@ export const ErpMarketingPage = () => {
                     setAutomationForm((form) => ({
                       ...form,
                       emailHtmlContent: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+            </>
+          ) : (
+            <>
+              <StyledField>
+                Nom
+                <StyledInput
+                  required
+                  minLength={2}
+                  maxLength={120}
+                  value={scoringForm.name}
+                  onChange={(event) =>
+                    setScoringForm((form) => ({
+                      ...form,
+                      name: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                Événement
+                <StyledSelect
+                  value={scoringForm.eventType}
+                  onChange={(event) =>
+                    setScoringForm((form) => ({
+                      ...form,
+                      eventType: event.target.value,
+                    }))
+                  }
+                >
+                  {Object.entries(eventTypeLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </StyledSelect>
+              </StyledField>
+              <StyledField>
+                Points attribués
+                <StyledInput
+                  required
+                  type="number"
+                  min={-100}
+                  max={100}
+                  value={scoringForm.points}
+                  onChange={(event) =>
+                    setScoringForm((form) => ({
+                      ...form,
+                      points: event.target.value,
                     }))
                   }
                 />

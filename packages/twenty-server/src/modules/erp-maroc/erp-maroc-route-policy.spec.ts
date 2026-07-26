@@ -18,7 +18,11 @@ import {
   marketingCampaignSchema,
   marketingContactListSchema,
   marketingContactSchema,
+  marketingEventListSchema,
+  marketingEventSchema,
   marketingOverviewSchema,
+  marketingScoringRuleListSchema,
+  marketingScoringRuleSchema,
   marketingSegmentListSchema,
   marketingSegmentSchema,
   marketingSegmentSyncResultSchema,
@@ -82,6 +86,9 @@ const requiredIdempotencyRoutes = new Set([
   'POST /marketing/automations',
   `POST /marketing/automations/${id}/activate`,
   `POST /marketing/automations/${id}/pause`,
+  'POST /marketing/scoring-rules',
+  `POST /marketing/scoring-rules/${id}/toggle`,
+  'POST /marketing/events',
 ]);
 
 const approvedRoutes = [
@@ -400,6 +407,36 @@ const approvedRoutes = [
     `/marketing/automations/${id}/pause`,
     'marketing.automations.pause',
     marketingAutomationSchema,
+  ],
+  [
+    'GET',
+    '/marketing/scoring-rules',
+    'marketing.scoringRules.collection',
+    marketingScoringRuleListSchema,
+  ],
+  [
+    'POST',
+    '/marketing/scoring-rules',
+    'marketing.scoringRules.collection',
+    marketingScoringRuleSchema,
+  ],
+  [
+    'POST',
+    `/marketing/scoring-rules/${id}/toggle`,
+    'marketing.scoringRules.toggle',
+    marketingScoringRuleSchema,
+  ],
+  [
+    'GET',
+    '/marketing/events',
+    'marketing.events.collection',
+    marketingEventListSchema,
+  ],
+  [
+    'POST',
+    '/marketing/events',
+    'marketing.events.collection',
+    marketingEventSchema,
   ],
 ] as const;
 
