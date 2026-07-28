@@ -16,11 +16,12 @@ import { ErpMarocActivatedUserGuard } from './erp-maroc-activated-user.guard';
 import { ErpMarocAuthFilter } from './erp-maroc-auth.filter';
 import { ErpMarocController } from './erp-maroc.controller';
 import { ErpMarocEnabledMiddleware } from './erp-maroc-enabled.middleware';
+import { ErpMarocPublicMarketingController } from './erp-maroc-public-marketing.controller';
 import { ErpMarocProxyService } from './erp-maroc-proxy.service';
 
 @Module({
   imports: [TokenModule, TwentyConfigModule, WorkspaceCacheStorageModule],
-  controllers: [ErpMarocController],
+  controllers: [ErpMarocController, ErpMarocPublicMarketingController],
   providers: [
     ErpMarocProxyService,
     ErpMarocEnabledMiddleware,

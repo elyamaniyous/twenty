@@ -142,6 +142,30 @@ const ErpMarocRemindersPage = lazy(() =>
   })),
 );
 
+const ErpMarketingPage = lazy(() =>
+  import('~/pages/erp-maroc/marketing/ErpMarketingPage').then((module) => ({
+    default: module.ErpMarketingPage,
+  })),
+);
+
+const ErpPayrollRegulatoryPage = lazy(() =>
+  import('~/pages/erp-maroc/hr/ErpPayrollRegulatoryPage').then((module) => ({
+    default: module.ErpPayrollRegulatoryPage,
+  })),
+);
+
+const ErpHrCorePage = lazy(() =>
+  import('~/pages/erp-maroc/hr/ErpHrCorePage').then((module) => ({
+    default: module.ErpHrCorePage,
+  })),
+);
+
+const ErpEmployeeHrDetailPage = lazy(() =>
+  import('~/pages/erp-maroc/hr/ErpEmployeeHrDetailPage').then((module) => ({
+    default: module.ErpEmployeeHrDetailPage,
+  })),
+);
+
 const ErpEntriesPage = lazy(() =>
   import('~/pages/erp-maroc/accounting/ErpEntriesPage').then((module) => ({
     default: module.ErpEntriesPage,
@@ -579,6 +603,38 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpMarocRemindersPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.marketing}
+                element={
+                  <LazyRoute>
+                    <ErpMarketingPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.hrCore}
+                element={
+                  <LazyRoute>
+                    <ErpHrCorePage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.hrEmployeeDetail}
+                element={
+                  <LazyRoute>
+                    <ErpEmployeeHrDetailPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.payrollRegulatory}
+                element={
+                  <LazyRoute>
+                    <ErpPayrollRegulatoryPage />
                   </LazyRoute>
                 }
               />

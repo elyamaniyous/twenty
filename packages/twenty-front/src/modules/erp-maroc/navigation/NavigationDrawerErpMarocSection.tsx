@@ -14,7 +14,9 @@ import {
   IconFileText,
   IconListDetails,
   IconLink,
+  IconMail,
   IconNotes,
+  IconSettings,
   IconUsers,
   type IconComponent,
 } from 'twenty-ui/display';
@@ -109,6 +111,24 @@ export const NavigationDrawerErpMarocSection = () => {
       path: erpMarocPaths.reminders,
       activePaths: [erpMarocPaths.reminders],
       Icon: IconBell,
+    },
+    {
+      label: t`Marketing`,
+      path: erpMarocPaths.marketing,
+      activePaths: [erpMarocPaths.marketing],
+      Icon: IconMail,
+    },
+    {
+      label: t`Ressources humaines`,
+      path: erpMarocPaths.hrCore,
+      activePaths: [erpMarocPaths.hrCore, erpMarocPaths.hrEmployeeDetail],
+      Icon: IconUsers,
+    },
+    {
+      label: t`Référentiel paie`,
+      path: erpMarocPaths.payrollRegulatory,
+      activePaths: [erpMarocPaths.payrollRegulatory],
+      Icon: IconSettings,
     },
     {
       label: t`Écritures`,
