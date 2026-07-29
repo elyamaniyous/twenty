@@ -25,6 +25,7 @@ import {
   hrGradeSchema,
   hrJobPositionListSchema,
   hrJobPositionSchema,
+  hrOrganisationChartSchema,
   hrTeamListSchema,
   hrTeamSchema,
   hrWorkLocationListSchema,
@@ -38,6 +39,7 @@ import {
   type HrEstablishment,
   type HrGrade,
   type HrJobPosition,
+  type HrOrganisationChart,
   type HrTeam,
   type HrWorkLocation,
 } from 'twenty-shared/erp-maroc';
@@ -54,6 +56,7 @@ import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { HrAccessManagementPanel } from './HrAccessManagementPanel';
 import { HrEmployeeImportPanel } from './HrEmployeeImportPanel';
 import { HrLifecyclePanel } from './HrLifecyclePanel';
+import { HrOrganisationChartPanel } from './HrOrganisationChartPanel';
 
 const StyledActionLink = styled(Link)`
   align-items: center;
@@ -81,13 +84,14 @@ type View =
   | 'workLocations'
   | 'departments'
   | 'positions'
+  | 'organisationChart'
   | 'deadlines'
   | 'journeys'
   | 'access';
 type LoadState = 'loading' | 'ready' | 'error';
 type StructureView = Exclude<
   View,
-  'employees' | 'deadlines' | 'journeys' | 'access'
+  'employees' | 'organisationChart' | 'deadlines' | 'journeys' | 'access'
 >;
 
 const EMPTY_SUMMARY: HrCoreSummary = {
@@ -100,6 +104,14 @@ const EMPTY_SUMMARY: HrCoreSummary = {
   activeContracts: 0,
   draftAmendments: 0,
   activeJourneys: 0,
+};
+
+const EMPTY_ORGANISATION_CHART: HrOrganisationChart = {
+  generatedAt: new Date(0).toISOString(),
+  departments: [],
+  teams: [],
+  nodes: [],
+  unassignedCount: 0,
 };
 
 const StyledMetrics = styled.section`
@@ -261,6 +273,7 @@ const viewLabels: Record<View, string> = {
   workLocations: 'Lieux',
   departments: 'Départements',
   positions: 'Postes',
+  organisationChart: 'Organigramme',
   deadlines: 'Échéances',
   journeys: 'Parcours RH',
   access: 'Accès RH',
@@ -268,6 +281,7 @@ const viewLabels: Record<View, string> = {
 
 const isStructureView = (view: View): view is StructureView =>
   view !== 'employees' &&
+  view !== 'organisationChart' &&
   view !== 'deadlines' &&
   view !== 'journeys' &&
   view !== 'access';
@@ -285,6 +299,8 @@ export const ErpHrCorePage = () => {
   const [workLocations, setWorkLocations] = useState<HrWorkLocation[]>([]);
   const [departments, setDepartments] = useState<HrDepartment[]>([]);
   const [positions, setPositions] = useState<HrJobPosition[]>([]);
+  const [organisationChart, setOrganisationChart] =
+    useState<HrOrganisationChart>(EMPTY_ORGANISATION_CHART);
   const [deadlines, setDeadlines] = useState<HrDeadlineItem[]>([]);
   const [access, setAccess] = useState<HrAccessContext | null>(null);
   const [query, setQuery] = useState('');
@@ -322,6 +338,7 @@ export const ErpHrCorePage = () => {
         nextWorkLocations,
         nextDepartments,
         nextPositions,
+        nextOrganisationChart,
         nextDeadlines,
       ] = await Promise.all([
         client.request({
@@ -376,6 +393,11 @@ export const ErpHrCorePage = () => {
         }),
         client.request({
           method: 'GET',
+          path: '/hr-core/organisation-chart',
+          schema: hrOrganisationChartSchema,
+        }),
+        client.request({
+          method: 'GET',
           path: '/hr-core/deadlines',
           schema: hrDeadlineCenterSchema,
         }),
@@ -390,6 +412,7 @@ export const ErpHrCorePage = () => {
       setWorkLocations(nextWorkLocations);
       setDepartments(nextDepartments);
       setPositions(nextPositions);
+      setOrganisationChart(nextOrganisationChart);
       setDeadlines(nextDeadlines.items);
       setLoadState('ready');
     } catch {
@@ -1119,6 +1142,8 @@ export const ErpHrCorePage = () => {
         emptyLabel="Aucun poste"
         onRetry={() => void load()}
       />
+    ) : view === 'organisationChart' ? (
+      <HrOrganisationChartPanel chart={organisationChart} query={query} />
     ) : view === 'deadlines' ? (
       <ErpOperationalTable
         ariaLabel="Échéances RH"

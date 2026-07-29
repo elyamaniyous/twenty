@@ -48,6 +48,8 @@ import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 import { EmployeePrivateProfileSections } from './EmployeePrivateProfileSections';
+import { EmployeeCrmLinkPanel } from './EmployeeCrmLinkPanel';
+import { Employee360Tabs } from './Employee360Tabs';
 
 const StyledActionLink = styled(Link)`
   align-items: center;
@@ -911,6 +913,15 @@ export const ErpEmployeeHrDetailPage = () => {
           {message === null ? null : (
             <StyledNotice danger={messageDanger}>{message}</StyledNotice>
           )}
+          <EmployeeCrmLinkPanel
+            employee={employee}
+            canWrite={employee.access.canWritePrivate}
+            onUpdated={load}
+            onNotify={(nextMessage, danger) => {
+              setMessageDanger(danger);
+              setMessage(nextMessage);
+            }}
+          />
           <EmployeePrivateProfileSections
             employee={employee}
             canWritePrivate={employee.access.canWritePrivate}
@@ -921,6 +932,7 @@ export const ErpEmployeeHrDetailPage = () => {
               setMessage(nextMessage);
             }}
           />
+          <Employee360Tabs employee={employee} />
           <StyledSectionHeader>
             <StyledSectionTitle>Parcours RH</StyledSectionTitle>
             <StyledLabel>

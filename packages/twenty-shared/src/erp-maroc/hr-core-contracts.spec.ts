@@ -3,11 +3,13 @@ import {
   hrDepartmentSchema,
   hrDeadlineCenterSchema,
   hrEmployeeDetailSchema,
+  hrEmployeeCrmLinkResultSchema,
   hrEmployeeDocumentSchema,
   hrEmployeeImportPreviewSchema,
   hrGradeSchema,
   hrJobPositionSchema,
   hrLifecycleJourneySchema,
+  hrOrganisationChartSchema,
 } from './hr-core-contracts';
 
 describe('hrEmployeeDetailSchema', () => {
@@ -111,7 +113,55 @@ describe('hrEmployeeDetailSchema', () => {
       assignments: [],
       hrDocuments: [],
       hrLifecycleJourneys: [],
+      leaveRequests: [
+        {
+          id: '88888888-8888-4888-8888-888888888888',
+          type: 'SICK',
+          status: 'APPROVED',
+          startDate: '2026-07-01',
+          endDate: '2026-07-02',
+          workingDays: 2,
+          createdAt,
+          reason: 'must-remain-private',
+        },
+      ],
+      leaveBalances: [
+        {
+          id: '99999999-9999-4999-8999-999999999999',
+          year: 2026,
+          entitledDays: 18,
+          carriedDays: 2,
+          adjustmentDays: 0,
+          consumedDays: 2,
+          availableDays: 18,
+          updatedAt: createdAt,
+        },
+      ],
+      payslips: [
+        {
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          periodKey: '2026-06',
+          periodStart: '2026-06-01',
+          periodEnd: '2026-06-30',
+          status: 'PAID',
+          grossSalaryCents: 950000,
+          netSalaryCents: 810000,
+          paidAt: createdAt,
+          createdAt,
+          calculation: { mustRemainServerSide: true },
+        },
+      ],
+      history: [
+        {
+          id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          action: 'HR_PRIVATE_PROFILE_UPDATED',
+          actorTwentyUserId: 'admin-user',
+          createdAt,
+          metadata: { cin: 'must-remain-private' },
+        },
+      ],
       employmentContracts: [],
+      crmLink: null,
       access: {
         role: 'HR_ADMIN',
         globalRole: 'COMMERCIAL',
@@ -151,6 +201,73 @@ describe('hrEmployeeDetailSchema', () => {
       updatedAt: createdAt,
     });
     expect(result.bankAccounts[0]).not.toHaveProperty('ribCiphertext');
+    expect(result.leaveRequests[0]).not.toHaveProperty('reason');
+    expect(result.payslips[0]).not.toHaveProperty('calculation');
+    expect(result.history[0]).not.toHaveProperty('metadata');
+  });
+
+  it('parses only public CRM links and organisation chart fields', () => {
+    const employeeId = '11111111-1111-4111-8111-111111111111';
+    const personId = '22222222-2222-4222-8222-222222222222';
+    const departmentId = '33333333-3333-4333-8333-333333333333';
+    const teamId = '44444444-4444-4444-8444-444444444444';
+    const now = '2026-07-29T08:00:00.000Z';
+    const link = hrEmployeeCrmLinkResultSchema.parse({
+      employeeId,
+      twentyPersonId: personId,
+      linkedAt: now,
+      lastSyncedAt: now,
+      syncedFields: ['firstName', 'email', 'jobTitle'],
+      updatedAt: now,
+      cin: 'must-not-be-accepted',
+    });
+    const chart = hrOrganisationChartSchema.parse({
+      generatedAt: now,
+      departments: [
+        {
+          id: departmentId,
+          code: 'COM',
+          name: 'Commercial',
+          parentId: null,
+          employeeCount: 1,
+        },
+      ],
+      teams: [
+        {
+          id: teamId,
+          code: 'VENTES',
+          name: 'Ventes',
+          departmentId,
+          managerEmployeeId: employeeId,
+          employeeCount: 1,
+        },
+      ],
+      nodes: [
+        {
+          employeeId,
+          employeeNumber: 'ZOW-001',
+          firstName: 'Salma',
+          lastName: 'Alaoui',
+          jobTitle: 'Responsable commerciale',
+          status: 'ACTIVE',
+          department: {
+            id: departmentId,
+            code: 'COM',
+            name: 'Commercial',
+            parentId: null,
+          },
+          team: { id: teamId, code: 'VENTES', name: 'Ventes' },
+          managerEmployeeId: employeeId,
+          twentyPersonId: personId,
+        },
+      ],
+      unassignedCount: 0,
+      baseSalaryCents: 900_000,
+    });
+
+    expect(link).not.toHaveProperty('cin');
+    expect(chart).not.toHaveProperty('baseSalaryCents');
+    expect(chart.nodes[0]).not.toHaveProperty('email');
   });
 
   it('parses a guided lifecycle journey with its checklist', () => {

@@ -463,6 +463,29 @@ export const hrEmploymentContractSummarySchema = z
   })
   .extend(hrContractStructureSchema.shape);
 
+export const hrEmployeeCrmLinkSchema = z.object({
+  twentyPersonId: uuidSchema,
+  linkedAt: instantSchema,
+  lastSyncedAt: instantSchema.nullable(),
+});
+
+export const hrCrmPublicFieldSchema = z.enum([
+  'firstName',
+  'lastName',
+  'email',
+  'phone',
+  'jobTitle',
+]);
+
+export const hrEmployeeCrmLinkResultSchema = z.object({
+  employeeId: uuidSchema,
+  twentyPersonId: uuidSchema.nullable(),
+  linkedAt: instantSchema.nullable(),
+  lastSyncedAt: instantSchema.nullable(),
+  syncedFields: z.array(hrCrmPublicFieldSchema),
+  updatedAt: instantSchema,
+});
+
 export const hrEmployeeListItemSchema = z.object({
   id: uuidSchema,
   employeeNumber: z.string(),
@@ -474,9 +497,54 @@ export const hrEmployeeListItemSchema = z.object({
   department: nullableStringSchema,
   status: hrEmployeeStatusSchema,
   hireDate: civilDateHttpSchema,
+  crmLink: hrEmployeeCrmLinkSchema.nullable(),
   employmentContracts: z.array(hrEmploymentContractSummarySchema),
 });
 export const hrEmployeeListSchema = z.array(hrEmployeeListItemSchema);
+
+const hrOrganisationChartDepartmentSchema = z.object({
+  id: uuidSchema,
+  code: z.string(),
+  name: z.string(),
+  parentId: uuidSchema.nullable(),
+});
+
+const hrOrganisationChartTeamSchema = z.object({
+  id: uuidSchema,
+  code: z.string(),
+  name: z.string(),
+});
+
+export const hrOrganisationChartSchema = z.object({
+  generatedAt: instantSchema,
+  departments: z.array(
+    hrOrganisationChartDepartmentSchema.extend({
+      employeeCount: nonNegativeIntegerSchema,
+    }),
+  ),
+  teams: z.array(
+    hrOrganisationChartTeamSchema.extend({
+      departmentId: uuidSchema.nullable(),
+      managerEmployeeId: uuidSchema.nullable(),
+      employeeCount: nonNegativeIntegerSchema,
+    }),
+  ),
+  nodes: z.array(
+    z.object({
+      employeeId: uuidSchema,
+      employeeNumber: z.string(),
+      firstName: z.string(),
+      lastName: z.string(),
+      jobTitle: z.string(),
+      status: hrEmployeeStatusSchema,
+      department: hrOrganisationChartDepartmentSchema.nullable(),
+      team: hrOrganisationChartTeamSchema.nullable(),
+      managerEmployeeId: uuidSchema.nullable(),
+      twentyPersonId: uuidSchema.nullable(),
+    }),
+  ),
+  unassignedCount: nonNegativeIntegerSchema,
+});
 
 export const hrEmployeeImportActionSchema = z.enum([
   'CREATE',
@@ -728,6 +796,46 @@ export const hrLifecycleJourneySchema = hrLifecycleJourneyBaseSchema.extend({
 });
 export const hrLifecycleJourneyListSchema = z.array(hrLifecycleJourneySchema);
 
+export const hrEmployeeLeaveRequestSchema = z.object({
+  id: uuidSchema,
+  type: z.enum(['ANNUAL', 'SICK', 'MATERNITY', 'PATERNITY', 'UNPAID', 'OTHER']),
+  status: z.enum(['REQUESTED', 'APPROVED', 'REJECTED', 'CANCELLED']),
+  startDate: civilDateHttpSchema,
+  endDate: civilDateHttpSchema,
+  workingDays: z.number().finite().nonnegative(),
+  createdAt: instantSchema,
+});
+
+export const hrEmployeeLeaveBalanceSchema = z.object({
+  id: uuidSchema,
+  year: nonNegativeIntegerSchema,
+  entitledDays: z.number().finite().nonnegative(),
+  carriedDays: z.number().finite(),
+  adjustmentDays: z.number().finite(),
+  consumedDays: z.number().finite().nonnegative(),
+  availableDays: z.number().finite(),
+  updatedAt: instantSchema,
+});
+
+export const hrEmployeePayslipSummarySchema = z.object({
+  id: uuidSchema,
+  periodKey: z.string(),
+  periodStart: civilDateHttpSchema,
+  periodEnd: civilDateHttpSchema,
+  status: z.enum(['DRAFT', 'VALIDATED', 'PAID', 'CANCELLED']),
+  grossSalaryCents: centsSchema,
+  netSalaryCents: centsSchema,
+  paidAt: instantSchema.nullable(),
+  createdAt: instantSchema,
+});
+
+export const hrEmployeeHistoryEventSchema = z.object({
+  id: uuidSchema,
+  action: z.string(),
+  actorTwentyUserId: nullableStringSchema,
+  createdAt: instantSchema,
+});
+
 export const hrEmployeeDetailSchema = z.object({
   id: uuidSchema,
   employeeNumber: z.string(),
@@ -748,6 +856,7 @@ export const hrEmployeeDetailSchema = z.object({
   familyDependants: nonNegativeIntegerSchema,
   createdAt: instantSchema,
   updatedAt: instantSchema,
+  crmLink: hrEmployeeCrmLinkSchema.nullable(),
   privateProfile: hrEmployeePrivateProfileSchema.nullable(),
   dependants: z.array(hrEmployeeDependantSchema),
   emergencyContacts: z.array(hrEmployeeEmergencyContactSchema),
@@ -755,6 +864,10 @@ export const hrEmployeeDetailSchema = z.object({
   assignments: z.array(hrEmployeeAssignmentSchema),
   hrDocuments: z.array(hrEmployeeDocumentSchema),
   hrLifecycleJourneys: z.array(hrLifecycleJourneyBaseSchema),
+  leaveRequests: z.array(hrEmployeeLeaveRequestSchema),
+  leaveBalances: z.array(hrEmployeeLeaveBalanceSchema),
+  payslips: z.array(hrEmployeePayslipSummarySchema),
+  history: z.array(hrEmployeeHistoryEventSchema),
   employmentContracts: z.array(hrEmploymentContractDetailSchema),
   access: hrAccessContextSchema,
 });
@@ -802,6 +915,12 @@ export type HrContractAmendment = z.infer<typeof hrContractAmendmentSchema>;
 export type HrEmploymentContract = z.infer<
   typeof hrEmploymentContractDetailSchema
 >;
+export type HrEmployeeCrmLink = z.infer<typeof hrEmployeeCrmLinkSchema>;
+export type HrCrmPublicField = z.infer<typeof hrCrmPublicFieldSchema>;
+export type HrEmployeeCrmLinkResult = z.infer<
+  typeof hrEmployeeCrmLinkResultSchema
+>;
+export type HrOrganisationChart = z.infer<typeof hrOrganisationChartSchema>;
 export type HrEmployeeListItem = z.infer<typeof hrEmployeeListItemSchema>;
 export type HrEmployeeImportAction = z.infer<
   typeof hrEmployeeImportActionSchema
@@ -835,5 +954,17 @@ export type HrLifecycleJourneyBase = z.infer<
   typeof hrLifecycleJourneyBaseSchema
 >;
 export type HrLifecycleJourney = z.infer<typeof hrLifecycleJourneySchema>;
+export type HrEmployeeLeaveRequest = z.infer<
+  typeof hrEmployeeLeaveRequestSchema
+>;
+export type HrEmployeeLeaveBalance = z.infer<
+  typeof hrEmployeeLeaveBalanceSchema
+>;
+export type HrEmployeePayslipSummary = z.infer<
+  typeof hrEmployeePayslipSummarySchema
+>;
+export type HrEmployeeHistoryEvent = z.infer<
+  typeof hrEmployeeHistoryEventSchema
+>;
 export type HrEmployeeDetail = z.infer<typeof hrEmployeeDetailSchema>;
 export type HrCoreSummary = z.infer<typeof hrCoreSummarySchema>;
