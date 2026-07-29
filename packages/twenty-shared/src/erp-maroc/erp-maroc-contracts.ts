@@ -2896,6 +2896,9 @@ export const erpMarocRouteIds = {
   hrJobPositionDetail: 'hr-core.job-position.detail',
   hrEmployees: 'hr-core.employees',
   hrEmployeeDetail: 'hr-core.employee.detail',
+  hrEmployeeImportTemplate: 'hr-core.employee-import.template',
+  hrEmployeeImportPreview: 'hr-core.employee-import.preview',
+  hrEmployeeImportCommit: 'hr-core.employee-import.commit',
   hrEmployeePersonalDetails: 'hr-core.employee.personal-details',
   hrEmployeeDependants: 'hr-core.employee.dependants',
   hrDependantDetail: 'hr-core.dependant.detail',
@@ -3245,6 +3248,9 @@ export const erpMarocUpstreamRoutes = {
     jobPosition: (id: string) => `/hr-core/job-positions/${encodeRouteId(id)}`,
     employees: '/hr-core/employees',
     employee: (id: string) => `/hr-core/employees/${encodeRouteId(id)}`,
+    employeeImportTemplate: '/hr-core/employee-import/template',
+    employeeImportPreview: '/hr-core/employee-import/preview',
+    employeeImportCommit: '/hr-core/employee-import/commit',
     employeePersonalDetails: (id: string) =>
       `/hr-core/employees/${encodeRouteId(id)}/personal-details`,
     employeeDependants: (id: string) =>

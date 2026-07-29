@@ -43,6 +43,7 @@ import {
 } from 'twenty-shared/erp-maroc';
 import {
   IconChevronRight,
+  IconFileImport,
   IconPlus,
   IconRefresh,
   IconSearch,
@@ -51,6 +52,7 @@ import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 import { HrAccessManagementPanel } from './HrAccessManagementPanel';
+import { HrEmployeeImportPanel } from './HrEmployeeImportPanel';
 import { HrLifecyclePanel } from './HrLifecyclePanel';
 
 const StyledActionLink = styled(Link)`
@@ -287,6 +289,7 @@ export const ErpHrCorePage = () => {
   const [access, setAccess] = useState<HrAccessContext | null>(null);
   const [query, setQuery] = useState('');
   const [drawer, setDrawer] = useState<StructureView | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -301,6 +304,9 @@ export const ErpHrCorePage = () => {
   });
 
   const canManage = access?.canManageStructure ?? false;
+  const canImport =
+    access?.canWriteContracts === true &&
+    (access.isSystemAdministrator || access.populationScope === 'ALL');
 
   const load = useCallback(async () => {
     setLoadState('loading');
@@ -1163,6 +1169,15 @@ export const ErpHrCorePage = () => {
               onClick={() => openCreateDrawer(view)}
             />
           ) : null}
+          {canImport && view === 'employees' ? (
+            <Button
+              title="Importer les salariés"
+              ariaLabel="Importer les salariés depuis Excel"
+              Icon={IconFileImport}
+              accent="blue"
+              onClick={() => setImportOpen(true)}
+            />
+          ) : null}
         </>
       }
     >
@@ -1212,6 +1227,12 @@ export const ErpHrCorePage = () => {
         )}
       </StyledToolbar>
       {table}
+
+      <HrEmployeeImportPanel
+        isOpen={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={load}
+      />
 
       <ErpFormDrawer
         isOpen={drawer !== null}

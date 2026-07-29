@@ -478,6 +478,71 @@ export const hrEmployeeListItemSchema = z.object({
 });
 export const hrEmployeeListSchema = z.array(hrEmployeeListItemSchema);
 
+export const hrEmployeeImportActionSchema = z.enum([
+  'CREATE',
+  'MIGRATE',
+  'BLOCKED',
+]);
+
+export const hrEmployeeImportRowSchema = z.object({
+  rowNumber: z.number().int().positive(),
+  action: hrEmployeeImportActionSchema,
+  existingEmployeeId: uuidSchema.nullable(),
+  establishmentId: uuidSchema.nullable(),
+  departmentId: uuidSchema.nullable(),
+  jobPositionId: uuidSchema.nullable(),
+  contractNumber: z.string(),
+  normalized: z.object({
+    employeeNumber: z.string(),
+    firstName: z.string(),
+    lastName: z.string(),
+    cin: nullableStringSchema,
+    cnssNumber: nullableStringSchema,
+    email: nullableStringSchema,
+    phone: nullableStringSchema,
+    jobTitle: z.string(),
+    departmentName: nullableStringSchema,
+    contractType: hrContractTypeSchema.nullable(),
+    hireDate: nullableCivilDateHttpSchema,
+    contractStartDate: nullableCivilDateHttpSchema,
+    contractEndDate: nullableCivilDateHttpSchema,
+    probationEndDate: nullableCivilDateHttpSchema,
+    baseSalaryCents: centsSchema.nullable(),
+    weeklyHoursHundredths: nonNegativeIntegerSchema.nullable(),
+    establishmentCode: nullableStringSchema,
+    departmentCode: nullableStringSchema,
+    jobPositionCode: nullableStringSchema,
+  }),
+  warnings: z.array(z.string()),
+  errors: z.array(z.string()),
+});
+
+export const hrEmployeeImportPreviewSchema = z.object({
+  fileName: z.string(),
+  rows: z.array(hrEmployeeImportRowSchema),
+  previewDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  readyCount: nonNegativeIntegerSchema,
+  errorCount: nonNegativeIntegerSchema,
+  createCount: nonNegativeIntegerSchema,
+  migrateCount: nonNegativeIntegerSchema,
+});
+
+export const hrEmployeeImportTemplateSchema = z.object({
+  fileName: z.string(),
+  mediaType: z.literal(
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ),
+  contentBase64: z.string(),
+});
+
+export const hrEmployeeImportCommitResultSchema = z.object({
+  previewDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  importedCount: nonNegativeIntegerSchema,
+  createdCount: nonNegativeIntegerSchema,
+  migratedCount: nonNegativeIntegerSchema,
+  employeeIds: z.array(uuidSchema),
+});
+
 export const hrEmployeePrivateProfileSchema = z.object({
   id: uuidSchema,
   organisationId: uuidSchema,
@@ -738,6 +803,19 @@ export type HrEmploymentContract = z.infer<
   typeof hrEmploymentContractDetailSchema
 >;
 export type HrEmployeeListItem = z.infer<typeof hrEmployeeListItemSchema>;
+export type HrEmployeeImportAction = z.infer<
+  typeof hrEmployeeImportActionSchema
+>;
+export type HrEmployeeImportRow = z.infer<typeof hrEmployeeImportRowSchema>;
+export type HrEmployeeImportPreview = z.infer<
+  typeof hrEmployeeImportPreviewSchema
+>;
+export type HrEmployeeImportTemplate = z.infer<
+  typeof hrEmployeeImportTemplateSchema
+>;
+export type HrEmployeeImportCommitResult = z.infer<
+  typeof hrEmployeeImportCommitResultSchema
+>;
 export type HrEmployeePrivateProfile = z.infer<
   typeof hrEmployeePrivateProfileSchema
 >;
