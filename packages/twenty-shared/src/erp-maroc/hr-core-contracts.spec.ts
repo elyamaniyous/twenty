@@ -4,6 +4,7 @@ import {
   hrDeadlineCenterSchema,
   hrEmployeeDetailSchema,
   hrEmployeeDocumentSchema,
+  hrEmployeeImportPreviewSchema,
   hrGradeSchema,
   hrJobPositionSchema,
   hrLifecycleJourneySchema,
@@ -334,5 +335,55 @@ describe('hrEmployeeDetailSchema', () => {
 
     expect(document.latestVersion).not.toHaveProperty('storageKey');
     expect(center.items[0]?.severity).toBe('UPCOMING');
+  });
+
+  it('parses an employee import preview with migration decisions', () => {
+    const preview = hrEmployeeImportPreviewSchema.parse({
+      fileName: 'migration-salaries.xlsx',
+      previewDigest: 'a'.repeat(64),
+      readyCount: 1,
+      errorCount: 0,
+      createCount: 0,
+      migrateCount: 1,
+      rows: [
+        {
+          rowNumber: 2,
+          action: 'MIGRATE',
+          existingEmployeeId: '11111111-1111-4111-8111-111111111111',
+          establishmentId: null,
+          departmentId: null,
+          jobPositionId: null,
+          contractNumber: 'CTR-ZOW-001-20260728',
+          normalized: {
+            employeeNumber: 'ZOW-001',
+            firstName: 'Salma',
+            lastName: 'Alaoui',
+            cin: 'BK123456',
+            cnssNumber: '123456789',
+            email: 'salma@zowka.com',
+            phone: '+212600000000',
+            jobTitle: 'Responsable administrative',
+            departmentName: 'Administration',
+            contractType: 'CDI',
+            hireDate: '2026-01-05',
+            contractStartDate: '2026-01-05',
+            contractEndDate: null,
+            probationEndDate: null,
+            baseSalaryCents: 950_000,
+            weeklyHoursHundredths: 4_400,
+            establishmentCode: null,
+            departmentCode: null,
+            jobPositionCode: null,
+          },
+          warnings: [
+            'Le salarié existe sans contrat et sera complété par migration.',
+          ],
+          errors: [],
+        },
+      ],
+    });
+
+    expect(preview.rows[0]?.action).toBe('MIGRATE');
+    expect(preview.readyCount).toBe(1);
   });
 });
