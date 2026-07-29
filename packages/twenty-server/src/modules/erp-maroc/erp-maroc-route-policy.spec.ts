@@ -54,6 +54,14 @@ import {
   hrLifecycleJourneyListSchema,
   hrLifecycleJourneySchema,
   hrLifecycleTaskSchema,
+  hrLeaveAccrualRunResultSchema,
+  hrLeaveBalanceSchema,
+  hrLeaveBalanceListSchema,
+  hrLeavePolicyListSchema,
+  hrLeavePolicySchema,
+  hrLeavePolicySeedResultSchema,
+  hrLeaveRequestListSchema,
+  hrLeaveRequestSchema,
   hrMoroccoHolidaySeedResultSchema,
   hrTeamListSchema,
   hrTeamSchema,
@@ -207,6 +215,14 @@ const requiredIdempotencyRoutes = new Set([
   `POST /hr-attendance/employees/${id}/work-schedule-assignments`,
   'POST /hr-attendance/time-entries',
   `PATCH /hr-attendance/time-entries/${id}/cancel`,
+  'POST /hr-leave/policies',
+  'POST /hr-leave/policies/seed-morocco',
+  'POST /hr-leave/requests',
+  `PATCH /hr-leave/requests/${id}/evidence`,
+  `PATCH /hr-leave/requests/${id}/decision`,
+  `PATCH /hr-leave/requests/${id}/cancel`,
+  'POST /hr-leave/balances/adjustments',
+  'POST /hr-leave/accruals/run',
 ]);
 
 const approvedRoutes = [
@@ -1008,6 +1024,47 @@ const approvedRoutes = [
     'hr-attendance.monthly',
     hrAttendanceMonthSchema,
   ],
+  ['GET', '/hr-leave/policies', 'hr-leave.policies', hrLeavePolicyListSchema],
+  ['POST', '/hr-leave/policies', 'hr-leave.policies', hrLeavePolicySchema],
+  [
+    'POST',
+    '/hr-leave/policies/seed-morocco',
+    'hr-leave.policy.seed-morocco',
+    hrLeavePolicySeedResultSchema,
+  ],
+  ['GET', '/hr-leave/requests', 'hr-leave.requests', hrLeaveRequestListSchema],
+  ['POST', '/hr-leave/requests', 'hr-leave.requests', hrLeaveRequestSchema],
+  [
+    'PATCH',
+    `/hr-leave/requests/${id}/evidence`,
+    'hr-leave.request.evidence',
+    hrLeaveRequestSchema,
+  ],
+  [
+    'PATCH',
+    `/hr-leave/requests/${id}/decision`,
+    'hr-leave.request.decision',
+    hrLeaveRequestSchema,
+  ],
+  [
+    'PATCH',
+    `/hr-leave/requests/${id}/cancel`,
+    'hr-leave.request.cancel',
+    hrLeaveRequestSchema,
+  ],
+  ['GET', '/hr-leave/balances', 'hr-leave.balances', hrLeaveBalanceListSchema],
+  [
+    'POST',
+    '/hr-leave/balances/adjustments',
+    'hr-leave.balance.adjustment',
+    hrLeaveBalanceSchema,
+  ],
+  [
+    'POST',
+    '/hr-leave/accruals/run',
+    'hr-leave.accrual.run',
+    hrLeaveAccrualRunResultSchema,
+  ],
 ] as const;
 
 describe('ERP Maroc route policy', () => {
@@ -1022,9 +1079,13 @@ describe('ERP Maroc route policy', () => {
           ? { year: '2026' }
           : routeId === 'hr-attendance.monthly'
             ? { month: '2026-07' }
-            : requiresAccountCode
-              ? { accountCode: '3421' }
-              : {};
+            : routeId === 'hr-leave.requests' && method === 'GET'
+              ? { year: '2026' }
+              : routeId === 'hr-leave.balances'
+                ? { year: '2026' }
+                : requiresAccountCode
+                  ? { accountCode: '3421' }
+                  : {};
       const resolved = resolveErpRoute(method, path, query);
 
       expect(resolved.routeId).toBe(routeId);
@@ -1033,9 +1094,12 @@ describe('ERP Maroc route policy', () => {
           ? `${path}?year=2026`
           : routeId === 'hr-attendance.monthly'
             ? `${path}?month=2026-07`
-            : requiresAccountCode
-              ? `${path}?accountCode=3421`
-              : path,
+            : (routeId === 'hr-leave.requests' && method === 'GET') ||
+                routeId === 'hr-leave.balances'
+              ? `${path}?year=2026`
+              : requiresAccountCode
+                ? `${path}?accountCode=3421`
+                : path,
       );
       expect(resolved.kind).toBe(routeId === 'invoices.pdf' ? 'pdf' : 'json');
       expect(resolved.idempotency).toBe(
@@ -1195,6 +1259,17 @@ describe('ERP Maroc route policy', () => {
         employeeId: id,
       }).upstreamPath,
     ).toBe(`/hr-attendance/monthly?month=2026-07&employeeId=${id}`);
+    expect(
+      resolveErpRoute('GET', '/hr-leave/requests', {
+        year: '2026',
+        status: 'MANAGER_APPROVED',
+      }).upstreamPath,
+    ).toBe('/hr-leave/requests?year=2026&status=MANAGER_APPROVED');
+    expect(
+      resolveErpRoute('GET', '/hr-leave/balances', {
+        year: '2026',
+      }).upstreamPath,
+    ).toBe('/hr-leave/balances?year=2026');
   });
 
   it.each([
@@ -1229,6 +1304,11 @@ describe('ERP Maroc route policy', () => {
     ['/hr-attendance/monthly', {}],
     ['/hr-attendance/monthly', { month: '2026-13' }],
     ['/hr-attendance/monthly', { month: '2026-07', employeeId: 'invalid' }],
+    ['/hr-leave/requests', {}],
+    ['/hr-leave/requests', { year: '1999' }],
+    ['/hr-leave/requests', { year: '2026', status: 'PENDING' }],
+    ['/hr-leave/balances', {}],
+    ['/hr-leave/balances', { year: '2201' }],
   ])('rejects non-normalized or unauthorized query for %s', (path, query) => {
     expect(() => resolveErpRoute('GET', path, query)).toThrow(
       'ERP route is not allowed',

@@ -54,6 +54,14 @@ import {
   hrLifecycleJourneyListSchema,
   hrLifecycleJourneySchema,
   hrLifecycleTaskSchema,
+  hrLeaveAccrualRunResultSchema,
+  hrLeaveBalanceSchema,
+  hrLeaveBalanceListSchema,
+  hrLeavePolicyListSchema,
+  hrLeavePolicySchema,
+  hrLeavePolicySeedResultSchema,
+  hrLeaveRequestListSchema,
+  hrLeaveRequestSchema,
   hrMoroccoHolidaySeedResultSchema,
   hrTeamListSchema,
   hrTeamSchema,
@@ -180,6 +188,8 @@ const grandLivreQuery = Object.freeze([
 const lettrageQuery = Object.freeze(['accountCode']);
 const workCalendarQuery = Object.freeze(['year']);
 const attendanceQuery = Object.freeze(['month', 'employeeId']);
+const leaveRequestQuery = Object.freeze(['year', 'status']);
+const leaveBalanceQuery = Object.freeze(['year']);
 const pdfSchema = z.instanceof(Uint8Array);
 
 const exact = (path: string) => new RegExp(`^${path}$`);
@@ -2007,6 +2017,116 @@ const routes: ErpMarocRoute[] = [
     kind: 'json',
     idempotency: 'forbidden',
   }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrLeavePolicies,
+    method: 'GET',
+    pattern: exact('/hr-leave/policies'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrLeave.policies),
+    queryKeys: noQuery,
+    responseSchema: hrLeavePolicyListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrLeavePolicies,
+    method: 'POST',
+    pattern: exact('/hr-leave/policies'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrLeave.policies),
+    queryKeys: noQuery,
+    responseSchema: hrLeavePolicySchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrLeavePolicySeedMorocco,
+    method: 'POST',
+    pattern: exact('/hr-leave/policies/seed-morocco'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrLeave.seedMoroccoPolicies),
+    queryKeys: noQuery,
+    responseSchema: hrLeavePolicySeedResultSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrLeaveRequests,
+    method: 'GET',
+    pattern: exact('/hr-leave/requests'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrLeave.requests),
+    queryKeys: leaveRequestQuery,
+    responseSchema: hrLeaveRequestListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrLeaveRequests,
+    method: 'POST',
+    pattern: exact('/hr-leave/requests'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrLeave.requests),
+    queryKeys: noQuery,
+    responseSchema: hrLeaveRequestSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrLeaveRequestEvidence,
+    method: 'PATCH',
+    pattern: action('hr-leave/requests', 'evidence'),
+    build: idBuilder(erpMarocUpstreamRoutes.hrLeave.requestEvidence),
+    queryKeys: noQuery,
+    responseSchema: hrLeaveRequestSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrLeaveRequestDecision,
+    method: 'PATCH',
+    pattern: action('hr-leave/requests', 'decision'),
+    build: idBuilder(erpMarocUpstreamRoutes.hrLeave.requestDecision),
+    queryKeys: noQuery,
+    responseSchema: hrLeaveRequestSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrLeaveRequestCancel,
+    method: 'PATCH',
+    pattern: action('hr-leave/requests', 'cancel'),
+    build: idBuilder(erpMarocUpstreamRoutes.hrLeave.requestCancel),
+    queryKeys: noQuery,
+    responseSchema: hrLeaveRequestSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrLeaveBalances,
+    method: 'GET',
+    pattern: exact('/hr-leave/balances'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrLeave.balances),
+    queryKeys: leaveBalanceQuery,
+    responseSchema: hrLeaveBalanceListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrLeaveBalanceAdjustment,
+    method: 'POST',
+    pattern: exact('/hr-leave/balances/adjustments'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrLeave.adjustBalance),
+    queryKeys: noQuery,
+    responseSchema: hrLeaveBalanceSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrLeaveAccrualRun,
+    method: 'POST',
+    pattern: exact('/hr-leave/accruals/run'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrLeave.runAccruals),
+    queryKeys: noQuery,
+    responseSchema: hrLeaveAccrualRunResultSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
 ];
 
 export const ERP_MAROC_ROUTE_POLICY: readonly ErpMarocRoute[] =
@@ -2164,6 +2284,27 @@ const assertNormalizedQueryValue = (
   ) {
     return;
   }
+  if (
+    (routeId === erpMarocRouteIds.hrLeaveRequests ||
+      routeId === erpMarocRouteIds.hrLeaveBalances) &&
+    key === 'year' &&
+    /^(?:20\d{2}|21\d{2}|2200)$/.test(value)
+  ) {
+    return;
+  }
+  if (
+    routeId === erpMarocRouteIds.hrLeaveRequests &&
+    key === 'status' &&
+    new Set([
+      'REQUESTED',
+      'MANAGER_APPROVED',
+      'APPROVED',
+      'REJECTED',
+      'CANCELLED',
+    ]).has(value)
+  ) {
+    return;
+  }
   rejectRoute();
 };
 
@@ -2192,6 +2333,13 @@ const buildQueryString = (
   if (
     route.routeId === erpMarocRouteIds.hrAttendanceMonthly &&
     !values.has('month')
+  ) {
+    rejectRoute();
+  }
+  if (
+    (route.queryKeys === leaveRequestQuery ||
+      route.queryKeys === leaveBalanceQuery) &&
+    !values.has('year')
   ) {
     rejectRoute();
   }

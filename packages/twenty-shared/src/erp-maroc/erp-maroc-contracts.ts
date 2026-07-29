@@ -2932,6 +2932,15 @@ export const erpMarocRouteIds = {
   hrTimeEntries: 'hr-attendance.time-entries',
   hrTimeEntryCancel: 'hr-attendance.time-entry.cancel',
   hrAttendanceMonthly: 'hr-attendance.monthly',
+  hrLeavePolicies: 'hr-leave.policies',
+  hrLeavePolicySeedMorocco: 'hr-leave.policy.seed-morocco',
+  hrLeaveRequests: 'hr-leave.requests',
+  hrLeaveRequestEvidence: 'hr-leave.request.evidence',
+  hrLeaveRequestDecision: 'hr-leave.request.decision',
+  hrLeaveRequestCancel: 'hr-leave.request.cancel',
+  hrLeaveBalances: 'hr-leave.balances',
+  hrLeaveBalanceAdjustment: 'hr-leave.balance.adjustment',
+  hrLeaveAccrualRun: 'hr-leave.accrual.run',
   documentsCollection: 'documents.collection',
   documentDetail: 'documents.detail',
   documentContent: 'documents.content',
@@ -3317,6 +3326,20 @@ export const erpMarocUpstreamRoutes = {
     timeEntryCancel: (id: string) =>
       `/hr-attendance/time-entries/${encodeRouteId(id)}/cancel`,
     monthly: '/hr-attendance/monthly',
+  },
+  hrLeave: {
+    policies: '/hr-leave/policies',
+    seedMoroccoPolicies: '/hr-leave/policies/seed-morocco',
+    requests: '/hr-leave/requests',
+    requestEvidence: (id: string) =>
+      `/hr-leave/requests/${encodeRouteId(id)}/evidence`,
+    requestDecision: (id: string) =>
+      `/hr-leave/requests/${encodeRouteId(id)}/decision`,
+    requestCancel: (id: string) =>
+      `/hr-leave/requests/${encodeRouteId(id)}/cancel`,
+    balances: '/hr-leave/balances',
+    adjustBalance: '/hr-leave/balances/adjustments',
+    runAccruals: '/hr-leave/accruals/run',
   },
   documents: {
     collection: '/documents',

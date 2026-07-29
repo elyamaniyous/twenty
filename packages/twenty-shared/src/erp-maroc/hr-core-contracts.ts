@@ -139,6 +139,30 @@ export const hrAttendanceDayStatusSchema = z.enum([
   'ANOMALY',
   'UNSCHEDULED',
 ]);
+export const hrLeaveTypeSchema = z.enum([
+  'ANNUAL',
+  'SICK',
+  'MATERNITY',
+  'PATERNITY',
+  'BIRTH',
+  'MARRIAGE',
+  'BEREAVEMENT',
+  'UNPAID',
+  'OTHER',
+]);
+export const hrLeaveRequestStatusSchema = z.enum([
+  'REQUESTED',
+  'MANAGER_APPROVED',
+  'APPROVED',
+  'REJECTED',
+  'CANCELLED',
+]);
+export const hrLeaveBalanceMovementTypeSchema = z.enum([
+  'ACCRUAL',
+  'SENIORITY',
+  'CARRYOVER',
+  'ADJUSTMENT',
+]);
 
 export const hrAccessContextSchema = z.object({
   role: hrAccessRoleSchema.nullable(),
@@ -832,8 +856,8 @@ export const hrLifecycleJourneyListSchema = z.array(hrLifecycleJourneySchema);
 
 export const hrEmployeeLeaveRequestSchema = z.object({
   id: uuidSchema,
-  type: z.enum(['ANNUAL', 'SICK', 'MATERNITY', 'PATERNITY', 'UNPAID', 'OTHER']),
-  status: z.enum(['REQUESTED', 'APPROVED', 'REJECTED', 'CANCELLED']),
+  type: hrLeaveTypeSchema,
+  status: hrLeaveRequestStatusSchema,
   startDate: civilDateHttpSchema,
   endDate: civilDateHttpSchema,
   workingDays: z.number().finite().nonnegative(),
@@ -849,6 +873,130 @@ export const hrEmployeeLeaveBalanceSchema = z.object({
   consumedDays: z.number().finite().nonnegative(),
   availableDays: z.number().finite(),
   updatedAt: instantSchema,
+});
+
+export const hrLeavePolicySchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  code: z.string(),
+  name: z.string(),
+  type: hrLeaveTypeSchema,
+  isPaid: z.boolean(),
+  deductsAnnualBalance: z.boolean(),
+  adultMonthlyAccrualDays: z.number().finite().nonnegative(),
+  minorMonthlyAccrualDays: z.number().finite().nonnegative(),
+  eligibilityMonths: nonNegativeIntegerSchema,
+  seniorityStepYears: nonNegativeIntegerSchema,
+  seniorityBonusDays: z.number().finite().nonnegative(),
+  annualCapDays: z.number().finite().nonnegative().nullable(),
+  maximumWorkingDays: z.number().finite().positive().nullable(),
+  paidWorkingDaysLimit: z.number().finite().nonnegative().nullable(),
+  minimumNoticeDays: nonNegativeIntegerSchema,
+  evidenceRequiredAfterDays: z.number().finite().nonnegative().nullable(),
+  managerApprovalRequired: z.boolean(),
+  hrApprovalRequired: z.boolean(),
+  allowNegativeBalance: z.boolean(),
+  isActive: z.boolean(),
+  sourceReference: nullableStringSchema,
+  createdByTwentyUserId: z.string(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  _count: z.object({ requests: nonNegativeIntegerSchema }).optional(),
+});
+export const hrLeavePolicyListSchema = z.array(hrLeavePolicySchema);
+
+const hrLeaveEmployeeSummarySchema = z.object({
+  id: uuidSchema,
+  employeeNumber: z.string(),
+  firstName: z.string(),
+  lastName: z.string(),
+});
+
+const hrLeaveSupportingDocumentSchema = z.object({
+  id: uuidSchema,
+  title: z.string(),
+  category: hrDocumentCategorySchema,
+  versions: z.array(
+    z.object({
+      id: uuidSchema,
+      filename: z.string(),
+      createdAt: instantSchema,
+    }),
+  ),
+});
+
+export const hrLeaveRequestSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  employeeId: uuidSchema,
+  delegateEmployeeId: uuidSchema.nullable(),
+  policyId: uuidSchema.nullable(),
+  supportingDocumentId: uuidSchema.nullable(),
+  type: hrLeaveTypeSchema,
+  status: hrLeaveRequestStatusSchema,
+  startDate: civilDateHttpSchema,
+  endDate: civilDateHttpSchema,
+  workingDays: z.number().finite().nonnegative(),
+  evidenceRequired: z.boolean(),
+  reason: nullableStringSchema,
+  requestedByTwentyUserId: nullableStringSchema,
+  managerApprovedAt: instantSchema.nullable(),
+  managerApprovedByTwentyUserId: nullableStringSchema,
+  decidedAt: instantSchema.nullable(),
+  decidedByTwentyUserId: nullableStringSchema,
+  decisionReason: nullableStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  employee: hrLeaveEmployeeSummarySchema,
+  delegateEmployee: hrLeaveEmployeeSummarySchema.nullable(),
+  policy: hrLeavePolicySchema.nullable(),
+  supportingDocument: hrLeaveSupportingDocumentSchema.nullable(),
+});
+export const hrLeaveRequestListSchema = z.array(hrLeaveRequestSchema);
+
+export const hrLeaveBalanceMovementSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  employeeId: uuidSchema,
+  policyId: uuidSchema,
+  year: z.number().int().min(2000).max(2200),
+  type: hrLeaveBalanceMovementTypeSchema,
+  days: z.number().finite(),
+  effectiveDate: civilDateHttpSchema,
+  periodKey: z.string(),
+  reason: z.string(),
+  createdByTwentyUserId: z.string(),
+  createdAt: instantSchema,
+});
+
+export const hrLeaveBalanceSchema = z.object({
+  id: uuidSchema.nullable(),
+  employee: hrLeaveEmployeeSummarySchema,
+  year: z.number().int().min(2000).max(2200),
+  entitledDays: z.number().finite(),
+  carriedDays: z.number().finite(),
+  adjustmentDays: z.number().finite(),
+  consumedDays: z.number().finite().nonnegative(),
+  pendingDays: z.number().finite().nonnegative(),
+  availableDays: z.number().finite(),
+  movements: z.array(hrLeaveBalanceMovementSchema),
+});
+export const hrLeaveBalanceListSchema = z.array(hrLeaveBalanceSchema);
+
+export const hrLeavePolicySeedResultSchema = z.object({
+  createdCount: nonNegativeIntegerSchema,
+  policies: hrLeavePolicyListSchema,
+});
+
+export const hrLeaveAccrualRunResultSchema = z.object({
+  year: z.number().int().min(2000).max(2200),
+  asOfDate: civilDateHttpSchema,
+  employeeCount: nonNegativeIntegerSchema,
+  createdMovementCount: nonNegativeIntegerSchema,
+  balances: hrLeaveBalanceListSchema,
 });
 
 export const hrEmployeePayslipSummarySchema = z.object({
@@ -1113,6 +1261,11 @@ export type HrTimeEntryStatus = z.infer<typeof hrTimeEntryStatusSchema>;
 export type HrTimeWorkMode = z.infer<typeof hrTimeWorkModeSchema>;
 export type HrCalendarDayType = z.infer<typeof hrCalendarDayTypeSchema>;
 export type HrAttendanceDayStatus = z.infer<typeof hrAttendanceDayStatusSchema>;
+export type HrLeaveType = z.infer<typeof hrLeaveTypeSchema>;
+export type HrLeaveRequestStatus = z.infer<typeof hrLeaveRequestStatusSchema>;
+export type HrLeaveBalanceMovementType = z.infer<
+  typeof hrLeaveBalanceMovementTypeSchema
+>;
 export type HrAccessContext = z.infer<typeof hrAccessContextSchema>;
 export type HrAccessGrant = z.infer<typeof hrAccessGrantSchema>;
 export type HrAccessAdministration = z.infer<
@@ -1174,6 +1327,18 @@ export type HrEmployeeLeaveRequest = z.infer<
 >;
 export type HrEmployeeLeaveBalance = z.infer<
   typeof hrEmployeeLeaveBalanceSchema
+>;
+export type HrLeavePolicy = z.infer<typeof hrLeavePolicySchema>;
+export type HrLeaveRequest = z.infer<typeof hrLeaveRequestSchema>;
+export type HrLeaveBalanceMovement = z.infer<
+  typeof hrLeaveBalanceMovementSchema
+>;
+export type HrLeaveBalance = z.infer<typeof hrLeaveBalanceSchema>;
+export type HrLeavePolicySeedResult = z.infer<
+  typeof hrLeavePolicySeedResultSchema
+>;
+export type HrLeaveAccrualRunResult = z.infer<
+  typeof hrLeaveAccrualRunResultSchema
 >;
 export type HrEmployeePayslipSummary = z.infer<
   typeof hrEmployeePayslipSummarySchema

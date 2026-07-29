@@ -8,12 +8,129 @@ import {
   hrEmployeeImportPreviewSchema,
   hrGradeSchema,
   hrJobPositionSchema,
+  hrLeaveBalanceSchema,
+  hrLeavePolicySchema,
+  hrLeaveRequestSchema,
   hrLifecycleJourneySchema,
   hrOrganisationChartSchema,
   hrAttendanceMonthSchema,
   hrWorkCalendarSchema,
   hrWorkScheduleSchema,
 } from './hr-core-contracts';
+
+describe('HR leave management contracts', () => {
+  it('parses an explained balance and a delegated two-step request', () => {
+    const organisationId = '11111111-1111-4111-8111-111111111111';
+    const societeId = '22222222-2222-4222-8222-222222222222';
+    const employeeId = '33333333-3333-4333-8333-333333333333';
+    const delegateEmployeeId = '44444444-4444-4444-8444-444444444444';
+    const policyId = '55555555-5555-4555-8555-555555555555';
+    const movementId = '66666666-6666-4666-8666-666666666666';
+    const now = '2026-07-29T12:00:00.000Z';
+    const employee = {
+      id: employeeId,
+      employeeNumber: 'ZOW-001',
+      firstName: 'Salma',
+      lastName: 'Alaoui',
+    };
+    const delegateEmployee = {
+      id: delegateEmployeeId,
+      employeeNumber: 'ZOW-002',
+      firstName: 'Omar',
+      lastName: 'Idrissi',
+    };
+    const policy = hrLeavePolicySchema.parse({
+      id: policyId,
+      organisationId,
+      societeId,
+      code: 'MA-MARRIAGE',
+      name: 'Mariage du salarié',
+      type: 'MARRIAGE',
+      isPaid: true,
+      deductsAnnualBalance: false,
+      adultMonthlyAccrualDays: 0,
+      minorMonthlyAccrualDays: 0,
+      eligibilityMonths: 0,
+      seniorityStepYears: 0,
+      seniorityBonusDays: 0,
+      annualCapDays: null,
+      maximumWorkingDays: 4,
+      paidWorkingDaysLimit: 2,
+      minimumNoticeDays: 0,
+      evidenceRequiredAfterDays: 1,
+      managerApprovalRequired: true,
+      hrApprovalRequired: true,
+      allowNegativeBalance: true,
+      isActive: true,
+      sourceReference: 'Code du travail marocain, articles 274 et 276',
+      createdByTwentyUserId: 'admin-user',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const request = hrLeaveRequestSchema.parse({
+      id: '77777777-7777-4777-8777-777777777777',
+      organisationId,
+      societeId,
+      employeeId,
+      delegateEmployeeId,
+      policyId,
+      supportingDocumentId: null,
+      type: 'MARRIAGE',
+      status: 'MANAGER_APPROVED',
+      startDate: '2026-08-03T00:00:00.000Z',
+      endDate: '2026-08-06T00:00:00.000Z',
+      workingDays: 4,
+      evidenceRequired: true,
+      reason: 'Mariage',
+      requestedByTwentyUserId: 'manager-user',
+      managerApprovedAt: now,
+      managerApprovedByTwentyUserId: 'manager-user',
+      decidedAt: null,
+      decidedByTwentyUserId: null,
+      decisionReason: null,
+      createdAt: now,
+      updatedAt: now,
+      employee,
+      delegateEmployee,
+      policy,
+      supportingDocument: null,
+    });
+    const balance = hrLeaveBalanceSchema.parse({
+      id: '88888888-8888-4888-8888-888888888888',
+      employee,
+      year: 2026,
+      entitledDays: 10.5,
+      carriedDays: 2,
+      adjustmentDays: -0.5,
+      consumedDays: 3,
+      pendingDays: 2,
+      availableDays: 7,
+      movements: [
+        {
+          id: movementId,
+          organisationId,
+          societeId,
+          employeeId,
+          policyId,
+          year: 2026,
+          type: 'ADJUSTMENT',
+          days: -0.5,
+          effectiveDate: '2026-07-01',
+          periodKey: 'manual:test',
+          reason: 'Régularisation validée',
+          createdByTwentyUserId: 'admin-user',
+          createdAt: now,
+        },
+      ],
+    });
+
+    expect(request.startDate).toBe('2026-08-03');
+    expect(request.delegateEmployee?.id).toBe(delegateEmployeeId);
+    expect(policy.paidWorkingDaysLimit).toBe(2);
+    expect(balance.movements[0]?.days).toBe(-0.5);
+  });
+});
 
 describe('hrEmployeeDetailSchema', () => {
   it('parses the private employee record without exposing bank secrets', () => {

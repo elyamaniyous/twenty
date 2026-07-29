@@ -29,13 +29,17 @@ const leaveTypeLabels: Record<string, string> = {
   ANNUAL: 'Congé annuel',
   SICK: 'Maladie',
   MATERNITY: 'Maternité',
-  PATERNITY: 'Paternité',
+  PATERNITY: 'Naissance',
+  BIRTH: 'Naissance',
+  MARRIAGE: 'Mariage',
+  BEREAVEMENT: 'Décès',
   UNPAID: 'Sans solde',
   OTHER: 'Autre',
 };
 
 const statusLabels: Record<string, string> = {
   REQUESTED: 'Demandé',
+  MANAGER_APPROVED: 'Validé manager',
   APPROVED: 'Approuvé',
   REJECTED: 'Rejeté',
   CANCELLED: 'Annulé',
@@ -46,6 +50,7 @@ const statusLabels: Record<string, string> = {
 
 const statusTones: Record<string, ErpStatusTone> = {
   REQUESTED: 'warning',
+  MANAGER_APPROVED: 'warning',
   APPROVED: 'success',
   REJECTED: 'danger',
   CANCELLED: 'neutral',
@@ -74,6 +79,11 @@ const historyLabels: Record<string, string> = {
   HR_WORK_SCHEDULE_ASSIGNED: 'Horaire de travail affecté',
   HR_TIME_ENTRY_RECORDED: 'Pointage enregistré',
   HR_TIME_ENTRY_CANCELLED: 'Pointage annulé',
+  HR_LEAVE_REQUEST_CREATED: 'Demande de congé créée',
+  HR_LEAVE_MANAGER_APPROVED: 'Congé validé par le manager',
+  HR_LEAVE_APPROVED: 'Congé approuvé par les RH',
+  HR_LEAVE_REJECTED: 'Demande de congé refusée',
+  HR_LEAVE_CANCELLED: 'Demande de congé annulée',
   EMPLOYMENT_CONTRACT_CREATED: 'Contrat créé',
   EMPLOYMENT_CONTRACT_ACTIVATED: 'Contrat activé',
   EMPLOYMENT_CONTRACT_ENDED: 'Contrat terminé',
@@ -85,6 +95,7 @@ const attendanceStatusLabels: Record<string, string> = {
   LATE: 'En retard',
   ABSENT: 'Absent',
   ON_LEAVE: 'En congé',
+  HOLIDAY: 'Férié',
   ANOMALY: 'Anomalie',
   UNSCHEDULED: 'Hors planning',
 };
@@ -95,6 +106,7 @@ const attendanceStatusTones: Record<string, ErpStatusTone> = {
   LATE: 'warning',
   ABSENT: 'danger',
   ON_LEAVE: 'neutral',
+  HOLIDAY: 'neutral',
   ANOMALY: 'danger',
   UNSCHEDULED: 'neutral',
 };

@@ -56,6 +56,7 @@ import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { HrAccessManagementPanel } from './HrAccessManagementPanel';
 import { HrEmployeeImportPanel } from './HrEmployeeImportPanel';
 import { HrLifecyclePanel } from './HrLifecyclePanel';
+import { HrLeaveManagementPanel } from './HrLeaveManagementPanel';
 import { HrOrganisationChartPanel } from './HrOrganisationChartPanel';
 import { HrTimeAttendancePanel } from './HrTimeAttendancePanel';
 
@@ -89,6 +90,7 @@ type View =
   | 'deadlines'
   | 'journeys'
   | 'attendance'
+  | 'leave'
   | 'access';
 type LoadState = 'loading' | 'ready' | 'error';
 type StructureView = Exclude<
@@ -99,6 +101,7 @@ type StructureView = Exclude<
   | 'journeys'
   | 'access'
   | 'attendance'
+  | 'leave'
 >;
 
 const EMPTY_SUMMARY: HrCoreSummary = {
@@ -284,6 +287,7 @@ const viewLabels: Record<View, string> = {
   deadlines: 'Échéances',
   journeys: 'Parcours RH',
   attendance: 'Présences',
+  leave: 'Congés',
   access: 'Accès RH',
 };
 
@@ -293,6 +297,7 @@ const isStructureView = (view: View): view is StructureView =>
   view !== 'deadlines' &&
   view !== 'journeys' &&
   view !== 'attendance' &&
+  view !== 'leave' &&
   view !== 'access';
 
 export const ErpHrCorePage = () => {
@@ -1177,6 +1182,13 @@ export const ErpHrCorePage = () => {
         canWrite={access?.canWriteTime ?? false}
         query={query}
       />
+    ) : view === 'leave' ? (
+      <HrLeaveManagementPanel
+        employees={employees}
+        canWrite={access?.canWriteTime ?? false}
+        canWriteDocuments={access?.canWriteDocuments ?? false}
+        query={query}
+      />
     ) : (
       <HrAccessManagementPanel
         establishments={establishments}
@@ -1187,7 +1199,8 @@ export const ErpHrCorePage = () => {
   const visibleViews = (Object.keys(viewLabels) as View[]).filter(
     (target) =>
       (target !== 'access' || access?.canAdministerAccess) &&
-      (target !== 'attendance' || access?.canReadTime),
+      (target !== 'attendance' || access?.canReadTime) &&
+      (target !== 'leave' || access?.canReadTime),
   );
 
   return (
