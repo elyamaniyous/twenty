@@ -57,6 +57,11 @@ import {
   hrTeamSchema,
   hrWorkLocationListSchema,
   hrWorkLocationSchema,
+  hrAttendanceMonthSchema,
+  hrTimeEntrySchema,
+  hrWorkScheduleAssignmentSchema,
+  hrWorkScheduleListSchema,
+  hrWorkScheduleSchema,
   marketingAutomationListSchema,
   marketingAutomationSchema,
   marketingCampaignListSchema,
@@ -169,6 +174,7 @@ const grandLivreQuery = Object.freeze([
   ...accountingReportQuery,
 ]);
 const lettrageQuery = Object.freeze(['accountCode']);
+const attendanceQuery = Object.freeze(['month', 'employeeId']);
 const pdfSchema = z.instanceof(Uint8Array);
 
 const exact = (path: string) => new RegExp(`^${path}$`);
@@ -1889,6 +1895,68 @@ const routes: ErpMarocRoute[] = [
     kind: 'json',
     idempotency: 'required',
   }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrWorkSchedules,
+    method: 'GET',
+    pattern: exact('/hr-attendance/work-schedules'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrAttendance.workSchedules),
+    queryKeys: noQuery,
+    responseSchema: hrWorkScheduleListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrWorkSchedules,
+    method: 'POST',
+    pattern: exact('/hr-attendance/work-schedules'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrAttendance.workSchedules),
+    queryKeys: noQuery,
+    responseSchema: hrWorkScheduleSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrEmployeeWorkScheduleAssignments,
+    method: 'POST',
+    pattern: action('hr-attendance/employees', 'work-schedule-assignments'),
+    build: idBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.employeeWorkScheduleAssignments,
+    ),
+    queryKeys: noQuery,
+    responseSchema: hrWorkScheduleAssignmentSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrTimeEntries,
+    method: 'POST',
+    pattern: exact('/hr-attendance/time-entries'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrAttendance.timeEntries),
+    queryKeys: noQuery,
+    responseSchema: hrTimeEntrySchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrTimeEntryCancel,
+    method: 'PATCH',
+    pattern: action('hr-attendance/time-entries', 'cancel'),
+    build: idBuilder(erpMarocUpstreamRoutes.hrAttendance.timeEntryCancel),
+    queryKeys: noQuery,
+    responseSchema: hrTimeEntrySchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrAttendanceMonthly,
+    method: 'GET',
+    pattern: exact('/hr-attendance/monthly'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrAttendance.monthly),
+    queryKeys: attendanceQuery,
+    responseSchema: hrAttendanceMonthSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
 ];
 
 export const ERP_MAROC_ROUTE_POLICY: readonly ErpMarocRoute[] =
@@ -1978,7 +2046,12 @@ const assertNormalizedQueryValue = (
   value: string,
 ): void => {
   if (value.length === 0 || value.trim() !== value) rejectRoute();
-  if (key === 'cursor' || key === 'tierId' || key === 'invoiceId') {
+  if (
+    key === 'cursor' ||
+    key === 'tierId' ||
+    key === 'invoiceId' ||
+    key === 'employeeId'
+  ) {
     if (!uuidSchema.safeParse(value).success) rejectRoute();
     return;
   }
@@ -2027,6 +2100,13 @@ const assertNormalizedQueryValue = (
     if (key === 'status' && accountingEntryStatuses.has(value)) return;
     if (key === 'sourceType' && accountingSourceTypes.has(value)) return;
   }
+  if (
+    routeId === erpMarocRouteIds.hrAttendanceMonthly &&
+    key === 'month' &&
+    /^\d{4}-(?:0[1-9]|1[0-2])$/.test(value)
+  ) {
+    return;
+  }
   rejectRoute();
 };
 
@@ -2046,6 +2126,12 @@ const buildQueryString = (
     (route.routeId === erpMarocRouteIds.accountingGrandLivre ||
       route.routeId === erpMarocRouteIds.accountingLettrageSuggestions) &&
     !values.has('accountCode')
+  ) {
+    rejectRoute();
+  }
+  if (
+    route.routeId === erpMarocRouteIds.hrAttendanceMonthly &&
+    !values.has('month')
   ) {
     rejectRoute();
   }

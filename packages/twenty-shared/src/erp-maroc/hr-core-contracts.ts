@@ -62,6 +62,8 @@ export const hrFieldPermissionSchema = z.enum([
   'HR_CONTRACT_WRITE',
   'HR_DOCUMENT_READ',
   'HR_DOCUMENT_WRITE',
+  'HR_TIME_READ',
+  'HR_TIME_WRITE',
 ]);
 export const hrAssignmentTypeSchema = z.enum([
   'PRIMARY',
@@ -107,6 +109,29 @@ export const hrLifecycleTaskStatusSchema = z.enum([
   'COMPLETED',
   'SKIPPED',
 ]);
+export const hrTimeEntryTypeSchema = z.enum([
+  'CLOCK_IN',
+  'CLOCK_OUT',
+  'BREAK_START',
+  'BREAK_END',
+]);
+export const hrTimeEntrySourceSchema = z.enum([
+  'MANUAL',
+  'IMPORT',
+  'DEVICE',
+  'API',
+]);
+export const hrTimeEntryStatusSchema = z.enum(['ACTIVE', 'CANCELLED']);
+export const hrTimeWorkModeSchema = z.enum(['ONSITE', 'REMOTE', 'CLIENT_SITE']);
+export const hrAttendanceDayStatusSchema = z.enum([
+  'PLANNED',
+  'PRESENT',
+  'LATE',
+  'ABSENT',
+  'ON_LEAVE',
+  'ANOMALY',
+  'UNSCHEDULED',
+]);
 
 export const hrAccessContextSchema = z.object({
   role: hrAccessRoleSchema.nullable(),
@@ -125,6 +150,8 @@ export const hrAccessContextSchema = z.object({
   canWriteContracts: z.boolean(),
   canReadDocuments: z.boolean(),
   canWriteDocuments: z.boolean(),
+  canReadTime: z.boolean(),
+  canWriteTime: z.boolean(),
   canAdministerAccess: z.boolean(),
 });
 
@@ -829,6 +856,122 @@ export const hrEmployeePayslipSummarySchema = z.object({
   createdAt: instantSchema,
 });
 
+export const hrWorkScheduleDaySchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  workScheduleId: uuidSchema,
+  weekday: z.number().int().min(1).max(7),
+  isWorkingDay: z.boolean(),
+  startMinute: z.number().int().min(0).max(1439).nullable(),
+  endMinute: z.number().int().min(1).max(1440).nullable(),
+  breakMinutes: z.number().int().min(0).max(1439),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+
+export const hrWorkScheduleSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  code: z.string(),
+  name: z.string(),
+  timezone: z.string(),
+  lateToleranceMinutes: z.number().int().min(0),
+  isActive: z.boolean(),
+  createdByTwentyUserId: z.string(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  days: z.array(hrWorkScheduleDaySchema),
+  _count: z.object({ assignments: nonNegativeIntegerSchema }).optional(),
+});
+export const hrWorkScheduleListSchema = z.array(hrWorkScheduleSchema);
+
+export const hrWorkScheduleAssignmentSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  employeeId: uuidSchema,
+  workScheduleId: uuidSchema,
+  validFrom: civilDateHttpSchema,
+  validTo: nullableCivilDateHttpSchema,
+  createdByTwentyUserId: z.string(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  workSchedule: hrWorkScheduleSchema,
+});
+
+export const hrTimeEntrySchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  employeeId: uuidSchema,
+  externalId: z.string(),
+  type: hrTimeEntryTypeSchema,
+  source: hrTimeEntrySourceSchema,
+  status: hrTimeEntryStatusSchema,
+  workMode: hrTimeWorkModeSchema,
+  occurredAt: instantSchema,
+  localDate: civilDateHttpSchema,
+  notes: nullableStringSchema,
+  recordedByTwentyUserId: z.string(),
+  cancelledAt: instantSchema.nullable(),
+  cancelledByTwentyUserId: nullableStringSchema,
+  cancellationReason: nullableStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+
+export const hrAttendanceDaySchema = z.object({
+  date: civilDateHttpSchema,
+  schedule: z
+    .object({
+      id: uuidSchema,
+      code: z.string(),
+      name: z.string(),
+      timezone: z.string(),
+    })
+    .nullable(),
+  status: hrAttendanceDayStatusSchema,
+  firstClockIn: instantSchema.nullable(),
+  lastClockOut: instantSchema.nullable(),
+  workedMinutes: nonNegativeIntegerSchema,
+  scheduledMinutes: nonNegativeIntegerSchema,
+  overtimeMinutes: nonNegativeIntegerSchema,
+  lateMinutes: nonNegativeIntegerSchema,
+  earlyLeaveMinutes: nonNegativeIntegerSchema,
+  breakMinutes: nonNegativeIntegerSchema,
+  anomalies: z.array(z.string()),
+  entries: z.array(hrTimeEntrySchema),
+});
+
+export const hrAttendanceEmployeeMonthSchema = z.object({
+  employee: z.object({
+    id: uuidSchema,
+    employeeNumber: z.string(),
+    firstName: z.string(),
+    lastName: z.string(),
+  }),
+  summary: z.object({
+    scheduledDays: nonNegativeIntegerSchema,
+    presentDays: nonNegativeIntegerSchema,
+    absentDays: nonNegativeIntegerSchema,
+    leaveDays: nonNegativeIntegerSchema,
+    lateCount: nonNegativeIntegerSchema,
+    lateMinutes: nonNegativeIntegerSchema,
+    workedMinutes: nonNegativeIntegerSchema,
+    overtimeMinutes: nonNegativeIntegerSchema,
+    anomalyCount: nonNegativeIntegerSchema,
+  }),
+  days: z.array(hrAttendanceDaySchema),
+});
+
+export const hrAttendanceMonthSchema = z.object({
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  generatedAt: instantSchema,
+  employees: z.array(hrAttendanceEmployeeMonthSchema),
+});
+
 export const hrEmployeeHistoryEventSchema = z.object({
   id: uuidSchema,
   action: z.string(),
@@ -898,6 +1041,11 @@ export type HrDocumentStatus = z.infer<typeof hrDocumentStatusSchema>;
 export type HrLifecycleType = z.infer<typeof hrLifecycleTypeSchema>;
 export type HrLifecycleStatus = z.infer<typeof hrLifecycleStatusSchema>;
 export type HrLifecycleTaskStatus = z.infer<typeof hrLifecycleTaskStatusSchema>;
+export type HrTimeEntryType = z.infer<typeof hrTimeEntryTypeSchema>;
+export type HrTimeEntrySource = z.infer<typeof hrTimeEntrySourceSchema>;
+export type HrTimeEntryStatus = z.infer<typeof hrTimeEntryStatusSchema>;
+export type HrTimeWorkMode = z.infer<typeof hrTimeWorkModeSchema>;
+export type HrAttendanceDayStatus = z.infer<typeof hrAttendanceDayStatusSchema>;
 export type HrAccessContext = z.infer<typeof hrAccessContextSchema>;
 export type HrAccessGrant = z.infer<typeof hrAccessGrantSchema>;
 export type HrAccessAdministration = z.infer<
@@ -963,6 +1111,17 @@ export type HrEmployeeLeaveBalance = z.infer<
 export type HrEmployeePayslipSummary = z.infer<
   typeof hrEmployeePayslipSummarySchema
 >;
+export type HrWorkScheduleDay = z.infer<typeof hrWorkScheduleDaySchema>;
+export type HrWorkSchedule = z.infer<typeof hrWorkScheduleSchema>;
+export type HrWorkScheduleAssignment = z.infer<
+  typeof hrWorkScheduleAssignmentSchema
+>;
+export type HrTimeEntry = z.infer<typeof hrTimeEntrySchema>;
+export type HrAttendanceDay = z.infer<typeof hrAttendanceDaySchema>;
+export type HrAttendanceEmployeeMonth = z.infer<
+  typeof hrAttendanceEmployeeMonthSchema
+>;
+export type HrAttendanceMonth = z.infer<typeof hrAttendanceMonthSchema>;
 export type HrEmployeeHistoryEvent = z.infer<
   typeof hrEmployeeHistoryEventSchema
 >;

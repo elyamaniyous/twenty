@@ -2,9 +2,14 @@ import {
   ErpStatusBadge,
   type ErpStatusTone,
 } from '@/erp-maroc/components/ErpStatusBadge';
+import { useErpMarocContext } from '@/erp-maroc/context/useErpMarocContext';
 import { styled } from '@linaria/react';
-import { useMemo, useState } from 'react';
-import { type HrEmployeeDetail } from 'twenty-shared/erp-maroc';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  hrAttendanceMonthSchema,
+  type HrAttendanceEmployeeMonth,
+  type HrEmployeeDetail,
+} from 'twenty-shared/erp-maroc';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 type Props = {
@@ -66,9 +71,32 @@ const historyLabels: Record<string, string> = {
   HR_EMPLOYEE_CRM_LINKED: 'Profil CRM lié',
   HR_EMPLOYEE_CRM_SYNCED: 'Profil CRM synchronisé',
   HR_EMPLOYEE_CRM_UNLINKED: 'Profil CRM délié',
+  HR_WORK_SCHEDULE_ASSIGNED: 'Horaire de travail affecté',
+  HR_TIME_ENTRY_RECORDED: 'Pointage enregistré',
+  HR_TIME_ENTRY_CANCELLED: 'Pointage annulé',
   EMPLOYMENT_CONTRACT_CREATED: 'Contrat créé',
   EMPLOYMENT_CONTRACT_ACTIVATED: 'Contrat activé',
   EMPLOYMENT_CONTRACT_ENDED: 'Contrat terminé',
+};
+
+const attendanceStatusLabels: Record<string, string> = {
+  PLANNED: 'Planifié',
+  PRESENT: 'Présent',
+  LATE: 'En retard',
+  ABSENT: 'Absent',
+  ON_LEAVE: 'En congé',
+  ANOMALY: 'Anomalie',
+  UNSCHEDULED: 'Hors planning',
+};
+
+const attendanceStatusTones: Record<string, ErpStatusTone> = {
+  PLANNED: 'neutral',
+  PRESENT: 'success',
+  LATE: 'warning',
+  ABSENT: 'danger',
+  ON_LEAVE: 'neutral',
+  ANOMALY: 'danger',
+  UNSCHEDULED: 'neutral',
 };
 
 const StyledSection = styled.section`
@@ -181,9 +209,30 @@ const formatInstant = (value: string) =>
     timeStyle: 'short',
   }).format(new Date(value));
 
+const formatClock = (value: string | null) =>
+  value === null
+    ? '—'
+    : new Intl.DateTimeFormat('fr-MA', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(value));
+
+const formatDuration = (minutes: number) =>
+  `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')}`;
+
 export const Employee360Tabs = ({ employee }: Props) => {
+  const { client } = useErpMarocContext();
   const [view, setView] = useState<View>('time');
+  const [attendance, setAttendance] =
+    useState<HrAttendanceEmployeeMonth | null>(null);
   const currentYear = new Date().getFullYear();
+  const month = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Casablanca',
+    year: 'numeric',
+    month: '2-digit',
+  })
+    .format(new Date())
+    .slice(0, 7);
   const activeContract = employee.employmentContracts.find(
     (contract) =>
       contract.status === 'ACTIVE' || contract.status === 'SUSPENDED',
@@ -199,6 +248,32 @@ export const Employee360Tabs = ({ employee }: Props) => {
         .reduce((total, leave) => total + leave.workingDays, 0),
     [employee.leaveRequests],
   );
+
+  useEffect(() => {
+    let active = true;
+    if (!employee.access.canReadTime) {
+      setAttendance(null);
+      return () => {
+        active = false;
+      };
+    }
+    void client
+      .request({
+        method: 'GET',
+        path: '/hr-attendance/monthly',
+        query: { month, employeeId: employee.id },
+        schema: hrAttendanceMonthSchema,
+      })
+      .then((result) => {
+        if (active) setAttendance(result.employees[0] ?? null);
+      })
+      .catch(() => {
+        if (active) setAttendance(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [client, employee.access.canReadTime, employee.id, month]);
 
   return (
     <StyledSection>
@@ -225,36 +300,92 @@ export const Employee360Tabs = ({ employee }: Props) => {
           <StyledMetrics>
             <StyledMetric>
               <StyledMetricValue>
-                {activeContract === undefined
-                  ? '—'
-                  : `${activeContract.weeklyHoursHundredths / 100} h`}
+                {attendance === null
+                  ? activeContract === undefined
+                    ? '—'
+                    : `${activeContract.weeklyHoursHundredths / 100} h`
+                  : formatDuration(attendance.summary.workedMinutes)}
               </StyledMetricValue>
-              <StyledMuted>Horaire contractuel hebdomadaire</StyledMuted>
+              <StyledMuted>
+                {attendance === null
+                  ? 'Horaire contractuel hebdomadaire'
+                  : `Heures réalisées · ${month}`}
+              </StyledMuted>
             </StyledMetric>
             <StyledMetric>
               <StyledMetricValue>
-                {
+                {attendance?.summary.presentDays ??
                   employee.assignments.filter(
                     (assignment) => assignment.endDate === null,
-                  ).length
-                }
+                  ).length}
               </StyledMetricValue>
-              <StyledMuted>Affectations actives</StyledMuted>
+              <StyledMuted>
+                {attendance === null
+                  ? 'Affectations actives'
+                  : 'Jours présents'}
+              </StyledMuted>
             </StyledMetric>
             <StyledMetric>
               <StyledMetricValue>
-                {activeContract?.startDate ?? '—'}
+                {attendance?.summary.lateMinutes ??
+                  activeContract?.startDate ??
+                  '—'}
               </StyledMetricValue>
-              <StyledMuted>Début du contrat actif</StyledMuted>
+              <StyledMuted>
+                {attendance === null
+                  ? 'Début du contrat actif'
+                  : 'Minutes de retard'}
+              </StyledMuted>
             </StyledMetric>
             <StyledMetric>
               <StyledMetricValue>
-                {activeContract?.paymentFrequency ?? '—'}
+                {attendance?.summary.anomalyCount ??
+                  activeContract?.paymentFrequency ??
+                  '—'}
               </StyledMetricValue>
-              <StyledMuted>Fréquence de paie</StyledMuted>
+              <StyledMuted>
+                {attendance === null
+                  ? 'Fréquence de paie'
+                  : 'Anomalies de pointage'}
+              </StyledMuted>
             </StyledMetric>
           </StyledMetrics>
-          {employee.assignments.length === 0 ? (
+          {attendance !== null ? (
+            attendance.days.length === 0 ? (
+              <StyledEmpty>Aucune journée planifiée pour ce mois.</StyledEmpty>
+            ) : (
+              attendance.days
+                .slice()
+                .reverse()
+                .slice(0, 15)
+                .map((day) => (
+                  <StyledRow key={day.date}>
+                    <StyledCell>
+                      <strong>{day.date}</strong>
+                      <StyledMuted>
+                        {day.schedule?.name ?? 'Hors planning'}
+                      </StyledMuted>
+                    </StyledCell>
+                    <span>
+                      {formatClock(day.firstClockIn)} →{' '}
+                      {formatClock(day.lastClockOut)}
+                    </span>
+                    <StyledCell>
+                      <span>{formatDuration(day.workedMinutes)}</span>
+                      <StyledMuted>
+                        {day.overtimeMinutes > 0
+                          ? `+${day.overtimeMinutes} min supplémentaires`
+                          : `${day.lateMinutes} min de retard`}
+                      </StyledMuted>
+                    </StyledCell>
+                    <ErpStatusBadge
+                      label={attendanceStatusLabels[day.status] ?? day.status}
+                      tone={attendanceStatusTones[day.status] ?? 'neutral'}
+                    />
+                  </StyledRow>
+                ))
+            )
+          ) : employee.assignments.length === 0 ? (
             <StyledEmpty>Aucune affectation historisée.</StyledEmpty>
           ) : (
             employee.assignments.slice(0, 8).map((assignment) => (

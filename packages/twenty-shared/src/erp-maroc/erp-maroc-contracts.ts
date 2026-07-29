@@ -2922,6 +2922,12 @@ export const erpMarocRouteIds = {
   hrContractStatus: 'hr-core.contract.status',
   hrContractAmendments: 'hr-core.contract.amendments',
   hrAmendmentStatus: 'hr-core.amendment.status',
+  hrWorkSchedules: 'hr-attendance.work-schedules',
+  hrEmployeeWorkScheduleAssignments:
+    'hr-attendance.employee.work-schedule-assignments',
+  hrTimeEntries: 'hr-attendance.time-entries',
+  hrTimeEntryCancel: 'hr-attendance.time-entry.cancel',
+  hrAttendanceMonthly: 'hr-attendance.monthly',
   documentsCollection: 'documents.collection',
   documentDetail: 'documents.detail',
   documentContent: 'documents.content',
@@ -3293,6 +3299,15 @@ export const erpMarocUpstreamRoutes = {
       `/hr-core/contracts/${encodeRouteId(id)}/amendments`,
     amendmentStatus: (id: string) =>
       `/hr-core/amendments/${encodeRouteId(id)}/status`,
+  },
+  hrAttendance: {
+    workSchedules: '/hr-attendance/work-schedules',
+    employeeWorkScheduleAssignments: (id: string) =>
+      `/hr-attendance/employees/${encodeRouteId(id)}/work-schedule-assignments`,
+    timeEntries: '/hr-attendance/time-entries',
+    timeEntryCancel: (id: string) =>
+      `/hr-attendance/time-entries/${encodeRouteId(id)}/cancel`,
+    monthly: '/hr-attendance/monthly',
   },
   documents: {
     collection: '/documents',

@@ -57,6 +57,7 @@ import { HrAccessManagementPanel } from './HrAccessManagementPanel';
 import { HrEmployeeImportPanel } from './HrEmployeeImportPanel';
 import { HrLifecyclePanel } from './HrLifecyclePanel';
 import { HrOrganisationChartPanel } from './HrOrganisationChartPanel';
+import { HrTimeAttendancePanel } from './HrTimeAttendancePanel';
 
 const StyledActionLink = styled(Link)`
   align-items: center;
@@ -87,11 +88,17 @@ type View =
   | 'organisationChart'
   | 'deadlines'
   | 'journeys'
+  | 'attendance'
   | 'access';
 type LoadState = 'loading' | 'ready' | 'error';
 type StructureView = Exclude<
   View,
-  'employees' | 'organisationChart' | 'deadlines' | 'journeys' | 'access'
+  | 'employees'
+  | 'organisationChart'
+  | 'deadlines'
+  | 'journeys'
+  | 'access'
+  | 'attendance'
 >;
 
 const EMPTY_SUMMARY: HrCoreSummary = {
@@ -276,6 +283,7 @@ const viewLabels: Record<View, string> = {
   organisationChart: 'Organigramme',
   deadlines: 'Échéances',
   journeys: 'Parcours RH',
+  attendance: 'Présences',
   access: 'Accès RH',
 };
 
@@ -284,6 +292,7 @@ const isStructureView = (view: View): view is StructureView =>
   view !== 'organisationChart' &&
   view !== 'deadlines' &&
   view !== 'journeys' &&
+  view !== 'attendance' &&
   view !== 'access';
 
 export const ErpHrCorePage = () => {
@@ -1161,6 +1170,12 @@ export const ErpHrCorePage = () => {
         query={query}
         onChanged={load}
       />
+    ) : view === 'attendance' ? (
+      <HrTimeAttendancePanel
+        employees={employees}
+        canWrite={access?.canWriteTime ?? false}
+        query={query}
+      />
     ) : (
       <HrAccessManagementPanel
         establishments={establishments}
@@ -1169,7 +1184,9 @@ export const ErpHrCorePage = () => {
     );
 
   const visibleViews = (Object.keys(viewLabels) as View[]).filter(
-    (target) => target !== 'access' || access?.canAdministerAccess,
+    (target) =>
+      (target !== 'access' || access?.canAdministerAccess) &&
+      (target !== 'attendance' || access?.canReadTime),
   );
 
   return (

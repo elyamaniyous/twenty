@@ -204,6 +204,8 @@ const permissionLabels: Record<HrFieldPermission, string> = {
   HR_CONTRACT_WRITE: 'Gérer contrats et avenants',
   HR_DOCUMENT_READ: 'Consulter les documents RH',
   HR_DOCUMENT_WRITE: 'Gérer les documents RH',
+  HR_TIME_READ: 'Consulter les présences et pointages',
+  HR_TIME_WRITE: 'Gérer les horaires et pointages',
 };
 
 const permissionsByRole: Record<HrAccessRole, readonly HrFieldPermission[]> = {
@@ -213,6 +215,8 @@ const permissionsByRole: Record<HrAccessRole, readonly HrFieldPermission[]> = {
     'HR_PRIVATE_WRITE',
     'HR_DOCUMENT_READ',
     'HR_DOCUMENT_WRITE',
+    'HR_TIME_READ',
+    'HR_TIME_WRITE',
   ],
   PAYROLL_MANAGER: [
     'HR_PRIVATE_READ',
@@ -220,8 +224,9 @@ const permissionsByRole: Record<HrAccessRole, readonly HrFieldPermission[]> = {
     'HR_BANK_WRITE',
     'HR_COMPENSATION_READ',
     'HR_DOCUMENT_READ',
+    'HR_TIME_READ',
   ],
-  HR_VIEWER: [],
+  HR_VIEWER: ['HR_TIME_READ'],
 };
 
 const emptyForm = (user?: AccessUser): GrantForm => {

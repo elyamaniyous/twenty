@@ -57,6 +57,11 @@ import {
   hrTeamSchema,
   hrWorkLocationListSchema,
   hrWorkLocationSchema,
+  hrAttendanceMonthSchema,
+  hrTimeEntrySchema,
+  hrWorkScheduleAssignmentSchema,
+  hrWorkScheduleListSchema,
+  hrWorkScheduleSchema,
   marketingAutomationListSchema,
   marketingAutomationSchema,
   marketingCampaignListSchema,
@@ -191,6 +196,10 @@ const requiredIdempotencyRoutes = new Set([
   `PATCH /hr-core/contracts/${id}/status`,
   `POST /hr-core/contracts/${id}/amendments`,
   `PATCH /hr-core/amendments/${id}/status`,
+  'POST /hr-attendance/work-schedules',
+  `POST /hr-attendance/employees/${id}/work-schedule-assignments`,
+  'POST /hr-attendance/time-entries',
+  `PATCH /hr-attendance/time-entries/${id}/cancel`,
 ]);
 
 const approvedRoutes = [
@@ -932,6 +941,42 @@ const approvedRoutes = [
     'hr-core.amendment.status',
     hrContractAmendmentSchema,
   ],
+  [
+    'GET',
+    '/hr-attendance/work-schedules',
+    'hr-attendance.work-schedules',
+    hrWorkScheduleListSchema,
+  ],
+  [
+    'POST',
+    '/hr-attendance/work-schedules',
+    'hr-attendance.work-schedules',
+    hrWorkScheduleSchema,
+  ],
+  [
+    'POST',
+    `/hr-attendance/employees/${id}/work-schedule-assignments`,
+    'hr-attendance.employee.work-schedule-assignments',
+    hrWorkScheduleAssignmentSchema,
+  ],
+  [
+    'POST',
+    '/hr-attendance/time-entries',
+    'hr-attendance.time-entries',
+    hrTimeEntrySchema,
+  ],
+  [
+    'PATCH',
+    `/hr-attendance/time-entries/${id}/cancel`,
+    'hr-attendance.time-entry.cancel',
+    hrTimeEntrySchema,
+  ],
+  [
+    'GET',
+    '/hr-attendance/monthly',
+    'hr-attendance.monthly',
+    hrAttendanceMonthSchema,
+  ],
 ] as const;
 
 describe('ERP Maroc route policy', () => {
@@ -941,12 +986,21 @@ describe('ERP Maroc route policy', () => {
       const requiresAccountCode =
         routeId === 'accounting.grand-livre' ||
         routeId === 'accounting.lettrage.suggestions';
-      const query = requiresAccountCode ? { accountCode: '3421' } : {};
+      const query =
+        routeId === 'hr-attendance.monthly'
+          ? { month: '2026-07' }
+          : requiresAccountCode
+            ? { accountCode: '3421' }
+            : {};
       const resolved = resolveErpRoute(method, path, query);
 
       expect(resolved.routeId).toBe(routeId);
       expect(resolved.upstreamPath).toBe(
-        requiresAccountCode ? `${path}?accountCode=3421` : path,
+        routeId === 'hr-attendance.monthly'
+          ? `${path}?month=2026-07`
+          : requiresAccountCode
+            ? `${path}?accountCode=3421`
+            : path,
       );
       expect(resolved.kind).toBe(routeId === 'invoices.pdf' ? 'pdf' : 'json');
       expect(resolved.idempotency).toBe(
@@ -1095,6 +1149,12 @@ describe('ERP Maroc route policy', () => {
         accountCode: '3421',
       }).upstreamPath,
     ).toBe('/accounting/lettrage/suggestions?accountCode=3421');
+    expect(
+      resolveErpRoute('GET', '/hr-attendance/monthly', {
+        month: '2026-07',
+        employeeId: id,
+      }).upstreamPath,
+    ).toBe(`/hr-attendance/monthly?month=2026-07&employeeId=${id}`);
   });
 
   it.each([
@@ -1122,6 +1182,9 @@ describe('ERP Maroc route policy', () => {
     ['/accounting/balance', { from: '2026-07-31', to: '2026-07-01' }],
     ['/accounting/lettrage/suggestions', {}],
     ['/accounting/lettrage/suggestions', { accountCode: '3421/../admin' }],
+    ['/hr-attendance/monthly', {}],
+    ['/hr-attendance/monthly', { month: '2026-13' }],
+    ['/hr-attendance/monthly', { month: '2026-07', employeeId: 'invalid' }],
   ])('rejects non-normalized or unauthorized query for %s', (path, query) => {
     expect(() => resolveErpRoute('GET', path, query)).toThrow(
       'ERP route is not allowed',

@@ -10,6 +10,8 @@ import {
   hrJobPositionSchema,
   hrLifecycleJourneySchema,
   hrOrganisationChartSchema,
+  hrAttendanceMonthSchema,
+  hrWorkScheduleSchema,
 } from './hr-core-contracts';
 
 describe('hrEmployeeDetailSchema', () => {
@@ -179,6 +181,8 @@ describe('hrEmployeeDetailSchema', () => {
         canWriteContracts: false,
         canReadDocuments: true,
         canWriteDocuments: true,
+        canReadTime: true,
+        canWriteTime: true,
         canAdministerAccess: false,
       },
     });
@@ -502,5 +506,113 @@ describe('hrEmployeeDetailSchema', () => {
 
     expect(preview.rows[0]?.action).toBe('MIGRATE');
     expect(preview.readyCount).toBe(1);
+  });
+
+  it('parses work schedules and monthly attendance without client calculations', () => {
+    const organisationId = '11111111-1111-4111-8111-111111111111';
+    const societeId = '22222222-2222-4222-8222-222222222222';
+    const scheduleId = '33333333-3333-4333-8333-333333333333';
+    const employeeId = '44444444-4444-4444-8444-444444444444';
+    const entryId = '55555555-5555-4555-8555-555555555555';
+    const now = '2026-07-29T12:00:00.000Z';
+    const schedule = hrWorkScheduleSchema.parse({
+      id: scheduleId,
+      organisationId,
+      societeId,
+      code: 'STD-44',
+      name: 'Horaire standard',
+      timezone: 'Africa/Casablanca',
+      lateToleranceMinutes: 5,
+      isActive: true,
+      createdByTwentyUserId: 'admin-user',
+      createdAt: now,
+      updatedAt: now,
+      days: [
+        {
+          id: '66666666-6666-4666-8666-666666666666',
+          organisationId,
+          societeId,
+          workScheduleId: scheduleId,
+          weekday: 1,
+          isWorkingDay: true,
+          startMinute: 510,
+          endMinute: 1050,
+          breakMinutes: 60,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      _count: { assignments: 1 },
+    });
+    const month = hrAttendanceMonthSchema.parse({
+      month: '2026-07',
+      generatedAt: now,
+      employees: [
+        {
+          employee: {
+            id: employeeId,
+            employeeNumber: 'ZOW-001',
+            firstName: 'Salma',
+            lastName: 'Alaoui',
+          },
+          summary: {
+            scheduledDays: 1,
+            presentDays: 1,
+            absentDays: 0,
+            leaveDays: 0,
+            lateCount: 1,
+            lateMinutes: 10,
+            workedMinutes: 480,
+            overtimeMinutes: 0,
+            anomalyCount: 0,
+          },
+          days: [
+            {
+              date: '2026-07-29',
+              schedule: {
+                id: schedule.id,
+                code: schedule.code,
+                name: schedule.name,
+                timezone: schedule.timezone,
+              },
+              status: 'LATE',
+              firstClockIn: '2026-07-29T07:45:00.000Z',
+              lastClockOut: '2026-07-29T16:45:00.000Z',
+              workedMinutes: 480,
+              scheduledMinutes: 480,
+              overtimeMinutes: 0,
+              lateMinutes: 10,
+              earlyLeaveMinutes: 0,
+              breakMinutes: 60,
+              anomalies: [],
+              entries: [
+                {
+                  id: entryId,
+                  organisationId,
+                  societeId,
+                  employeeId,
+                  externalId: 'manual-1',
+                  type: 'CLOCK_IN',
+                  source: 'MANUAL',
+                  status: 'ACTIVE',
+                  workMode: 'ONSITE',
+                  occurredAt: '2026-07-29T07:45:00.000Z',
+                  localDate: '2026-07-29',
+                  notes: null,
+                  recordedByTwentyUserId: 'admin-user',
+                  cancelledAt: null,
+                  cancelledByTwentyUserId: null,
+                  cancellationReason: null,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(month.employees[0]?.summary.lateMinutes).toBe(10);
   });
 });
