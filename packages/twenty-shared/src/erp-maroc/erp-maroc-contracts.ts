@@ -2922,6 +2922,10 @@ export const erpMarocRouteIds = {
   hrContractStatus: 'hr-core.contract.status',
   hrContractAmendments: 'hr-core.contract.amendments',
   hrAmendmentStatus: 'hr-core.amendment.status',
+  hrWorkCalendars: 'hr-attendance.work-calendars',
+  hrWorkCalendarDays: 'hr-attendance.work-calendar.days',
+  hrWorkCalendarMoroccoNationalHolidays:
+    'hr-attendance.work-calendar.morocco-national-holidays',
   hrWorkSchedules: 'hr-attendance.work-schedules',
   hrEmployeeWorkScheduleAssignments:
     'hr-attendance.employee.work-schedule-assignments',
@@ -3301,6 +3305,11 @@ export const erpMarocUpstreamRoutes = {
       `/hr-core/amendments/${encodeRouteId(id)}/status`,
   },
   hrAttendance: {
+    workCalendars: '/hr-attendance/work-calendars',
+    workCalendarDays: (id: string) =>
+      `/hr-attendance/work-calendars/${encodeRouteId(id)}/days`,
+    workCalendarMoroccoNationalHolidays: (id: string) =>
+      `/hr-attendance/work-calendars/${encodeRouteId(id)}/morocco-national-holidays`,
     workSchedules: '/hr-attendance/work-schedules',
     employeeWorkScheduleAssignments: (id: string) =>
       `/hr-attendance/employees/${encodeRouteId(id)}/work-schedule-assignments`,

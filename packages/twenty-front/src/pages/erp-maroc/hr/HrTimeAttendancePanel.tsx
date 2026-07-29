@@ -10,15 +10,22 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   hrAttendanceMonthSchema,
+  hrCalendarDaySchema,
+  hrMoroccoHolidaySeedResultSchema,
   hrTimeEntrySchema,
+  hrWorkCalendarListSchema,
+  hrWorkCalendarSchema,
   hrWorkScheduleAssignmentSchema,
   hrWorkScheduleListSchema,
   hrWorkScheduleSchema,
   type HrAttendanceEmployeeMonth,
   type HrAttendanceMonth,
+  type HrCalendarDayType,
   type HrEmployeeListItem,
+  type HrTeam,
   type HrTimeEntryType,
   type HrTimeWorkMode,
+  type HrWorkCalendar,
   type HrWorkSchedule,
 } from 'twenty-shared/erp-maroc';
 import { IconChevronRight, IconPlus, IconRefresh } from 'twenty-ui/display';
@@ -27,6 +34,7 @@ import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 type Props = {
   employees: HrEmployeeListItem[];
+  teams: HrTeam[];
   canWrite: boolean;
   query: string;
 };
@@ -74,11 +82,40 @@ const StyledCommands = styled.section`
   overflow-x: auto;
 `;
 
+const StyledCalendarCommands = styled.section`
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
+  display: grid;
+  grid-template-columns: repeat(3, minmax(360px, 1fr));
+  overflow-x: auto;
+`;
+
 const StyledCommand = styled.form`
   border-right: 1px solid ${themeCssVariables.border.color.light};
   display: grid;
   gap: ${themeCssVariables.spacing[2]};
   min-width: 360px;
+  padding: ${themeCssVariables.spacing[3]};
+`;
+
+const StyledCalendarEvents = styled.div`
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+`;
+
+const StyledCalendarEvent = styled.div`
+  align-items: center;
+  border-right: 1px solid ${themeCssVariables.border.color.light};
+  display: grid;
+  gap: ${themeCssVariables.spacing[2]};
+  grid-template-columns: 84px minmax(120px, 1fr) auto;
+  min-height: 40px;
+  padding: 0 ${themeCssVariables.spacing[3]};
+`;
+
+const StyledCalendarEmpty = styled.div`
+  color: ${themeCssVariables.font.color.tertiary};
+  font-size: ${themeCssVariables.font.size.sm};
   padding: ${themeCssVariables.spacing[3]};
 `;
 
@@ -208,8 +245,16 @@ const typeLabels: Record<HrTimeEntryType, string> = {
   BREAK_END: 'Fin pause',
 };
 
+const calendarDayTypeLabels: Record<HrCalendarDayType, string> = {
+  NATIONAL_HOLIDAY: 'Fête nationale',
+  RELIGIOUS_HOLIDAY: 'Fête religieuse',
+  COMPANY_CLOSURE: 'Fermeture',
+  WORKING_EXCEPTION: 'Ouverture exceptionnelle',
+};
+
 export const HrTimeAttendancePanel = ({
   employees,
+  teams,
   canWrite,
   query,
 }: Props) => {
@@ -218,6 +263,7 @@ export const HrTimeAttendancePanel = ({
   const [state, setState] = useState<LoadState>('loading');
   const [attendance, setAttendance] = useState<HrAttendanceMonth | null>(null);
   const [schedules, setSchedules] = useState<HrWorkSchedule[]>([]);
+  const [calendars, setCalendars] = useState<HrWorkCalendar[]>([]);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{
     message: string;
@@ -231,6 +277,30 @@ export const HrTimeAttendancePanel = ({
     breakMinutes: '60',
     tolerance: '5',
     weekdays: [1, 2, 3, 4, 5],
+  });
+  const [calendarForm, setCalendarForm] = useState({
+    code: 'MA',
+    name: 'Calendrier Maroc',
+    teamId: '',
+  });
+  const [calendarDayForm, setCalendarDayForm] = useState<{
+    workCalendarId: string;
+    date: string;
+    name: string;
+    type: HrCalendarDayType;
+    isConfirmed: boolean;
+    start: string;
+    end: string;
+    breakMinutes: string;
+  }>({
+    workCalendarId: '',
+    date: currentDate(),
+    name: '',
+    type: 'RELIGIOUS_HOLIDAY',
+    isConfirmed: false,
+    start: '08:30',
+    end: '17:30',
+    breakMinutes: '60',
   });
   const [assignmentForm, setAssignmentForm] = useState({
     employeeId: '',
@@ -252,7 +322,7 @@ export const HrTimeAttendancePanel = ({
   const load = useCallback(async () => {
     setState('loading');
     try {
-      const [nextAttendance, nextSchedules] = await Promise.all([
+      const [nextAttendance, nextSchedules, nextCalendars] = await Promise.all([
         client.request({
           method: 'GET',
           path: '/hr-attendance/monthly',
@@ -264,9 +334,16 @@ export const HrTimeAttendancePanel = ({
           path: '/hr-attendance/work-schedules',
           schema: hrWorkScheduleListSchema,
         }),
+        client.request({
+          method: 'GET',
+          path: '/hr-attendance/work-calendars',
+          query: { year: month.slice(0, 4) },
+          schema: hrWorkCalendarListSchema,
+        }),
       ]);
       setAttendance(nextAttendance);
       setSchedules(nextSchedules);
+      setCalendars(nextCalendars);
       setAssignmentForm((current) => ({
         ...current,
         employeeId: current.employeeId || employees[0]?.id || '',
@@ -278,6 +355,13 @@ export const HrTimeAttendancePanel = ({
       setEntryForm((current) => ({
         ...current,
         employeeId: current.employeeId || employees[0]?.id || '',
+      }));
+      setCalendarDayForm((current) => ({
+        ...current,
+        workCalendarId:
+          current.workCalendarId ||
+          nextCalendars.find(({ isActive }) => isActive)?.id ||
+          '',
       }));
       setState('ready');
     } catch {
@@ -310,6 +394,63 @@ export const HrTimeAttendancePanel = ({
     } finally {
       setBusy(false);
     }
+  };
+
+  const createCalendar = async () => {
+    await execute(
+      {
+        method: 'POST',
+        path: '/hr-attendance/work-calendars',
+        schema: hrWorkCalendarSchema,
+        body: {
+          code: calendarForm.code,
+          name: calendarForm.name,
+          timezone: 'Africa/Casablanca',
+          teamId: calendarForm.teamId || null,
+        },
+      },
+      'Calendrier de travail créé.',
+    );
+  };
+
+  const upsertCalendarDay = async () => {
+    if (!calendarDayForm.workCalendarId || !calendarDayForm.name) return;
+    const isWorkingDay = calendarDayForm.type === 'WORKING_EXCEPTION';
+    await execute(
+      {
+        method: 'POST',
+        path: `/hr-attendance/work-calendars/${calendarDayForm.workCalendarId}/days`,
+        schema: hrCalendarDaySchema,
+        body: {
+          date: calendarDayForm.date,
+          name: calendarDayForm.name,
+          type: calendarDayForm.type,
+          isWorkingDay,
+          isConfirmed: calendarDayForm.isConfirmed,
+          ...(isWorkingDay
+            ? {
+                startMinute: parseMinute(calendarDayForm.start),
+                endMinute: parseMinute(calendarDayForm.end),
+                breakMinutes: Number(calendarDayForm.breakMinutes),
+              }
+            : {}),
+        },
+      },
+      'Exception de calendrier enregistrée.',
+    );
+  };
+
+  const seedMoroccoNationalHolidays = async () => {
+    if (!calendarDayForm.workCalendarId) return;
+    await execute(
+      {
+        method: 'POST',
+        path: `/hr-attendance/work-calendars/${calendarDayForm.workCalendarId}/morocco-national-holidays`,
+        schema: hrMoroccoHolidaySeedResultSchema,
+        body: { year: Number(month.slice(0, 4)) },
+      },
+      'Jours fériés nationaux ajoutés sans écraser les exceptions existantes.',
+    );
   };
 
   const createSchedule = async () => {
@@ -395,6 +536,18 @@ export const HrTimeAttendancePanel = ({
       ),
     [attendance, normalizedQuery],
   );
+  const calendarEvents = useMemo(
+    () =>
+      calendars
+        .filter(({ isActive }) => isActive)
+        .flatMap((calendar) =>
+          calendar.days
+            .filter(({ date }) => date.startsWith(month))
+            .map((day) => ({ calendar, day })),
+        )
+        .sort((left, right) => left.day.date.localeCompare(right.day.date)),
+    [calendars, month],
+  );
 
   const columns: ErpOperationalTableColumn<HrAttendanceEmployeeMonth>[] = [
     {
@@ -447,6 +600,12 @@ export const HrTimeAttendancePanel = ({
       render: ({ summary }) => summary.absentDays,
     },
     {
+      key: 'holidays',
+      header: 'Fériés',
+      width: '120px',
+      render: ({ summary }) => summary.holidayDays,
+    },
+    {
       key: 'anomalies',
       header: 'Anomalies',
       width: '150px',
@@ -476,6 +635,285 @@ export const HrTimeAttendancePanel = ({
 
   return (
     <>
+      {canWrite ? (
+        <StyledCalendarCommands>
+          <StyledCommand
+            onSubmit={(event) => {
+              event.preventDefault();
+              void createCalendar();
+            }}
+          >
+            <StyledCommandTitle>Nouveau calendrier</StyledCommandTitle>
+            <StyledFields>
+              <StyledField>
+                Code
+                <StyledInput
+                  value={calendarForm.code}
+                  onChange={(event) =>
+                    setCalendarForm((current) => ({
+                      ...current,
+                      code: event.target.value.toUpperCase(),
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                Libellé
+                <StyledInput
+                  value={calendarForm.name}
+                  onChange={(event) =>
+                    setCalendarForm((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <Button
+                title="Créer"
+                ariaLabel="Créer le calendrier"
+                Icon={IconPlus}
+                accent="blue"
+                disabled={busy}
+                type="submit"
+              />
+            </StyledFields>
+            <StyledField>
+              Portée
+              <StyledSelect
+                value={calendarForm.teamId}
+                onChange={(event) =>
+                  setCalendarForm((current) => ({
+                    ...current,
+                    teamId: event.target.value,
+                  }))
+                }
+              >
+                <option value="">Toute la société</option>
+                {teams
+                  .filter(({ isActive }) => isActive)
+                  .map((team) => (
+                    <option key={team.id} value={team.id}>
+                      Équipe · {team.name}
+                    </option>
+                  ))}
+              </StyledSelect>
+            </StyledField>
+          </StyledCommand>
+
+          <StyledCommand
+            onSubmit={(event) => {
+              event.preventDefault();
+              void upsertCalendarDay();
+            }}
+          >
+            <StyledCommandTitle>Jour férié ou exception</StyledCommandTitle>
+            <StyledFields>
+              <StyledField>
+                Calendrier
+                <StyledSelect
+                  value={calendarDayForm.workCalendarId}
+                  onChange={(event) =>
+                    setCalendarDayForm((current) => ({
+                      ...current,
+                      workCalendarId: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Sélectionner</option>
+                  {calendars
+                    .filter(({ isActive }) => isActive)
+                    .map((calendar) => (
+                      <option key={calendar.id} value={calendar.id}>
+                        {calendar.code} · {calendar.team?.name ?? 'Société'}
+                      </option>
+                    ))}
+                </StyledSelect>
+              </StyledField>
+              <StyledField>
+                Date
+                <StyledInput
+                  type="date"
+                  value={calendarDayForm.date}
+                  onChange={(event) =>
+                    setCalendarDayForm((current) => ({
+                      ...current,
+                      date: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                Nature
+                <StyledSelect
+                  value={calendarDayForm.type}
+                  onChange={(event) => {
+                    const type = event.target.value as HrCalendarDayType;
+                    setCalendarDayForm((current) => ({
+                      ...current,
+                      type,
+                      isConfirmed: type !== 'RELIGIOUS_HOLIDAY',
+                    }));
+                  }}
+                >
+                  {Object.entries(calendarDayTypeLabels).map(
+                    ([type, label]) => (
+                      <option key={type} value={type}>
+                        {label}
+                      </option>
+                    ),
+                  )}
+                </StyledSelect>
+              </StyledField>
+            </StyledFields>
+            <StyledFields>
+              <StyledField>
+                Libellé
+                <StyledInput
+                  value={calendarDayForm.name}
+                  onChange={(event) =>
+                    setCalendarDayForm((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledDay>
+                <input
+                  type="checkbox"
+                  checked={calendarDayForm.isConfirmed}
+                  onChange={(event) =>
+                    setCalendarDayForm((current) => ({
+                      ...current,
+                      isConfirmed: event.target.checked,
+                    }))
+                  }
+                />
+                Date confirmée
+              </StyledDay>
+              <Button
+                title="Enregistrer"
+                ariaLabel="Enregistrer le jour de calendrier"
+                Icon={IconPlus}
+                accent="blue"
+                disabled={busy || calendars.length === 0}
+                type="submit"
+              />
+            </StyledFields>
+            {calendarDayForm.type === 'WORKING_EXCEPTION' ? (
+              <StyledFields>
+                <StyledField>
+                  Début
+                  <StyledInput
+                    type="time"
+                    value={calendarDayForm.start}
+                    onChange={(event) =>
+                      setCalendarDayForm((current) => ({
+                        ...current,
+                        start: event.target.value,
+                      }))
+                    }
+                  />
+                </StyledField>
+                <StyledField>
+                  Fin
+                  <StyledInput
+                    type="time"
+                    value={calendarDayForm.end}
+                    onChange={(event) =>
+                      setCalendarDayForm((current) => ({
+                        ...current,
+                        end: event.target.value,
+                      }))
+                    }
+                  />
+                </StyledField>
+                <StyledField>
+                  Pause
+                  <StyledInput
+                    type="number"
+                    min="0"
+                    value={calendarDayForm.breakMinutes}
+                    onChange={(event) =>
+                      setCalendarDayForm((current) => ({
+                        ...current,
+                        breakMinutes: event.target.value,
+                      }))
+                    }
+                  />
+                </StyledField>
+              </StyledFields>
+            ) : null}
+          </StyledCommand>
+
+          <StyledCommand
+            onSubmit={(event) => {
+              event.preventDefault();
+              void seedMoroccoNationalHolidays();
+            }}
+          >
+            <StyledCommandTitle>
+              Calendrier national marocain
+            </StyledCommandTitle>
+            <StyledField>
+              Calendrier
+              <StyledSelect
+                value={calendarDayForm.workCalendarId}
+                onChange={(event) =>
+                  setCalendarDayForm((current) => ({
+                    ...current,
+                    workCalendarId: event.target.value,
+                  }))
+                }
+              >
+                <option value="">Sélectionner</option>
+                {calendars
+                  .filter(({ isActive }) => isActive)
+                  .map((calendar) => (
+                    <option key={calendar.id} value={calendar.id}>
+                      {calendar.code} · {calendar.team?.name ?? 'Société'}
+                    </option>
+                  ))}
+              </StyledSelect>
+            </StyledField>
+            <StyledFields>
+              <StyledField>
+                Année
+                <StyledInput value={month.slice(0, 4)} readOnly />
+              </StyledField>
+              <Button
+                title="Ajouter les fêtes nationales"
+                ariaLabel="Ajouter les fêtes nationales marocaines"
+                Icon={IconPlus}
+                accent="blue"
+                disabled={busy || calendars.length === 0}
+                type="submit"
+              />
+            </StyledFields>
+          </StyledCommand>
+        </StyledCalendarCommands>
+      ) : null}
+
+      <StyledCalendarEvents>
+        {calendarEvents.length === 0 ? (
+          <StyledCalendarEmpty>
+            Aucun jour férié ou exception sur ce mois.
+          </StyledCalendarEmpty>
+        ) : (
+          calendarEvents.map(({ calendar, day }) => (
+            <StyledCalendarEvent key={`${calendar.id}:${day.id}`}>
+              <span>{day.date.split('-').reverse().join('/')}</span>
+              <span>{day.name}</span>
+              <ErpStatusBadge
+                label={day.isConfirmed ? 'Confirmé' : 'À confirmer'}
+                tone={day.isConfirmed ? 'success' : 'warning'}
+              />
+            </StyledCalendarEvent>
+          ))
+        )}
+      </StyledCalendarEvents>
+
       {canWrite ? (
         <StyledCommands>
           <StyledCommand
@@ -771,6 +1209,7 @@ export const HrTimeAttendancePanel = ({
           />
         </StyledField>
         <StyledScheduleSummary>
+          {calendars.filter(({ isActive }) => isActive).length} calendrier(s) ·{' '}
           {schedules.length} horaire(s) · {attendance?.employees.length ?? 0}{' '}
           collaborateur(s)
         </StyledScheduleSummary>

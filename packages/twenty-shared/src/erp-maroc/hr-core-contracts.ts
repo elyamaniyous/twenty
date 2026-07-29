@@ -123,12 +123,19 @@ export const hrTimeEntrySourceSchema = z.enum([
 ]);
 export const hrTimeEntryStatusSchema = z.enum(['ACTIVE', 'CANCELLED']);
 export const hrTimeWorkModeSchema = z.enum(['ONSITE', 'REMOTE', 'CLIENT_SITE']);
+export const hrCalendarDayTypeSchema = z.enum([
+  'NATIONAL_HOLIDAY',
+  'RELIGIOUS_HOLIDAY',
+  'COMPANY_CLOSURE',
+  'WORKING_EXCEPTION',
+]);
 export const hrAttendanceDayStatusSchema = z.enum([
   'PLANNED',
   'PRESENT',
   'LATE',
   'ABSENT',
   'ON_LEAVE',
+  'HOLIDAY',
   'ANOMALY',
   'UNSCHEDULED',
 ]);
@@ -856,6 +863,54 @@ export const hrEmployeePayslipSummarySchema = z.object({
   createdAt: instantSchema,
 });
 
+export const hrCalendarDaySchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  workCalendarId: uuidSchema,
+  date: civilDateHttpSchema,
+  name: z.string(),
+  type: hrCalendarDayTypeSchema,
+  isWorkingDay: z.boolean(),
+  isConfirmed: z.boolean(),
+  startMinute: z.number().int().min(0).max(1439).nullable(),
+  endMinute: z.number().int().min(1).max(1440).nullable(),
+  breakMinutes: z.number().int().min(0).max(1439),
+  sourceUrl: nullableStringSchema,
+  notes: nullableStringSchema,
+  createdByTwentyUserId: z.string(),
+  confirmedByTwentyUserId: nullableStringSchema,
+  confirmedAt: instantSchema.nullable(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+
+export const hrWorkCalendarSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  teamId: uuidSchema.nullable(),
+  code: z.string(),
+  name: z.string(),
+  timezone: z.string(),
+  isActive: z.boolean(),
+  createdByTwentyUserId: z.string(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  team: z
+    .object({ id: uuidSchema, code: z.string(), name: z.string() })
+    .nullable()
+    .optional(),
+  days: z.array(hrCalendarDaySchema),
+});
+export const hrWorkCalendarListSchema = z.array(hrWorkCalendarSchema);
+
+export const hrMoroccoHolidaySeedResultSchema = z.object({
+  year: z.number().int().min(2000).max(2100),
+  createdCount: nonNegativeIntegerSchema,
+  days: z.array(hrCalendarDaySchema),
+});
+
 export const hrWorkScheduleDaySchema = z.object({
   id: uuidSchema,
   organisationId: uuidSchema,
@@ -932,6 +987,16 @@ export const hrAttendanceDaySchema = z.object({
       timezone: z.string(),
     })
     .nullable(),
+  calendarDay: z
+    .object({
+      id: uuidSchema,
+      workCalendarId: uuidSchema,
+      name: z.string(),
+      type: hrCalendarDayTypeSchema,
+      isWorkingDay: z.boolean(),
+      isConfirmed: z.boolean(),
+    })
+    .nullable(),
   status: hrAttendanceDayStatusSchema,
   firstClockIn: instantSchema.nullable(),
   lastClockOut: instantSchema.nullable(),
@@ -957,6 +1022,7 @@ export const hrAttendanceEmployeeMonthSchema = z.object({
     presentDays: nonNegativeIntegerSchema,
     absentDays: nonNegativeIntegerSchema,
     leaveDays: nonNegativeIntegerSchema,
+    holidayDays: nonNegativeIntegerSchema,
     lateCount: nonNegativeIntegerSchema,
     lateMinutes: nonNegativeIntegerSchema,
     workedMinutes: nonNegativeIntegerSchema,
@@ -1045,6 +1111,7 @@ export type HrTimeEntryType = z.infer<typeof hrTimeEntryTypeSchema>;
 export type HrTimeEntrySource = z.infer<typeof hrTimeEntrySourceSchema>;
 export type HrTimeEntryStatus = z.infer<typeof hrTimeEntryStatusSchema>;
 export type HrTimeWorkMode = z.infer<typeof hrTimeWorkModeSchema>;
+export type HrCalendarDayType = z.infer<typeof hrCalendarDayTypeSchema>;
 export type HrAttendanceDayStatus = z.infer<typeof hrAttendanceDayStatusSchema>;
 export type HrAccessContext = z.infer<typeof hrAccessContextSchema>;
 export type HrAccessGrant = z.infer<typeof hrAccessGrantSchema>;
@@ -1110,6 +1177,11 @@ export type HrEmployeeLeaveBalance = z.infer<
 >;
 export type HrEmployeePayslipSummary = z.infer<
   typeof hrEmployeePayslipSummarySchema
+>;
+export type HrCalendarDay = z.infer<typeof hrCalendarDaySchema>;
+export type HrWorkCalendar = z.infer<typeof hrWorkCalendarSchema>;
+export type HrMoroccoHolidaySeedResult = z.infer<
+  typeof hrMoroccoHolidaySeedResultSchema
 >;
 export type HrWorkScheduleDay = z.infer<typeof hrWorkScheduleDaySchema>;
 export type HrWorkSchedule = z.infer<typeof hrWorkScheduleSchema>;

@@ -23,6 +23,7 @@ import {
   hrAccessContextSchema,
   hrAccessGrantSchema,
   hrContractAmendmentSchema,
+  hrCalendarDaySchema,
   hrCostCenterListSchema,
   hrCostCenterSchema,
   hrCoreSummarySchema,
@@ -53,10 +54,13 @@ import {
   hrLifecycleJourneyListSchema,
   hrLifecycleJourneySchema,
   hrLifecycleTaskSchema,
+  hrMoroccoHolidaySeedResultSchema,
   hrTeamListSchema,
   hrTeamSchema,
   hrWorkLocationListSchema,
   hrWorkLocationSchema,
+  hrWorkCalendarListSchema,
+  hrWorkCalendarSchema,
   hrAttendanceMonthSchema,
   hrTimeEntrySchema,
   hrWorkScheduleAssignmentSchema,
@@ -174,6 +178,7 @@ const grandLivreQuery = Object.freeze([
   ...accountingReportQuery,
 ]);
 const lettrageQuery = Object.freeze(['accountCode']);
+const workCalendarQuery = Object.freeze(['year']);
 const attendanceQuery = Object.freeze(['month', 'employeeId']);
 const pdfSchema = z.instanceof(Uint8Array);
 
@@ -1896,6 +1901,51 @@ const routes: ErpMarocRoute[] = [
     idempotency: 'required',
   }),
   defineRoute({
+    routeId: erpMarocRouteIds.hrWorkCalendars,
+    method: 'GET',
+    pattern: exact('/hr-attendance/work-calendars'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrAttendance.workCalendars),
+    queryKeys: workCalendarQuery,
+    responseSchema: hrWorkCalendarListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrWorkCalendars,
+    method: 'POST',
+    pattern: exact('/hr-attendance/work-calendars'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrAttendance.workCalendars),
+    queryKeys: noQuery,
+    responseSchema: hrWorkCalendarSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrWorkCalendarDays,
+    method: 'POST',
+    pattern: action('hr-attendance/work-calendars', 'days'),
+    build: idBuilder(erpMarocUpstreamRoutes.hrAttendance.workCalendarDays),
+    queryKeys: noQuery,
+    responseSchema: hrCalendarDaySchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrWorkCalendarMoroccoNationalHolidays,
+    method: 'POST',
+    pattern: action(
+      'hr-attendance/work-calendars',
+      'morocco-national-holidays',
+    ),
+    build: idBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.workCalendarMoroccoNationalHolidays,
+    ),
+    queryKeys: noQuery,
+    responseSchema: hrMoroccoHolidaySeedResultSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
     routeId: erpMarocRouteIds.hrWorkSchedules,
     method: 'GET',
     pattern: exact('/hr-attendance/work-schedules'),
@@ -2101,6 +2151,13 @@ const assertNormalizedQueryValue = (
     if (key === 'sourceType' && accountingSourceTypes.has(value)) return;
   }
   if (
+    routeId === erpMarocRouteIds.hrWorkCalendars &&
+    key === 'year' &&
+    /^(?:20\d{2}|2100)$/.test(value)
+  ) {
+    return;
+  }
+  if (
     routeId === erpMarocRouteIds.hrAttendanceMonthly &&
     key === 'month' &&
     /^\d{4}-(?:0[1-9]|1[0-2])$/.test(value)
@@ -2127,6 +2184,9 @@ const buildQueryString = (
       route.routeId === erpMarocRouteIds.accountingLettrageSuggestions) &&
     !values.has('accountCode')
   ) {
+    rejectRoute();
+  }
+  if (route.queryKeys === workCalendarQuery && !values.has('year')) {
     rejectRoute();
   }
   if (

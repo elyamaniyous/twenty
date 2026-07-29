@@ -11,6 +11,7 @@ import {
   hrLifecycleJourneySchema,
   hrOrganisationChartSchema,
   hrAttendanceMonthSchema,
+  hrWorkCalendarSchema,
   hrWorkScheduleSchema,
 } from './hr-core-contracts';
 
@@ -515,6 +516,21 @@ describe('hrEmployeeDetailSchema', () => {
     const employeeId = '44444444-4444-4444-8444-444444444444';
     const entryId = '55555555-5555-4555-8555-555555555555';
     const now = '2026-07-29T12:00:00.000Z';
+    const calendar = hrWorkCalendarSchema.parse({
+      id: '77777777-7777-4777-8777-777777777777',
+      organisationId,
+      societeId,
+      teamId: null,
+      code: 'MA',
+      name: 'Calendrier Maroc',
+      timezone: 'Africa/Casablanca',
+      isActive: true,
+      createdByTwentyUserId: 'admin-user',
+      createdAt: now,
+      updatedAt: now,
+      team: null,
+      days: [],
+    });
     const schedule = hrWorkScheduleSchema.parse({
       id: scheduleId,
       organisationId,
@@ -560,6 +576,7 @@ describe('hrEmployeeDetailSchema', () => {
             presentDays: 1,
             absentDays: 0,
             leaveDays: 0,
+            holidayDays: 0,
             lateCount: 1,
             lateMinutes: 10,
             workedMinutes: 480,
@@ -575,6 +592,7 @@ describe('hrEmployeeDetailSchema', () => {
                 name: schedule.name,
                 timezone: schedule.timezone,
               },
+              calendarDay: null,
               status: 'LATE',
               firstClockIn: '2026-07-29T07:45:00.000Z',
               lastClockOut: '2026-07-29T16:45:00.000Z',
@@ -614,5 +632,6 @@ describe('hrEmployeeDetailSchema', () => {
     });
 
     expect(month.employees[0]?.summary.lateMinutes).toBe(10);
+    expect(calendar.code).toBe('MA');
   });
 });

@@ -23,6 +23,7 @@ import {
   hrAccessContextSchema,
   hrAccessGrantSchema,
   hrContractAmendmentSchema,
+  hrCalendarDaySchema,
   hrCostCenterListSchema,
   hrCostCenterSchema,
   hrCoreSummarySchema,
@@ -53,10 +54,13 @@ import {
   hrLifecycleJourneyListSchema,
   hrLifecycleJourneySchema,
   hrLifecycleTaskSchema,
+  hrMoroccoHolidaySeedResultSchema,
   hrTeamListSchema,
   hrTeamSchema,
   hrWorkLocationListSchema,
   hrWorkLocationSchema,
+  hrWorkCalendarListSchema,
+  hrWorkCalendarSchema,
   hrAttendanceMonthSchema,
   hrTimeEntrySchema,
   hrWorkScheduleAssignmentSchema,
@@ -196,6 +200,9 @@ const requiredIdempotencyRoutes = new Set([
   `PATCH /hr-core/contracts/${id}/status`,
   `POST /hr-core/contracts/${id}/amendments`,
   `PATCH /hr-core/amendments/${id}/status`,
+  'POST /hr-attendance/work-calendars',
+  `POST /hr-attendance/work-calendars/${id}/days`,
+  `POST /hr-attendance/work-calendars/${id}/morocco-national-holidays`,
   'POST /hr-attendance/work-schedules',
   `POST /hr-attendance/employees/${id}/work-schedule-assignments`,
   'POST /hr-attendance/time-entries',
@@ -943,6 +950,30 @@ const approvedRoutes = [
   ],
   [
     'GET',
+    '/hr-attendance/work-calendars',
+    'hr-attendance.work-calendars',
+    hrWorkCalendarListSchema,
+  ],
+  [
+    'POST',
+    '/hr-attendance/work-calendars',
+    'hr-attendance.work-calendars',
+    hrWorkCalendarSchema,
+  ],
+  [
+    'POST',
+    `/hr-attendance/work-calendars/${id}/days`,
+    'hr-attendance.work-calendar.days',
+    hrCalendarDaySchema,
+  ],
+  [
+    'POST',
+    `/hr-attendance/work-calendars/${id}/morocco-national-holidays`,
+    'hr-attendance.work-calendar.morocco-national-holidays',
+    hrMoroccoHolidaySeedResultSchema,
+  ],
+  [
+    'GET',
     '/hr-attendance/work-schedules',
     'hr-attendance.work-schedules',
     hrWorkScheduleListSchema,
@@ -987,20 +1018,24 @@ describe('ERP Maroc route policy', () => {
         routeId === 'accounting.grand-livre' ||
         routeId === 'accounting.lettrage.suggestions';
       const query =
-        routeId === 'hr-attendance.monthly'
-          ? { month: '2026-07' }
-          : requiresAccountCode
-            ? { accountCode: '3421' }
-            : {};
+        method === 'GET' && routeId === 'hr-attendance.work-calendars'
+          ? { year: '2026' }
+          : routeId === 'hr-attendance.monthly'
+            ? { month: '2026-07' }
+            : requiresAccountCode
+              ? { accountCode: '3421' }
+              : {};
       const resolved = resolveErpRoute(method, path, query);
 
       expect(resolved.routeId).toBe(routeId);
       expect(resolved.upstreamPath).toBe(
-        routeId === 'hr-attendance.monthly'
-          ? `${path}?month=2026-07`
-          : requiresAccountCode
-            ? `${path}?accountCode=3421`
-            : path,
+        method === 'GET' && routeId === 'hr-attendance.work-calendars'
+          ? `${path}?year=2026`
+          : routeId === 'hr-attendance.monthly'
+            ? `${path}?month=2026-07`
+            : requiresAccountCode
+              ? `${path}?accountCode=3421`
+              : path,
       );
       expect(resolved.kind).toBe(routeId === 'invoices.pdf' ? 'pdf' : 'json');
       expect(resolved.idempotency).toBe(
@@ -1150,6 +1185,11 @@ describe('ERP Maroc route policy', () => {
       }).upstreamPath,
     ).toBe('/accounting/lettrage/suggestions?accountCode=3421');
     expect(
+      resolveErpRoute('GET', '/hr-attendance/work-calendars', {
+        year: '2026',
+      }).upstreamPath,
+    ).toBe('/hr-attendance/work-calendars?year=2026');
+    expect(
       resolveErpRoute('GET', '/hr-attendance/monthly', {
         month: '2026-07',
         employeeId: id,
@@ -1182,6 +1222,10 @@ describe('ERP Maroc route policy', () => {
     ['/accounting/balance', { from: '2026-07-31', to: '2026-07-01' }],
     ['/accounting/lettrage/suggestions', {}],
     ['/accounting/lettrage/suggestions', { accountCode: '3421/../admin' }],
+    ['/hr-attendance/work-calendars', {}],
+    ['/hr-attendance/work-calendars', { year: '1999' }],
+    ['/hr-attendance/work-calendars', { year: '2101' }],
+    ['/hr-attendance/work-calendars', { year: '02026' }],
     ['/hr-attendance/monthly', {}],
     ['/hr-attendance/monthly', { month: '2026-13' }],
     ['/hr-attendance/monthly', { month: '2026-07', employeeId: 'invalid' }],

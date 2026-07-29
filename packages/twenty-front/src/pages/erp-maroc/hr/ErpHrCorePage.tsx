@@ -1173,6 +1173,7 @@ export const ErpHrCorePage = () => {
     ) : view === 'attendance' ? (
       <HrTimeAttendancePanel
         employees={employees}
+        teams={teams}
         canWrite={access?.canWriteTime ?? false}
         query={query}
       />
