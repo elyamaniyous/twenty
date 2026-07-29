@@ -5,6 +5,7 @@ import {
   civilDateSchema,
   erpRoleSchema,
   instantSchema,
+  nullableInstantSchema,
   nonNegativeIntegerSchema,
   uuidSchema,
 } from './erp-maroc-contracts';
@@ -163,6 +164,21 @@ export const hrLeaveBalanceMovementTypeSchema = z.enum([
   'CARRYOVER',
   'ADJUSTMENT',
 ]);
+export const hrMonthlyPeriodStatusSchema = z.enum([
+  'OPEN',
+  'IN_REVIEW',
+  'FROZEN',
+  'TRANSMITTED',
+]);
+export const hrPayrollVariableKindSchema = z.enum([
+  'WORKED_MINUTES',
+  'OVERTIME_MINUTES',
+  'LATE_MINUTES',
+  'ABSENCE_DAYS',
+  'PAID_LEAVE_DAYS',
+  'UNPAID_LEAVE_DAYS',
+]);
+export const hrPayrollVariableUnitSchema = z.enum(['MINUTES', 'DAYS']);
 
 export const hrAccessContextSchema = z.object({
   role: hrAccessRoleSchema.nullable(),
@@ -1186,6 +1202,94 @@ export const hrAttendanceMonthSchema = z.object({
   employees: z.array(hrAttendanceEmployeeMonthSchema),
 });
 
+const hrMonthlyEmployeeSchema = z.object({
+  id: uuidSchema,
+  employeeNumber: z.string(),
+  firstName: z.string(),
+  lastName: z.string(),
+});
+
+export const hrMonthlyPeriodSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  status: hrMonthlyPeriodStatusSchema,
+  currentSnapshotVersion: nonNegativeIntegerSchema.nullable(),
+  frozenSnapshotVersion: nonNegativeIntegerSchema.nullable(),
+  sourceDigest: nullableStringSchema,
+  employeeCount: nonNegativeIntegerSchema,
+  totalAnomalyCount: nonNegativeIntegerSchema,
+  totalWorkedMinutes: nonNegativeIntegerSchema,
+  totalOvertimeMinutes: nonNegativeIntegerSchema,
+  totalAbsenceDays: z.number().nonnegative(),
+  totalPaidLeaveDays: z.number().nonnegative(),
+  totalUnpaidLeaveDays: z.number().nonnegative(),
+  reviewSubmittedAt: nullableInstantSchema,
+  reviewSubmittedByTwentyUserId: nullableStringSchema,
+  frozenAt: nullableInstantSchema,
+  frozenByTwentyUserId: nullableStringSchema,
+  transmittedAt: nullableInstantSchema,
+  transmittedByTwentyUserId: nullableStringSchema,
+  reopenedAt: nullableInstantSchema,
+  reopenedByTwentyUserId: nullableStringSchema,
+  reopenReason: nullableStringSchema,
+  createdByTwentyUserId: z.string(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  _count: z.object({
+    snapshots: nonNegativeIntegerSchema,
+    payrollVariables: nonNegativeIntegerSchema,
+  }),
+});
+
+export const hrMonthlyEmployeeSnapshotSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  periodId: uuidSchema,
+  employeeId: uuidSchema,
+  version: nonNegativeIntegerSchema,
+  scheduledDays: nonNegativeIntegerSchema,
+  presentDays: nonNegativeIntegerSchema,
+  absentDays: z.number().nonnegative(),
+  paidLeaveDays: z.number().nonnegative(),
+  unpaidLeaveDays: z.number().nonnegative(),
+  holidayDays: nonNegativeIntegerSchema,
+  lateMinutes: nonNegativeIntegerSchema,
+  workedMinutes: nonNegativeIntegerSchema,
+  overtimeMinutes: nonNegativeIntegerSchema,
+  anomalyCount: nonNegativeIntegerSchema,
+  pendingLeaveRequestCount: nonNegativeIntegerSchema,
+  sourceDigest: z.string(),
+  details: z.unknown(),
+  generatedByTwentyUserId: z.string(),
+  generatedAt: instantSchema,
+  employee: hrMonthlyEmployeeSchema,
+});
+
+export const hrPayrollVariableSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  periodId: uuidSchema,
+  employeeId: uuidSchema,
+  snapshotVersion: nonNegativeIntegerSchema,
+  kind: hrPayrollVariableKindSchema,
+  unit: hrPayrollVariableUnitSchema,
+  value: z.number().nonnegative(),
+  sourceDigest: z.string(),
+  generatedByTwentyUserId: z.string(),
+  createdAt: instantSchema,
+  employee: hrMonthlyEmployeeSchema,
+});
+
+export const hrMonthlyPeriodListSchema = z.array(hrMonthlyPeriodSchema);
+export const hrMonthlyPeriodDetailSchema = hrMonthlyPeriodSchema.extend({
+  snapshots: z.array(hrMonthlyEmployeeSnapshotSchema),
+  payrollVariables: z.array(hrPayrollVariableSchema),
+});
+
 export const hrEmployeeHistoryEventSchema = z.object({
   id: uuidSchema,
   action: z.string(),
@@ -1266,6 +1370,9 @@ export type HrLeaveRequestStatus = z.infer<typeof hrLeaveRequestStatusSchema>;
 export type HrLeaveBalanceMovementType = z.infer<
   typeof hrLeaveBalanceMovementTypeSchema
 >;
+export type HrMonthlyPeriodStatus = z.infer<typeof hrMonthlyPeriodStatusSchema>;
+export type HrPayrollVariableKind = z.infer<typeof hrPayrollVariableKindSchema>;
+export type HrPayrollVariableUnit = z.infer<typeof hrPayrollVariableUnitSchema>;
 export type HrAccessContext = z.infer<typeof hrAccessContextSchema>;
 export type HrAccessGrant = z.infer<typeof hrAccessGrantSchema>;
 export type HrAccessAdministration = z.infer<
@@ -1359,6 +1466,12 @@ export type HrAttendanceEmployeeMonth = z.infer<
   typeof hrAttendanceEmployeeMonthSchema
 >;
 export type HrAttendanceMonth = z.infer<typeof hrAttendanceMonthSchema>;
+export type HrMonthlyPeriod = z.infer<typeof hrMonthlyPeriodSchema>;
+export type HrMonthlyPeriodDetail = z.infer<typeof hrMonthlyPeriodDetailSchema>;
+export type HrMonthlyEmployeeSnapshot = z.infer<
+  typeof hrMonthlyEmployeeSnapshotSchema
+>;
+export type HrPayrollVariable = z.infer<typeof hrPayrollVariableSchema>;
 export type HrEmployeeHistoryEvent = z.infer<
   typeof hrEmployeeHistoryEventSchema
 >;

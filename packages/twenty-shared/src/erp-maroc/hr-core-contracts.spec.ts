@@ -12,11 +12,106 @@ import {
   hrLeavePolicySchema,
   hrLeaveRequestSchema,
   hrLifecycleJourneySchema,
+  hrMonthlyPeriodDetailSchema,
   hrOrganisationChartSchema,
   hrAttendanceMonthSchema,
   hrWorkCalendarSchema,
   hrWorkScheduleSchema,
 } from './hr-core-contracts';
+
+describe('HR monthly closing contracts', () => {
+  it('parses a frozen payroll snapshot and its transmitted variable', () => {
+    const organisationId = '11111111-1111-4111-8111-111111111111';
+    const societeId = '22222222-2222-4222-8222-222222222222';
+    const periodId = '33333333-3333-4333-8333-333333333333';
+    const employeeId = '44444444-4444-4444-8444-444444444444';
+    const now = '2026-07-30T12:00:00.000Z';
+    const employee = {
+      id: employeeId,
+      employeeNumber: 'ZOW-001',
+      firstName: 'Salma',
+      lastName: 'Alaoui',
+    };
+
+    const period = hrMonthlyPeriodDetailSchema.parse({
+      id: periodId,
+      organisationId,
+      societeId,
+      month: '2026-06',
+      status: 'TRANSMITTED',
+      currentSnapshotVersion: 1,
+      frozenSnapshotVersion: 1,
+      sourceDigest: 'a'.repeat(64),
+      employeeCount: 1,
+      totalAnomalyCount: 0,
+      totalWorkedMinutes: 9_600,
+      totalOvertimeMinutes: 120,
+      totalAbsenceDays: 1,
+      totalPaidLeaveDays: 2,
+      totalUnpaidLeaveDays: 0,
+      reviewSubmittedAt: now,
+      reviewSubmittedByTwentyUserId: 'hr-user',
+      frozenAt: now,
+      frozenByTwentyUserId: 'hr-user',
+      transmittedAt: now,
+      transmittedByTwentyUserId: 'payroll-user',
+      reopenedAt: null,
+      reopenedByTwentyUserId: null,
+      reopenReason: null,
+      createdByTwentyUserId: 'hr-user',
+      createdAt: now,
+      updatedAt: now,
+      _count: { snapshots: 1, payrollVariables: 6 },
+      snapshots: [
+        {
+          id: '55555555-5555-4555-8555-555555555555',
+          organisationId,
+          societeId,
+          periodId,
+          employeeId,
+          version: 1,
+          scheduledDays: 22,
+          presentDays: 19,
+          absentDays: 1,
+          paidLeaveDays: 2,
+          unpaidLeaveDays: 0,
+          holidayDays: 0,
+          lateMinutes: 15,
+          workedMinutes: 9_600,
+          overtimeMinutes: 120,
+          anomalyCount: 0,
+          pendingLeaveRequestCount: 0,
+          sourceDigest: 'b'.repeat(64),
+          details: { days: [] },
+          generatedByTwentyUserId: 'hr-user',
+          generatedAt: now,
+          employee,
+        },
+      ],
+      payrollVariables: [
+        {
+          id: '66666666-6666-4666-8666-666666666666',
+          organisationId,
+          societeId,
+          periodId,
+          employeeId,
+          snapshotVersion: 1,
+          kind: 'OVERTIME_MINUTES',
+          unit: 'MINUTES',
+          value: 120,
+          sourceDigest: 'b'.repeat(64),
+          generatedByTwentyUserId: 'payroll-user',
+          createdAt: now,
+          employee,
+        },
+      ],
+    });
+
+    expect(period.status).toBe('TRANSMITTED');
+    expect(period.snapshots[0]?.anomalyCount).toBe(0);
+    expect(period.payrollVariables[0]?.value).toBe(120);
+  });
+});
 
 describe('HR leave management contracts', () => {
   it('parses an explained balance and a delegated two-step request', () => {

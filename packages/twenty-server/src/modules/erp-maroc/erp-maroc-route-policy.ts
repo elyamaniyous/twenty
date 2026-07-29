@@ -62,6 +62,8 @@ import {
   hrLeavePolicySeedResultSchema,
   hrLeaveRequestListSchema,
   hrLeaveRequestSchema,
+  hrMonthlyPeriodDetailSchema,
+  hrMonthlyPeriodListSchema,
   hrMoroccoHolidaySeedResultSchema,
   hrTeamListSchema,
   hrTeamSchema,
@@ -190,6 +192,7 @@ const workCalendarQuery = Object.freeze(['year']);
 const attendanceQuery = Object.freeze(['month', 'employeeId']);
 const leaveRequestQuery = Object.freeze(['year', 'status']);
 const leaveBalanceQuery = Object.freeze(['year']);
+const monthlyClosingQuery = Object.freeze(['year']);
 const pdfSchema = z.instanceof(Uint8Array);
 
 const exact = (path: string) => new RegExp(`^${path}$`);
@@ -2127,6 +2130,86 @@ const routes: ErpMarocRoute[] = [
     kind: 'json',
     idempotency: 'required',
   }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrMonthlyPeriods,
+    method: 'GET',
+    pattern: exact('/hr-monthly-periods'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrMonthlyClosing.periods),
+    queryKeys: monthlyClosingQuery,
+    responseSchema: hrMonthlyPeriodListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrMonthlyPeriods,
+    method: 'POST',
+    pattern: exact('/hr-monthly-periods'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrMonthlyClosing.periods),
+    queryKeys: noQuery,
+    responseSchema: hrMonthlyPeriodDetailSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrMonthlyPeriodDetail,
+    method: 'GET',
+    pattern: detail('hr-monthly-periods'),
+    build: idBuilder(erpMarocUpstreamRoutes.hrMonthlyClosing.period),
+    queryKeys: noQuery,
+    responseSchema: hrMonthlyPeriodDetailSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrMonthlyPeriodRecalculate,
+    method: 'POST',
+    pattern: action('hr-monthly-periods', 'recalculate'),
+    build: idBuilder(erpMarocUpstreamRoutes.hrMonthlyClosing.recalculate),
+    queryKeys: noQuery,
+    responseSchema: hrMonthlyPeriodDetailSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrMonthlyPeriodSubmitReview,
+    method: 'POST',
+    pattern: action('hr-monthly-periods', 'submit-review'),
+    build: idBuilder(erpMarocUpstreamRoutes.hrMonthlyClosing.submitReview),
+    queryKeys: noQuery,
+    responseSchema: hrMonthlyPeriodDetailSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrMonthlyPeriodFreeze,
+    method: 'POST',
+    pattern: action('hr-monthly-periods', 'freeze'),
+    build: idBuilder(erpMarocUpstreamRoutes.hrMonthlyClosing.freeze),
+    queryKeys: noQuery,
+    responseSchema: hrMonthlyPeriodDetailSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrMonthlyPeriodReopen,
+    method: 'POST',
+    pattern: action('hr-monthly-periods', 'reopen'),
+    build: idBuilder(erpMarocUpstreamRoutes.hrMonthlyClosing.reopen),
+    queryKeys: noQuery,
+    responseSchema: hrMonthlyPeriodDetailSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrMonthlyPeriodTransmit,
+    method: 'POST',
+    pattern: action('hr-monthly-periods', 'transmit'),
+    build: idBuilder(erpMarocUpstreamRoutes.hrMonthlyClosing.transmit),
+    queryKeys: noQuery,
+    responseSchema: hrMonthlyPeriodDetailSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
 ];
 
 export const ERP_MAROC_ROUTE_POLICY: readonly ErpMarocRoute[] =
@@ -2289,6 +2372,13 @@ const assertNormalizedQueryValue = (
       routeId === erpMarocRouteIds.hrLeaveBalances) &&
     key === 'year' &&
     /^(?:20\d{2}|21\d{2}|2200)$/.test(value)
+  ) {
+    return;
+  }
+  if (
+    routeId === erpMarocRouteIds.hrMonthlyPeriods &&
+    key === 'year' &&
+    /^(?:20\d{2}|2100)$/.test(value)
   ) {
     return;
   }

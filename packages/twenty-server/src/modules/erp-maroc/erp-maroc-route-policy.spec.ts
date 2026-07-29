@@ -62,6 +62,8 @@ import {
   hrLeavePolicySeedResultSchema,
   hrLeaveRequestListSchema,
   hrLeaveRequestSchema,
+  hrMonthlyPeriodDetailSchema,
+  hrMonthlyPeriodListSchema,
   hrMoroccoHolidaySeedResultSchema,
   hrTeamListSchema,
   hrTeamSchema,
@@ -223,6 +225,12 @@ const requiredIdempotencyRoutes = new Set([
   `PATCH /hr-leave/requests/${id}/cancel`,
   'POST /hr-leave/balances/adjustments',
   'POST /hr-leave/accruals/run',
+  'POST /hr-monthly-periods',
+  `POST /hr-monthly-periods/${id}/recalculate`,
+  `POST /hr-monthly-periods/${id}/submit-review`,
+  `POST /hr-monthly-periods/${id}/freeze`,
+  `POST /hr-monthly-periods/${id}/reopen`,
+  `POST /hr-monthly-periods/${id}/transmit`,
 ]);
 
 const approvedRoutes = [
@@ -1065,6 +1073,54 @@ const approvedRoutes = [
     'hr-leave.accrual.run',
     hrLeaveAccrualRunResultSchema,
   ],
+  [
+    'GET',
+    '/hr-monthly-periods',
+    'hr-monthly-closing.periods',
+    hrMonthlyPeriodListSchema,
+  ],
+  [
+    'POST',
+    '/hr-monthly-periods',
+    'hr-monthly-closing.periods',
+    hrMonthlyPeriodDetailSchema,
+  ],
+  [
+    'GET',
+    `/hr-monthly-periods/${id}`,
+    'hr-monthly-closing.period.detail',
+    hrMonthlyPeriodDetailSchema,
+  ],
+  [
+    'POST',
+    `/hr-monthly-periods/${id}/recalculate`,
+    'hr-monthly-closing.period.recalculate',
+    hrMonthlyPeriodDetailSchema,
+  ],
+  [
+    'POST',
+    `/hr-monthly-periods/${id}/submit-review`,
+    'hr-monthly-closing.period.submit-review',
+    hrMonthlyPeriodDetailSchema,
+  ],
+  [
+    'POST',
+    `/hr-monthly-periods/${id}/freeze`,
+    'hr-monthly-closing.period.freeze',
+    hrMonthlyPeriodDetailSchema,
+  ],
+  [
+    'POST',
+    `/hr-monthly-periods/${id}/reopen`,
+    'hr-monthly-closing.period.reopen',
+    hrMonthlyPeriodDetailSchema,
+  ],
+  [
+    'POST',
+    `/hr-monthly-periods/${id}/transmit`,
+    'hr-monthly-closing.period.transmit',
+    hrMonthlyPeriodDetailSchema,
+  ],
 ] as const;
 
 describe('ERP Maroc route policy', () => {
@@ -1083,9 +1139,11 @@ describe('ERP Maroc route policy', () => {
               ? { year: '2026' }
               : routeId === 'hr-leave.balances'
                 ? { year: '2026' }
-                : requiresAccountCode
-                  ? { accountCode: '3421' }
-                  : {};
+                : routeId === 'hr-monthly-closing.periods' && method === 'GET'
+                  ? { year: '2026' }
+                  : requiresAccountCode
+                    ? { accountCode: '3421' }
+                    : {};
       const resolved = resolveErpRoute(method, path, query);
 
       expect(resolved.routeId).toBe(routeId);
@@ -1097,9 +1155,11 @@ describe('ERP Maroc route policy', () => {
             : (routeId === 'hr-leave.requests' && method === 'GET') ||
                 routeId === 'hr-leave.balances'
               ? `${path}?year=2026`
-              : requiresAccountCode
-                ? `${path}?accountCode=3421`
-                : path,
+              : routeId === 'hr-monthly-closing.periods' && method === 'GET'
+                ? `${path}?year=2026`
+                : requiresAccountCode
+                  ? `${path}?accountCode=3421`
+                  : path,
       );
       expect(resolved.kind).toBe(routeId === 'invoices.pdf' ? 'pdf' : 'json');
       expect(resolved.idempotency).toBe(
@@ -1270,6 +1330,11 @@ describe('ERP Maroc route policy', () => {
         year: '2026',
       }).upstreamPath,
     ).toBe('/hr-leave/balances?year=2026');
+    expect(
+      resolveErpRoute('GET', '/hr-monthly-periods', {
+        year: '2026',
+      }).upstreamPath,
+    ).toBe('/hr-monthly-periods?year=2026');
   });
 
   it.each([
@@ -1309,6 +1374,9 @@ describe('ERP Maroc route policy', () => {
     ['/hr-leave/requests', { year: '2026', status: 'PENDING' }],
     ['/hr-leave/balances', {}],
     ['/hr-leave/balances', { year: '2201' }],
+    ['/hr-monthly-periods', { year: '1999' }],
+    ['/hr-monthly-periods', { year: '2101' }],
+    ['/hr-monthly-periods', { year: '02026' }],
   ])('rejects non-normalized or unauthorized query for %s', (path, query) => {
     expect(() => resolveErpRoute('GET', path, query)).toThrow(
       'ERP route is not allowed',

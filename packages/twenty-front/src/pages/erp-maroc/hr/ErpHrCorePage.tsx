@@ -57,6 +57,7 @@ import { HrAccessManagementPanel } from './HrAccessManagementPanel';
 import { HrEmployeeImportPanel } from './HrEmployeeImportPanel';
 import { HrLifecyclePanel } from './HrLifecyclePanel';
 import { HrLeaveManagementPanel } from './HrLeaveManagementPanel';
+import { HrMonthlyClosingPanel } from './HrMonthlyClosingPanel';
 import { HrOrganisationChartPanel } from './HrOrganisationChartPanel';
 import { HrTimeAttendancePanel } from './HrTimeAttendancePanel';
 
@@ -91,6 +92,7 @@ type View =
   | 'journeys'
   | 'attendance'
   | 'leave'
+  | 'monthlyClosing'
   | 'access';
 type LoadState = 'loading' | 'ready' | 'error';
 type StructureView = Exclude<
@@ -102,6 +104,7 @@ type StructureView = Exclude<
   | 'access'
   | 'attendance'
   | 'leave'
+  | 'monthlyClosing'
 >;
 
 const EMPTY_SUMMARY: HrCoreSummary = {
@@ -288,6 +291,7 @@ const viewLabels: Record<View, string> = {
   journeys: 'Parcours RH',
   attendance: 'Présences',
   leave: 'Congés',
+  monthlyClosing: 'Clôture mensuelle',
   access: 'Accès RH',
 };
 
@@ -298,6 +302,7 @@ const isStructureView = (view: View): view is StructureView =>
   view !== 'journeys' &&
   view !== 'attendance' &&
   view !== 'leave' &&
+  view !== 'monthlyClosing' &&
   view !== 'access';
 
 export const ErpHrCorePage = () => {
@@ -1189,6 +1194,11 @@ export const ErpHrCorePage = () => {
         canWriteDocuments={access?.canWriteDocuments ?? false}
         query={query}
       />
+    ) : view === 'monthlyClosing' ? (
+      <HrMonthlyClosingPanel
+        canWrite={access?.canWriteTime ?? false}
+        query={query}
+      />
     ) : (
       <HrAccessManagementPanel
         establishments={establishments}
@@ -1200,7 +1210,8 @@ export const ErpHrCorePage = () => {
     (target) =>
       (target !== 'access' || access?.canAdministerAccess) &&
       (target !== 'attendance' || access?.canReadTime) &&
-      (target !== 'leave' || access?.canReadTime),
+      (target !== 'leave' || access?.canReadTime) &&
+      (target !== 'monthlyClosing' || access?.canReadTime),
   );
 
   return (

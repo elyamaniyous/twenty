@@ -2941,6 +2941,13 @@ export const erpMarocRouteIds = {
   hrLeaveBalances: 'hr-leave.balances',
   hrLeaveBalanceAdjustment: 'hr-leave.balance.adjustment',
   hrLeaveAccrualRun: 'hr-leave.accrual.run',
+  hrMonthlyPeriods: 'hr-monthly-closing.periods',
+  hrMonthlyPeriodDetail: 'hr-monthly-closing.period.detail',
+  hrMonthlyPeriodRecalculate: 'hr-monthly-closing.period.recalculate',
+  hrMonthlyPeriodSubmitReview: 'hr-monthly-closing.period.submit-review',
+  hrMonthlyPeriodFreeze: 'hr-monthly-closing.period.freeze',
+  hrMonthlyPeriodReopen: 'hr-monthly-closing.period.reopen',
+  hrMonthlyPeriodTransmit: 'hr-monthly-closing.period.transmit',
   documentsCollection: 'documents.collection',
   documentDetail: 'documents.detail',
   documentContent: 'documents.content',
@@ -3340,6 +3347,18 @@ export const erpMarocUpstreamRoutes = {
     balances: '/hr-leave/balances',
     adjustBalance: '/hr-leave/balances/adjustments',
     runAccruals: '/hr-leave/accruals/run',
+  },
+  hrMonthlyClosing: {
+    periods: '/hr-monthly-periods',
+    period: (id: string) => `/hr-monthly-periods/${encodeRouteId(id)}`,
+    recalculate: (id: string) =>
+      `/hr-monthly-periods/${encodeRouteId(id)}/recalculate`,
+    submitReview: (id: string) =>
+      `/hr-monthly-periods/${encodeRouteId(id)}/submit-review`,
+    freeze: (id: string) => `/hr-monthly-periods/${encodeRouteId(id)}/freeze`,
+    reopen: (id: string) => `/hr-monthly-periods/${encodeRouteId(id)}/reopen`,
+    transmit: (id: string) =>
+      `/hr-monthly-periods/${encodeRouteId(id)}/transmit`,
   },
   documents: {
     collection: '/documents',
