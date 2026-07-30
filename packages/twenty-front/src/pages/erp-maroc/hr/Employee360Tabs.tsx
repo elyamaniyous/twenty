@@ -375,7 +375,9 @@ export const Employee360Tabs = ({ employee }: Props) => {
                     <StyledCell>
                       <strong>{day.date}</strong>
                       <StyledMuted>
-                        {day.schedule?.name ?? 'Hors planning'}
+                        {day.rotation?.name ??
+                          day.schedule?.name ??
+                          'Hors planning'}
                       </StyledMuted>
                     </StyledCell>
                     <span>

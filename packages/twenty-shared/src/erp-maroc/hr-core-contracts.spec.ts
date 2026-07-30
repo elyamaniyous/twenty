@@ -15,6 +15,7 @@ import {
   hrMonthlyPeriodDetailSchema,
   hrOrganisationChartSchema,
   hrAttendanceMonthSchema,
+  hrShiftRotationSchema,
   hrWorkCalendarSchema,
   hrWorkScheduleSchema,
 } from './hr-core-contracts';
@@ -765,6 +766,39 @@ describe('hrEmployeeDetailSchema', () => {
           isWorkingDay: true,
           startMinute: 510,
           endMinute: 1050,
+          endsNextDay: false,
+          breakMinutes: 60,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      _count: { assignments: 1 },
+    });
+    const rotation = hrShiftRotationSchema.parse({
+      id: '88888888-8888-4888-8888-888888888888',
+      organisationId,
+      societeId,
+      code: 'ROT-NUIT',
+      name: 'Rotation nuit',
+      timezone: 'Africa/Casablanca',
+      cycleLengthDays: 2,
+      lateToleranceMinutes: 5,
+      isActive: true,
+      createdByTwentyUserId: 'admin-user',
+      createdAt: now,
+      updatedAt: now,
+      days: [
+        {
+          id: '99999999-9999-4999-8999-999999999999',
+          organisationId,
+          societeId,
+          rotationId: '88888888-8888-4888-8888-888888888888',
+          dayOffset: 0,
+          label: 'Nuit',
+          isWorkingDay: true,
+          startMinute: 1320,
+          endMinute: 360,
+          endsNextDay: true,
           breakMinutes: 60,
           createdAt: now,
           updatedAt: now,
@@ -804,6 +838,7 @@ describe('hrEmployeeDetailSchema', () => {
                 name: schedule.name,
                 timezone: schedule.timezone,
               },
+              rotation: null,
               calendarDay: null,
               status: 'LATE',
               firstClockIn: '2026-07-29T07:45:00.000Z',
@@ -828,6 +863,7 @@ describe('hrEmployeeDetailSchema', () => {
                   workMode: 'ONSITE',
                   occurredAt: '2026-07-29T07:45:00.000Z',
                   localDate: '2026-07-29',
+                  attendanceDate: '2026-07-29',
                   notes: null,
                   recordedByTwentyUserId: 'admin-user',
                   cancelledAt: null,
@@ -845,5 +881,6 @@ describe('hrEmployeeDetailSchema', () => {
 
     expect(month.employees[0]?.summary.lateMinutes).toBe(10);
     expect(calendar.code).toBe('MA');
+    expect(rotation.days[0]?.endsNextDay).toBe(true);
   });
 });

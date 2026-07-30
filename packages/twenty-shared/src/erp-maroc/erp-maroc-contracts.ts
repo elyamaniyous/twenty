@@ -2927,8 +2927,11 @@ export const erpMarocRouteIds = {
   hrWorkCalendarMoroccoNationalHolidays:
     'hr-attendance.work-calendar.morocco-national-holidays',
   hrWorkSchedules: 'hr-attendance.work-schedules',
+  hrShiftRotations: 'hr-attendance.shift-rotations',
   hrEmployeeWorkScheduleAssignments:
     'hr-attendance.employee.work-schedule-assignments',
+  hrEmployeeShiftRotationAssignments:
+    'hr-attendance.employee.shift-rotation-assignments',
   hrTimeEntries: 'hr-attendance.time-entries',
   hrTimeEntryCancel: 'hr-attendance.time-entry.cancel',
   hrAttendanceMonthly: 'hr-attendance.monthly',
@@ -3327,8 +3330,11 @@ export const erpMarocUpstreamRoutes = {
     workCalendarMoroccoNationalHolidays: (id: string) =>
       `/hr-attendance/work-calendars/${encodeRouteId(id)}/morocco-national-holidays`,
     workSchedules: '/hr-attendance/work-schedules',
+    shiftRotations: '/hr-attendance/shift-rotations',
     employeeWorkScheduleAssignments: (id: string) =>
       `/hr-attendance/employees/${encodeRouteId(id)}/work-schedule-assignments`,
+    employeeShiftRotationAssignments: (id: string) =>
+      `/hr-attendance/employees/${encodeRouteId(id)}/shift-rotation-assignments`,
     timeEntries: '/hr-attendance/time-entries',
     timeEntryCancel: (id: string) =>
       `/hr-attendance/time-entries/${encodeRouteId(id)}/cancel`,

@@ -12,6 +12,9 @@ import {
   hrAttendanceMonthSchema,
   hrCalendarDaySchema,
   hrMoroccoHolidaySeedResultSchema,
+  hrShiftRotationAssignmentSchema,
+  hrShiftRotationListSchema,
+  hrShiftRotationSchema,
   hrTimeEntrySchema,
   hrWorkCalendarListSchema,
   hrWorkCalendarSchema,
@@ -22,6 +25,7 @@ import {
   type HrAttendanceMonth,
   type HrCalendarDayType,
   type HrEmployeeListItem,
+  type HrShiftRotation,
   type HrTeam,
   type HrTimeEntryType,
   type HrTimeWorkMode,
@@ -86,6 +90,13 @@ const StyledCalendarCommands = styled.section`
   border-bottom: 1px solid ${themeCssVariables.border.color.light};
   display: grid;
   grid-template-columns: repeat(3, minmax(360px, 1fr));
+  overflow-x: auto;
+`;
+
+const StyledRotationCommands = styled.section`
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
+  display: grid;
+  grid-template-columns: repeat(2, minmax(420px, 1fr));
   overflow-x: auto;
 `;
 
@@ -252,6 +263,85 @@ const calendarDayTypeLabels: Record<HrCalendarDayType, string> = {
   WORKING_EXCEPTION: 'Ouverture exceptionnelle',
 };
 
+const rotationPresets = {
+  NIGHT_4X4: {
+    label: '4 nuits · 4 repos',
+    cycleLengthDays: 8,
+    days: Array.from({ length: 8 }, (_, dayOffset) =>
+      dayOffset < 4
+        ? {
+            dayOffset,
+            label: 'Nuit',
+            isWorkingDay: true,
+            startMinute: 22 * 60,
+            endMinute: 6 * 60,
+            endsNextDay: true,
+            breakMinutes: 60,
+          }
+        : { dayOffset, label: 'Repos', isWorkingDay: false },
+    ),
+  },
+  THREE_SHIFT: {
+    label: '2 matin · 2 soir · 2 nuit · 2 repos',
+    cycleLengthDays: 8,
+    days: Array.from({ length: 8 }, (_, dayOffset) => {
+      if (dayOffset < 2) {
+        return {
+          dayOffset,
+          label: 'Matin',
+          isWorkingDay: true,
+          startMinute: 6 * 60,
+          endMinute: 14 * 60,
+          endsNextDay: false,
+          breakMinutes: 30,
+        };
+      }
+      if (dayOffset < 4) {
+        return {
+          dayOffset,
+          label: 'Soir',
+          isWorkingDay: true,
+          startMinute: 14 * 60,
+          endMinute: 22 * 60,
+          endsNextDay: false,
+          breakMinutes: 30,
+        };
+      }
+      if (dayOffset < 6) {
+        return {
+          dayOffset,
+          label: 'Nuit',
+          isWorkingDay: true,
+          startMinute: 22 * 60,
+          endMinute: 6 * 60,
+          endsNextDay: true,
+          breakMinutes: 30,
+        };
+      }
+      return { dayOffset, label: 'Repos', isWorkingDay: false };
+    }),
+  },
+  DAY_5X2: {
+    label: '5 jours · 2 repos',
+    cycleLengthDays: 7,
+    days: Array.from({ length: 7 }, (_, dayOffset) =>
+      dayOffset < 5
+        ? {
+            dayOffset,
+            label: 'Jour',
+            isWorkingDay: true,
+            startMinute: 8 * 60 + 30,
+            endMinute: 17 * 60 + 30,
+            endsNextDay: false,
+            breakMinutes: 60,
+          }
+        : { dayOffset, label: 'Repos', isWorkingDay: false },
+    ),
+  },
+} as const;
+
+type RotationPreset = keyof typeof rotationPresets;
+
 export const HrTimeAttendancePanel = ({
   employees,
   teams,
@@ -263,6 +353,7 @@ export const HrTimeAttendancePanel = ({
   const [state, setState] = useState<LoadState>('loading');
   const [attendance, setAttendance] = useState<HrAttendanceMonth | null>(null);
   const [schedules, setSchedules] = useState<HrWorkSchedule[]>([]);
+  const [rotations, setRotations] = useState<HrShiftRotation[]>([]);
   const [calendars, setCalendars] = useState<HrWorkCalendar[]>([]);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{
@@ -276,7 +367,19 @@ export const HrTimeAttendancePanel = ({
     end: '17:30',
     breakMinutes: '60',
     tolerance: '5',
+    endsNextDay: false,
     weekdays: [1, 2, 3, 4, 5],
+  });
+  const [rotationForm, setRotationForm] = useState<{
+    code: string;
+    name: string;
+    preset: RotationPreset;
+    tolerance: string;
+  }>({
+    code: 'ROT-NUIT',
+    name: 'Rotation nuit 4x4',
+    preset: 'NIGHT_4X4',
+    tolerance: '5',
   });
   const [calendarForm, setCalendarForm] = useState({
     code: 'MA',
@@ -307,6 +410,12 @@ export const HrTimeAttendancePanel = ({
     workScheduleId: '',
     validFrom: currentDate(),
   });
+  const [rotationAssignmentForm, setRotationAssignmentForm] = useState({
+    employeeId: '',
+    rotationId: '',
+    validFrom: currentDate(),
+    startOffset: '0',
+  });
   const [entryForm, setEntryForm] = useState<{
     employeeId: string;
     type: HrTimeEntryType;
@@ -322,27 +431,34 @@ export const HrTimeAttendancePanel = ({
   const load = useCallback(async () => {
     setState('loading');
     try {
-      const [nextAttendance, nextSchedules, nextCalendars] = await Promise.all([
-        client.request({
-          method: 'GET',
-          path: '/hr-attendance/monthly',
-          query: { month },
-          schema: hrAttendanceMonthSchema,
-        }),
-        client.request({
-          method: 'GET',
-          path: '/hr-attendance/work-schedules',
-          schema: hrWorkScheduleListSchema,
-        }),
-        client.request({
-          method: 'GET',
-          path: '/hr-attendance/work-calendars',
-          query: { year: month.slice(0, 4) },
-          schema: hrWorkCalendarListSchema,
-        }),
-      ]);
+      const [nextAttendance, nextSchedules, nextRotations, nextCalendars] =
+        await Promise.all([
+          client.request({
+            method: 'GET',
+            path: '/hr-attendance/monthly',
+            query: { month },
+            schema: hrAttendanceMonthSchema,
+          }),
+          client.request({
+            method: 'GET',
+            path: '/hr-attendance/work-schedules',
+            schema: hrWorkScheduleListSchema,
+          }),
+          client.request({
+            method: 'GET',
+            path: '/hr-attendance/shift-rotations',
+            schema: hrShiftRotationListSchema,
+          }),
+          client.request({
+            method: 'GET',
+            path: '/hr-attendance/work-calendars',
+            query: { year: month.slice(0, 4) },
+            schema: hrWorkCalendarListSchema,
+          }),
+        ]);
       setAttendance(nextAttendance);
       setSchedules(nextSchedules);
+      setRotations(nextRotations);
       setCalendars(nextCalendars);
       setAssignmentForm((current) => ({
         ...current,
@@ -355,6 +471,14 @@ export const HrTimeAttendancePanel = ({
       setEntryForm((current) => ({
         ...current,
         employeeId: current.employeeId || employees[0]?.id || '',
+      }));
+      setRotationAssignmentForm((current) => ({
+        ...current,
+        employeeId: current.employeeId || employees[0]?.id || '',
+        rotationId:
+          current.rotationId ||
+          nextRotations.find(({ isActive }) => isActive)?.id ||
+          '',
       }));
       setCalendarDayForm((current) => ({
         ...current,
@@ -472,6 +596,7 @@ export const HrTimeAttendancePanel = ({
                   isWorkingDay: true,
                   startMinute: parseMinute(scheduleForm.start),
                   endMinute: parseMinute(scheduleForm.end),
+                  endsNextDay: scheduleForm.endsNextDay,
                   breakMinutes: Number(scheduleForm.breakMinutes),
                 }
               : { weekday, isWorkingDay: false },
@@ -479,6 +604,26 @@ export const HrTimeAttendancePanel = ({
         },
       },
       'Horaire créé.',
+    );
+  };
+
+  const createRotation = async () => {
+    const preset = rotationPresets[rotationForm.preset];
+    await execute(
+      {
+        method: 'POST',
+        path: '/hr-attendance/shift-rotations',
+        schema: hrShiftRotationSchema,
+        body: {
+          code: rotationForm.code,
+          name: rotationForm.name,
+          timezone: 'Africa/Casablanca',
+          cycleLengthDays: preset.cycleLengthDays,
+          lateToleranceMinutes: Number(rotationForm.tolerance),
+          days: preset.days,
+        },
+      },
+      'Cycle de rotation créé.',
     );
   };
 
@@ -496,6 +641,29 @@ export const HrTimeAttendancePanel = ({
         },
       },
       'Horaire affecté au collaborateur.',
+    );
+  };
+
+  const assignRotation = async () => {
+    if (
+      !rotationAssignmentForm.employeeId ||
+      !rotationAssignmentForm.rotationId
+    ) {
+      return;
+    }
+    await execute(
+      {
+        method: 'POST',
+        path: `/hr-attendance/employees/${rotationAssignmentForm.employeeId}/shift-rotation-assignments`,
+        schema: hrShiftRotationAssignmentSchema,
+        body: {
+          rotationId: rotationAssignmentForm.rotationId,
+          validFrom: rotationAssignmentForm.validFrom,
+          validTo: null,
+          startOffset: Number(rotationAssignmentForm.startOffset),
+        },
+      },
+      'Rotation affectée au collaborateur.',
     );
   };
 
@@ -1017,6 +1185,19 @@ export const HrTimeAttendancePanel = ({
                   {label}
                 </StyledDay>
               ))}
+              <StyledDay>
+                <input
+                  type="checkbox"
+                  checked={scheduleForm.endsNextDay}
+                  onChange={(event) =>
+                    setScheduleForm((current) => ({
+                      ...current,
+                      endsNextDay: event.target.checked,
+                    }))
+                  }
+                />
+                Fin le lendemain
+              </StyledDay>
               <StyledField>
                 Tolérance
                 <StyledInput
@@ -1193,6 +1374,184 @@ export const HrTimeAttendancePanel = ({
         </StyledCommands>
       ) : null}
 
+      {canWrite ? (
+        <StyledRotationCommands>
+          <StyledCommand
+            onSubmit={(event) => {
+              event.preventDefault();
+              void createRotation();
+            }}
+          >
+            <StyledCommandTitle>Nouveau cycle de rotation</StyledCommandTitle>
+            <StyledFields>
+              <StyledField>
+                Code
+                <StyledInput
+                  value={rotationForm.code}
+                  onChange={(event) =>
+                    setRotationForm((current) => ({
+                      ...current,
+                      code: event.target.value.toUpperCase(),
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                Libellé
+                <StyledInput
+                  value={rotationForm.name}
+                  onChange={(event) =>
+                    setRotationForm((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <Button
+                title="Créer"
+                ariaLabel="Créer le cycle de rotation"
+                Icon={IconPlus}
+                accent="blue"
+                disabled={busy}
+                type="submit"
+              />
+            </StyledFields>
+            <StyledFields>
+              <StyledField>
+                Modèle
+                <StyledSelect
+                  value={rotationForm.preset}
+                  onChange={(event) =>
+                    setRotationForm((current) => ({
+                      ...current,
+                      preset: event.target.value as RotationPreset,
+                    }))
+                  }
+                >
+                  {Object.entries(rotationPresets).map(([value, preset]) => (
+                    <option key={value} value={value}>
+                      {preset.label}
+                    </option>
+                  ))}
+                </StyledSelect>
+              </StyledField>
+              <StyledField>
+                Tolérance (min)
+                <StyledInput
+                  type="number"
+                  min="0"
+                  max="180"
+                  value={rotationForm.tolerance}
+                  onChange={(event) =>
+                    setRotationForm((current) => ({
+                      ...current,
+                      tolerance: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+            </StyledFields>
+          </StyledCommand>
+
+          <StyledCommand
+            onSubmit={(event) => {
+              event.preventDefault();
+              void assignRotation();
+            }}
+          >
+            <StyledCommandTitle>Affecter une rotation</StyledCommandTitle>
+            <StyledFields>
+              <StyledField>
+                Collaborateur
+                <StyledSelect
+                  value={rotationAssignmentForm.employeeId}
+                  onChange={(event) =>
+                    setRotationAssignmentForm((current) => ({
+                      ...current,
+                      employeeId: event.target.value,
+                    }))
+                  }
+                >
+                  {employees.map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.firstName} {employee.lastName}
+                    </option>
+                  ))}
+                </StyledSelect>
+              </StyledField>
+              <StyledField>
+                Cycle
+                <StyledSelect
+                  value={rotationAssignmentForm.rotationId}
+                  onChange={(event) =>
+                    setRotationAssignmentForm((current) => ({
+                      ...current,
+                      rotationId: event.target.value,
+                      startOffset: '0',
+                    }))
+                  }
+                >
+                  <option value="">Sélectionner</option>
+                  {rotations
+                    .filter(({ isActive }) => isActive)
+                    .map((rotation) => (
+                      <option key={rotation.id} value={rotation.id}>
+                        {rotation.code} · {rotation.name}
+                      </option>
+                    ))}
+                </StyledSelect>
+              </StyledField>
+              <StyledField>
+                Jour initial
+                <StyledInput
+                  type="number"
+                  min="0"
+                  max={String(
+                    Math.max(
+                      0,
+                      (rotations.find(
+                        ({ id }) => id === rotationAssignmentForm.rotationId,
+                      )?.cycleLengthDays ?? 1) - 1,
+                    ),
+                  )}
+                  value={rotationAssignmentForm.startOffset}
+                  onChange={(event) =>
+                    setRotationAssignmentForm((current) => ({
+                      ...current,
+                      startOffset: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+            </StyledFields>
+            <StyledFields>
+              <StyledField>
+                À partir du
+                <StyledInput
+                  type="date"
+                  value={rotationAssignmentForm.validFrom}
+                  onChange={(event) =>
+                    setRotationAssignmentForm((current) => ({
+                      ...current,
+                      validFrom: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <Button
+                title="Affecter"
+                ariaLabel="Affecter le cycle de rotation"
+                Icon={IconPlus}
+                accent="blue"
+                disabled={busy || rotations.length === 0}
+                type="submit"
+              />
+            </StyledFields>
+          </StyledCommand>
+        </StyledRotationCommands>
+      ) : null}
+
       {feedback === null ? null : (
         <StyledFeedback danger={feedback.danger} role="status">
           {feedback.message}
@@ -1210,8 +1569,8 @@ export const HrTimeAttendancePanel = ({
         </StyledField>
         <StyledScheduleSummary>
           {calendars.filter(({ isActive }) => isActive).length} calendrier(s) ·{' '}
-          {schedules.length} horaire(s) · {attendance?.employees.length ?? 0}{' '}
-          collaborateur(s)
+          {schedules.length} horaire(s) · {rotations.length} rotation(s) ·{' '}
+          {attendance?.employees.length ?? 0} collaborateur(s)
         </StyledScheduleSummary>
         <Button
           title="Actualiser"

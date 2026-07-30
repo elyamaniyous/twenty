@@ -1084,6 +1084,7 @@ export const hrWorkScheduleDaySchema = z.object({
   isWorkingDay: z.boolean(),
   startMinute: z.number().int().min(0).max(1439).nullable(),
   endMinute: z.number().int().min(1).max(1440).nullable(),
+  endsNextDay: z.boolean(),
   breakMinutes: z.number().int().min(0).max(1439),
   createdAt: instantSchema,
   updatedAt: instantSchema,
@@ -1105,6 +1106,55 @@ export const hrWorkScheduleSchema = z.object({
   _count: z.object({ assignments: nonNegativeIntegerSchema }).optional(),
 });
 export const hrWorkScheduleListSchema = z.array(hrWorkScheduleSchema);
+
+export const hrShiftRotationDaySchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  rotationId: uuidSchema,
+  dayOffset: z.number().int().min(0).max(59),
+  label: nullableStringSchema,
+  isWorkingDay: z.boolean(),
+  startMinute: z.number().int().min(0).max(1439).nullable(),
+  endMinute: z.number().int().min(1).max(1440).nullable(),
+  endsNextDay: z.boolean(),
+  breakMinutes: z.number().int().min(0).max(1439),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+
+export const hrShiftRotationSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  code: z.string(),
+  name: z.string(),
+  timezone: z.string(),
+  cycleLengthDays: z.number().int().min(1).max(60),
+  lateToleranceMinutes: z.number().int().min(0).max(180),
+  isActive: z.boolean(),
+  createdByTwentyUserId: z.string(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  days: z.array(hrShiftRotationDaySchema),
+  _count: z.object({ assignments: nonNegativeIntegerSchema }).optional(),
+});
+export const hrShiftRotationListSchema = z.array(hrShiftRotationSchema);
+
+export const hrShiftRotationAssignmentSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  employeeId: uuidSchema,
+  rotationId: uuidSchema,
+  validFrom: civilDateHttpSchema,
+  validTo: nullableCivilDateHttpSchema,
+  startOffset: z.number().int().min(0).max(59),
+  createdByTwentyUserId: z.string(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  rotation: hrShiftRotationSchema,
+});
 
 export const hrWorkScheduleAssignmentSchema = z.object({
   id: uuidSchema,
@@ -1132,6 +1182,7 @@ export const hrTimeEntrySchema = z.object({
   workMode: hrTimeWorkModeSchema,
   occurredAt: instantSchema,
   localDate: civilDateHttpSchema,
+  attendanceDate: civilDateHttpSchema,
   notes: nullableStringSchema,
   recordedByTwentyUserId: z.string(),
   cancelledAt: instantSchema.nullable(),
@@ -1149,6 +1200,16 @@ export const hrAttendanceDaySchema = z.object({
       code: z.string(),
       name: z.string(),
       timezone: z.string(),
+    })
+    .nullable(),
+  rotation: z
+    .object({
+      id: uuidSchema,
+      code: z.string(),
+      name: z.string(),
+      timezone: z.string(),
+      dayOffset: z.number().int().min(0).max(59).nullable(),
+      label: nullableStringSchema,
     })
     .nullable(),
   calendarDay: z
@@ -1457,6 +1518,11 @@ export type HrMoroccoHolidaySeedResult = z.infer<
 >;
 export type HrWorkScheduleDay = z.infer<typeof hrWorkScheduleDaySchema>;
 export type HrWorkSchedule = z.infer<typeof hrWorkScheduleSchema>;
+export type HrShiftRotationDay = z.infer<typeof hrShiftRotationDaySchema>;
+export type HrShiftRotation = z.infer<typeof hrShiftRotationSchema>;
+export type HrShiftRotationAssignment = z.infer<
+  typeof hrShiftRotationAssignmentSchema
+>;
 export type HrWorkScheduleAssignment = z.infer<
   typeof hrWorkScheduleAssignmentSchema
 >;
