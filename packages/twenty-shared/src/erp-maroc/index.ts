@@ -550,6 +550,7 @@ export {
   hrAttendanceMonthSchema,
   hrOvertimePolicySchema,
   hrNullableOvertimePolicySchema,
+  hrOvertimePolicyResponseSchema,
   hrOvertimeLimitAlertSchema,
   hrCompensatoryRestMovementSchema,
   hrOvertimeApprovalSchema,

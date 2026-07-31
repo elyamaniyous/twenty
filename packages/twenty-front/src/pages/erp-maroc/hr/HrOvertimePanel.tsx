@@ -11,10 +11,10 @@ import { type z } from 'zod';
 import {
   hrCompensatoryRestBalanceResponseSchema,
   hrCompensatoryRestExpirationResultSchema,
-  hrNullableOvertimePolicySchema,
   hrOvertimeApprovalListSchema,
   hrOvertimeApprovalSchema,
   hrOvertimePolicySchema,
+  hrOvertimePolicyResponseSchema,
   type HrCompensatoryRestBalanceResponse,
   type HrEmployeeListItem,
   type HrOvertimeApproval,
@@ -339,11 +339,11 @@ export const HrOvertimePanel = ({
   const load = useCallback(async () => {
     setState('loading');
     try {
-      const [nextPolicy, nextApprovals, nextRest] = await Promise.all([
+      const [policyResponse, nextApprovals, nextRest] = await Promise.all([
         client.request({
           method: 'GET',
           path: '/hr-attendance/overtime-policy',
-          schema: hrNullableOvertimePolicySchema,
+          schema: hrOvertimePolicyResponseSchema,
         }),
         client.request({
           method: 'GET',
@@ -357,6 +357,7 @@ export const HrOvertimePanel = ({
           schema: hrCompensatoryRestBalanceResponseSchema,
         }),
       ]);
+      const nextPolicy = policyResponse.policy;
       setPolicy(nextPolicy);
       if (nextPolicy !== null) setPolicyDraft(policyToDraft(nextPolicy));
       setApprovals(nextApprovals);

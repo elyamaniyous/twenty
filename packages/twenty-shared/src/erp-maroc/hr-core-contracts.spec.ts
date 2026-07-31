@@ -16,12 +16,21 @@ import {
   hrOrganisationChartSchema,
   hrAttendanceMonthSchema,
   hrBreastfeedingArrangementSchema,
+  hrOvertimePolicyResponseSchema,
   hrShiftRotationSchema,
   hrTimeEntryCorrectionRequestSchema,
   hrWorkPatternChangeRequestSchema,
   hrWorkCalendarSchema,
   hrWorkScheduleSchema,
 } from './hr-core-contracts';
+
+describe('HR overtime contracts', () => {
+  it('represents an unconfigured policy as explicit JSON null', () => {
+    expect(hrOvertimePolicyResponseSchema.parse({ policy: null })).toEqual({
+      policy: null,
+    });
+  });
+});
 
 describe('HR monthly closing contracts', () => {
   it('parses a frozen payroll snapshot and its transmitted variable', () => {

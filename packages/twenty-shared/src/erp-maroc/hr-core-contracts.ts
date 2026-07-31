@@ -1627,6 +1627,9 @@ export const hrOvertimePolicySchema = z.object({
   updatedAt: instantSchema,
 });
 export const hrNullableOvertimePolicySchema = hrOvertimePolicySchema.nullable();
+export const hrOvertimePolicyResponseSchema = z.object({
+  policy: hrNullableOvertimePolicySchema,
+});
 
 export const hrOvertimeLimitAlertSchema = z.object({
   code: z.enum([
