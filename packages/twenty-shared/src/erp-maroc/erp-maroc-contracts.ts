@@ -2928,6 +2928,9 @@ export const erpMarocRouteIds = {
     'hr-attendance.work-calendar.morocco-national-holidays',
   hrWorkSchedules: 'hr-attendance.work-schedules',
   hrShiftRotations: 'hr-attendance.shift-rotations',
+  hrWorkPatternChangeRequests: 'hr-attendance.work-pattern-change-requests',
+  hrWorkPatternChangeApprove: 'hr-attendance.work-pattern-change.approve',
+  hrWorkPatternChangeReject: 'hr-attendance.work-pattern-change.reject',
   hrEmployeeWorkScheduleAssignments:
     'hr-attendance.employee.work-schedule-assignments',
   hrEmployeeShiftRotationAssignments:
@@ -3331,6 +3334,11 @@ export const erpMarocUpstreamRoutes = {
       `/hr-attendance/work-calendars/${encodeRouteId(id)}/morocco-national-holidays`,
     workSchedules: '/hr-attendance/work-schedules',
     shiftRotations: '/hr-attendance/shift-rotations',
+    workPatternChangeRequests: '/hr-attendance/work-pattern-change-requests',
+    workPatternChangeApprove: (id: string) =>
+      `/hr-attendance/work-pattern-change-requests/${encodeRouteId(id)}/approve`,
+    workPatternChangeReject: (id: string) =>
+      `/hr-attendance/work-pattern-change-requests/${encodeRouteId(id)}/reject`,
     employeeWorkScheduleAssignments: (id: string) =>
       `/hr-attendance/employees/${encodeRouteId(id)}/work-schedule-assignments`,
     employeeShiftRotationAssignments: (id: string) =>

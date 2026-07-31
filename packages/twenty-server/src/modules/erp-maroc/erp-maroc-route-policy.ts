@@ -79,6 +79,8 @@ import {
   hrWorkScheduleAssignmentSchema,
   hrWorkScheduleListSchema,
   hrWorkScheduleSchema,
+  hrWorkPatternChangeRequestListSchema,
+  hrWorkPatternChangeRequestSchema,
   marketingAutomationListSchema,
   marketingAutomationSchema,
   marketingCampaignListSchema,
@@ -193,6 +195,7 @@ const grandLivreQuery = Object.freeze([
 const lettrageQuery = Object.freeze(['accountCode']);
 const workCalendarQuery = Object.freeze(['year']);
 const attendanceQuery = Object.freeze(['month', 'employeeId']);
+const workPatternChangeQuery = Object.freeze(['status']);
 const leaveRequestQuery = Object.freeze(['year', 'status']);
 const leaveBalanceQuery = Object.freeze(['year']);
 const monthlyClosingQuery = Object.freeze(['year']);
@@ -2002,6 +2005,54 @@ const routes: ErpMarocRoute[] = [
     idempotency: 'required',
   }),
   defineRoute({
+    routeId: erpMarocRouteIds.hrWorkPatternChangeRequests,
+    method: 'GET',
+    pattern: exact('/hr-attendance/work-pattern-change-requests'),
+    build: staticBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.workPatternChangeRequests,
+    ),
+    queryKeys: workPatternChangeQuery,
+    responseSchema: hrWorkPatternChangeRequestListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrWorkPatternChangeRequests,
+    method: 'POST',
+    pattern: exact('/hr-attendance/work-pattern-change-requests'),
+    build: staticBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.workPatternChangeRequests,
+    ),
+    queryKeys: noQuery,
+    responseSchema: hrWorkPatternChangeRequestSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrWorkPatternChangeApprove,
+    method: 'PATCH',
+    pattern: action('hr-attendance/work-pattern-change-requests', 'approve'),
+    build: idBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.workPatternChangeApprove,
+    ),
+    queryKeys: noQuery,
+    responseSchema: hrWorkPatternChangeRequestSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrWorkPatternChangeReject,
+    method: 'PATCH',
+    pattern: action('hr-attendance/work-pattern-change-requests', 'reject'),
+    build: idBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.workPatternChangeReject,
+    ),
+    queryKeys: noQuery,
+    responseSchema: hrWorkPatternChangeRequestSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
     routeId: erpMarocRouteIds.hrEmployeeWorkScheduleAssignments,
     method: 'POST',
     pattern: action('hr-attendance/employees', 'work-schedule-assignments'),
@@ -2399,6 +2450,13 @@ const assertNormalizedQueryValue = (
     routeId === erpMarocRouteIds.hrAttendanceMonthly &&
     key === 'month' &&
     /^\d{4}-(?:0[1-9]|1[0-2])$/.test(value)
+  ) {
+    return;
+  }
+  if (
+    routeId === erpMarocRouteIds.hrWorkPatternChangeRequests &&
+    key === 'status' &&
+    new Set(['PENDING', 'APPROVED', 'REJECTED']).has(value)
   ) {
     return;
   }

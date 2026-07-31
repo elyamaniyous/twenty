@@ -130,6 +130,15 @@ export const hrCalendarDayTypeSchema = z.enum([
   'COMPANY_CLOSURE',
   'WORKING_EXCEPTION',
 ]);
+export const hrWorkPatternTypeSchema = z.enum([
+  'WORK_SCHEDULE',
+  'SHIFT_ROTATION',
+]);
+export const hrWorkPatternChangeStatusSchema = z.enum([
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+]);
 export const hrAttendanceDayStatusSchema = z.enum([
   'PLANNED',
   'PRESENT',
@@ -1170,6 +1179,82 @@ export const hrWorkScheduleAssignmentSchema = z.object({
   workSchedule: hrWorkScheduleSchema,
 });
 
+export const hrWorkPatternChangeRequestSchema = z
+  .object({
+    id: uuidSchema,
+    organisationId: uuidSchema,
+    societeId: uuidSchema,
+    employeeId: uuidSchema,
+    patternType: hrWorkPatternTypeSchema,
+    workScheduleId: uuidSchema.nullable(),
+    rotationId: uuidSchema.nullable(),
+    effectiveFrom: civilDateHttpSchema,
+    startOffset: z.number().int().min(0).max(59),
+    reason: z.string(),
+    status: hrWorkPatternChangeStatusSchema,
+    requestedByTwentyUserId: z.string(),
+    requestedAt: instantSchema,
+    reviewedByTwentyUserId: nullableStringSchema,
+    reviewedAt: instantSchema.nullable(),
+    reviewNote: nullableStringSchema,
+    appliedWorkScheduleAssignmentId: uuidSchema.nullable(),
+    appliedShiftRotationAssignmentId: uuidSchema.nullable(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+    employee: hrLeaveEmployeeSummarySchema,
+    workSchedule: hrWorkScheduleSchema.nullable(),
+    rotation: hrShiftRotationSchema.nullable(),
+  })
+  .superRefine((request, context) => {
+    const targetsSchedule =
+      request.patternType === 'WORK_SCHEDULE' &&
+      request.workScheduleId !== null &&
+      request.workSchedule !== null &&
+      request.rotationId === null &&
+      request.rotation === null &&
+      request.startOffset === 0;
+    const targetsRotation =
+      request.patternType === 'SHIFT_ROTATION' &&
+      request.workScheduleId === null &&
+      request.workSchedule === null &&
+      request.rotationId !== null &&
+      request.rotation !== null;
+    if (!targetsSchedule && !targetsRotation) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Work pattern target does not match its type',
+      });
+    }
+
+    const isReviewed =
+      request.reviewedByTwentyUserId !== null && request.reviewedAt !== null;
+    const appliedSchedule =
+      request.appliedWorkScheduleAssignmentId !== null &&
+      request.appliedShiftRotationAssignmentId === null;
+    const appliedRotation =
+      request.appliedWorkScheduleAssignmentId === null &&
+      request.appliedShiftRotationAssignmentId !== null;
+    const hasNoAppliedAssignment =
+      request.appliedWorkScheduleAssignmentId === null &&
+      request.appliedShiftRotationAssignmentId === null;
+    const reviewIsConsistent =
+      (request.status === 'PENDING' && !isReviewed && hasNoAppliedAssignment) ||
+      (request.status === 'REJECTED' && isReviewed && hasNoAppliedAssignment) ||
+      (request.status === 'APPROVED' &&
+        isReviewed &&
+        ((request.patternType === 'WORK_SCHEDULE' && appliedSchedule) ||
+          (request.patternType === 'SHIFT_ROTATION' && appliedRotation)));
+    if (!reviewIsConsistent) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Work pattern review state is inconsistent',
+      });
+    }
+  });
+export const hrWorkPatternChangeRequestListSchema = z.array(
+  hrWorkPatternChangeRequestSchema,
+);
+
 export const hrTimeEntrySchema = z.object({
   id: uuidSchema,
   organisationId: uuidSchema,
@@ -1425,6 +1510,10 @@ export type HrTimeEntrySource = z.infer<typeof hrTimeEntrySourceSchema>;
 export type HrTimeEntryStatus = z.infer<typeof hrTimeEntryStatusSchema>;
 export type HrTimeWorkMode = z.infer<typeof hrTimeWorkModeSchema>;
 export type HrCalendarDayType = z.infer<typeof hrCalendarDayTypeSchema>;
+export type HrWorkPatternType = z.infer<typeof hrWorkPatternTypeSchema>;
+export type HrWorkPatternChangeStatus = z.infer<
+  typeof hrWorkPatternChangeStatusSchema
+>;
 export type HrAttendanceDayStatus = z.infer<typeof hrAttendanceDayStatusSchema>;
 export type HrLeaveType = z.infer<typeof hrLeaveTypeSchema>;
 export type HrLeaveRequestStatus = z.infer<typeof hrLeaveRequestStatusSchema>;
@@ -1525,6 +1614,9 @@ export type HrShiftRotationAssignment = z.infer<
 >;
 export type HrWorkScheduleAssignment = z.infer<
   typeof hrWorkScheduleAssignmentSchema
+>;
+export type HrWorkPatternChangeRequest = z.infer<
+  typeof hrWorkPatternChangeRequestSchema
 >;
 export type HrTimeEntry = z.infer<typeof hrTimeEntrySchema>;
 export type HrAttendanceDay = z.infer<typeof hrAttendanceDaySchema>;

@@ -16,6 +16,7 @@ import {
   hrOrganisationChartSchema,
   hrAttendanceMonthSchema,
   hrShiftRotationSchema,
+  hrWorkPatternChangeRequestSchema,
   hrWorkCalendarSchema,
   hrWorkScheduleSchema,
 } from './hr-core-contracts';
@@ -806,6 +807,36 @@ describe('hrEmployeeDetailSchema', () => {
       ],
       _count: { assignments: 1 },
     });
+    const changeRequest = hrWorkPatternChangeRequestSchema.parse({
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      organisationId,
+      societeId,
+      employeeId,
+      patternType: 'WORK_SCHEDULE',
+      workScheduleId: scheduleId,
+      rotationId: null,
+      effectiveFrom: '2026-07-15',
+      startOffset: 0,
+      reason: 'Passage à un nouvel horaire',
+      status: 'PENDING',
+      requestedByTwentyUserId: 'hr-manager',
+      requestedAt: now,
+      reviewedByTwentyUserId: null,
+      reviewedAt: null,
+      reviewNote: null,
+      appliedWorkScheduleAssignmentId: null,
+      appliedShiftRotationAssignmentId: null,
+      createdAt: now,
+      updatedAt: now,
+      employee: {
+        id: employeeId,
+        employeeNumber: 'ZOW-001',
+        firstName: 'Salma',
+        lastName: 'Alaoui',
+      },
+      workSchedule: schedule,
+      rotation: null,
+    });
     const month = hrAttendanceMonthSchema.parse({
       month: '2026-07',
       generatedAt: now,
@@ -882,5 +913,13 @@ describe('hrEmployeeDetailSchema', () => {
     expect(month.employees[0]?.summary.lateMinutes).toBe(10);
     expect(calendar.code).toBe('MA');
     expect(rotation.days[0]?.endsNextDay).toBe(true);
+    expect(changeRequest.status).toBe('PENDING');
+    expect(
+      hrWorkPatternChangeRequestSchema.safeParse({
+        ...changeRequest,
+        rotationId: rotation.id,
+        rotation,
+      }).success,
+    ).toBe(false);
   });
 });

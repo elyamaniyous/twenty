@@ -15,6 +15,8 @@ import {
   hrShiftRotationAssignmentSchema,
   hrShiftRotationListSchema,
   hrShiftRotationSchema,
+  hrWorkPatternChangeRequestListSchema,
+  hrWorkPatternChangeRequestSchema,
   hrTimeEntrySchema,
   hrWorkCalendarListSchema,
   hrWorkCalendarSchema,
@@ -29,10 +31,18 @@ import {
   type HrTeam,
   type HrTimeEntryType,
   type HrTimeWorkMode,
+  type HrWorkPatternChangeRequest,
+  type HrWorkPatternType,
   type HrWorkCalendar,
   type HrWorkSchedule,
 } from 'twenty-shared/erp-maroc';
-import { IconChevronRight, IconPlus, IconRefresh } from 'twenty-ui/display';
+import {
+  IconCheck,
+  IconChevronRight,
+  IconPlus,
+  IconRefresh,
+  IconX,
+} from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
@@ -100,11 +110,41 @@ const StyledRotationCommands = styled.section`
   overflow-x: auto;
 `;
 
+const StyledWorkflow = styled.section`
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
+`;
+
+const StyledWorkflowHeader = styled.div`
+  align-items: center;
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
+  display: flex;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 0 ${themeCssVariables.spacing[3]};
+`;
+
+const StyledWorkflowTitle = styled.strong`
+  color: ${themeCssVariables.font.color.primary};
+  font-size: ${themeCssVariables.font.size.md};
+`;
+
 const StyledCommand = styled.form`
   border-right: 1px solid ${themeCssVariables.border.color.light};
   display: grid;
   gap: ${themeCssVariables.spacing[2]};
   min-width: 360px;
+  padding: ${themeCssVariables.spacing[3]};
+`;
+
+const StyledChangeForm = styled.form`
+  align-items: end;
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
+  display: grid;
+  gap: ${themeCssVariables.spacing[2]};
+  grid-template-columns:
+    minmax(190px, 1.1fr) minmax(145px, 0.8fr) minmax(210px, 1.1fr)
+    minmax(135px, 0.7fr) minmax(240px, 1.4fr) auto;
+  overflow-x: auto;
   padding: ${themeCssVariables.spacing[3]};
 `;
 
@@ -168,6 +208,18 @@ const StyledInput = styled.input`
 
 const StyledSelect = styled.select`
   ${fieldStyles}
+`;
+
+const StyledReviewInput = styled.input`
+  ${fieldStyles}
+  height: 28px;
+  min-width: 150px;
+`;
+
+const StyledApprovalActions = styled.div`
+  align-items: center;
+  display: flex;
+  gap: ${themeCssVariables.spacing[1]};
 `;
 
 const StyledDays = styled.div`
@@ -354,6 +406,9 @@ export const HrTimeAttendancePanel = ({
   const [attendance, setAttendance] = useState<HrAttendanceMonth | null>(null);
   const [schedules, setSchedules] = useState<HrWorkSchedule[]>([]);
   const [rotations, setRotations] = useState<HrShiftRotation[]>([]);
+  const [changeRequests, setChangeRequests] = useState<
+    HrWorkPatternChangeRequest[]
+  >([]);
   const [calendars, setCalendars] = useState<HrWorkCalendar[]>([]);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{
@@ -416,6 +471,22 @@ export const HrTimeAttendancePanel = ({
     validFrom: currentDate(),
     startOffset: '0',
   });
+  const [changeRequestForm, setChangeRequestForm] = useState<{
+    employeeId: string;
+    patternType: HrWorkPatternType;
+    patternId: string;
+    effectiveFrom: string;
+    startOffset: string;
+    reason: string;
+  }>({
+    employeeId: '',
+    patternType: 'WORK_SCHEDULE',
+    patternId: '',
+    effectiveFrom: currentDate(),
+    startOffset: '0',
+    reason: '',
+  });
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
   const [entryForm, setEntryForm] = useState<{
     employeeId: string;
     type: HrTimeEntryType;
@@ -431,35 +502,46 @@ export const HrTimeAttendancePanel = ({
   const load = useCallback(async () => {
     setState('loading');
     try {
-      const [nextAttendance, nextSchedules, nextRotations, nextCalendars] =
-        await Promise.all([
-          client.request({
-            method: 'GET',
-            path: '/hr-attendance/monthly',
-            query: { month },
-            schema: hrAttendanceMonthSchema,
-          }),
-          client.request({
-            method: 'GET',
-            path: '/hr-attendance/work-schedules',
-            schema: hrWorkScheduleListSchema,
-          }),
-          client.request({
-            method: 'GET',
-            path: '/hr-attendance/shift-rotations',
-            schema: hrShiftRotationListSchema,
-          }),
-          client.request({
-            method: 'GET',
-            path: '/hr-attendance/work-calendars',
-            query: { year: month.slice(0, 4) },
-            schema: hrWorkCalendarListSchema,
-          }),
-        ]);
+      const [
+        nextAttendance,
+        nextSchedules,
+        nextRotations,
+        nextCalendars,
+        nextChangeRequests,
+      ] = await Promise.all([
+        client.request({
+          method: 'GET',
+          path: '/hr-attendance/monthly',
+          query: { month },
+          schema: hrAttendanceMonthSchema,
+        }),
+        client.request({
+          method: 'GET',
+          path: '/hr-attendance/work-schedules',
+          schema: hrWorkScheduleListSchema,
+        }),
+        client.request({
+          method: 'GET',
+          path: '/hr-attendance/shift-rotations',
+          schema: hrShiftRotationListSchema,
+        }),
+        client.request({
+          method: 'GET',
+          path: '/hr-attendance/work-calendars',
+          query: { year: month.slice(0, 4) },
+          schema: hrWorkCalendarListSchema,
+        }),
+        client.request({
+          method: 'GET',
+          path: '/hr-attendance/work-pattern-change-requests',
+          schema: hrWorkPatternChangeRequestListSchema,
+        }),
+      ]);
       setAttendance(nextAttendance);
       setSchedules(nextSchedules);
       setRotations(nextRotations);
       setCalendars(nextCalendars);
+      setChangeRequests(nextChangeRequests);
       setAssignmentForm((current) => ({
         ...current,
         employeeId: current.employeeId || employees[0]?.id || '',
@@ -480,6 +562,21 @@ export const HrTimeAttendancePanel = ({
           nextRotations.find(({ isActive }) => isActive)?.id ||
           '',
       }));
+      setChangeRequestForm((current) => {
+        const availablePatterns =
+          current.patternType === 'WORK_SCHEDULE'
+            ? nextSchedules
+            : nextRotations;
+        return {
+          ...current,
+          employeeId: current.employeeId || employees[0]?.id || '',
+          patternId: availablePatterns.some(
+            ({ id }) => id === current.patternId,
+          )
+            ? current.patternId
+            : (availablePatterns.find(({ isActive }) => isActive)?.id ?? ''),
+        };
+      });
       setCalendarDayForm((current) => ({
         ...current,
         workCalendarId:
@@ -509,12 +606,14 @@ export const HrTimeAttendancePanel = ({
         .execute();
       setFeedback({ message: success, danger: false });
       await load();
+      return true;
     } catch {
       setFeedback({
         message:
           "L'opération n'a pas abouti. Vérifiez les dates et les chevauchements.",
         danger: true,
       });
+      return false;
     } finally {
       setBusy(false);
     }
@@ -667,6 +766,62 @@ export const HrTimeAttendancePanel = ({
     );
   };
 
+  const createChangeRequest = async () => {
+    if (
+      !changeRequestForm.employeeId ||
+      !changeRequestForm.patternId ||
+      changeRequestForm.reason.trim().length < 3
+    ) {
+      return;
+    }
+    const isSchedule = changeRequestForm.patternType === 'WORK_SCHEDULE';
+    const succeeded = await execute(
+      {
+        method: 'POST',
+        path: '/hr-attendance/work-pattern-change-requests',
+        schema: hrWorkPatternChangeRequestSchema,
+        body: {
+          employeeId: changeRequestForm.employeeId,
+          patternType: changeRequestForm.patternType,
+          effectiveFrom: changeRequestForm.effectiveFrom,
+          reason: changeRequestForm.reason.trim(),
+          workScheduleId: isSchedule ? changeRequestForm.patternId : null,
+          rotationId: isSchedule ? null : changeRequestForm.patternId,
+          startOffset: isSchedule ? 0 : Number(changeRequestForm.startOffset),
+        },
+      },
+      "Demande de changement d'horaire envoyée pour validation.",
+    );
+    if (succeeded) {
+      setChangeRequestForm((current) => ({ ...current, reason: '' }));
+    }
+  };
+
+  const reviewChangeRequest = async (
+    request: HrWorkPatternChangeRequest,
+    decision: 'approve' | 'reject',
+  ) => {
+    const reviewNote = reviewNotes[request.id]?.trim() ?? '';
+    if (decision === 'reject' && reviewNote.length < 3) return;
+    const succeeded = await execute(
+      {
+        method: 'PATCH',
+        path: `/hr-attendance/work-pattern-change-requests/${request.id}/${decision}`,
+        schema: hrWorkPatternChangeRequestSchema,
+        body: { reviewNote: reviewNote || null },
+      },
+      decision === 'approve'
+        ? 'Le nouvel horaire est approuvé et affecté.'
+        : 'La demande de changement est refusée.',
+    );
+    if (!succeeded) return;
+    setReviewNotes((current) => {
+      const next = { ...current };
+      delete next[request.id];
+      return next;
+    });
+  };
+
   const recordEntry = async () => {
     if (!entryForm.employeeId || !entryForm.occurredAt) return;
     await execute(
@@ -800,6 +955,122 @@ export const HrTimeAttendancePanel = ({
       ),
     },
   ];
+
+  const changeRequestColumns: ErpOperationalTableColumn<HrWorkPatternChangeRequest>[] =
+    [
+      {
+        key: 'employee',
+        header: 'Collaborateur',
+        width: '220px',
+        render: ({ employee }) => (
+          <StyledEmployee>
+            <span>
+              {employee.firstName} {employee.lastName}
+            </span>
+            <StyledMuted>{employee.employeeNumber}</StyledMuted>
+          </StyledEmployee>
+        ),
+      },
+      {
+        key: 'pattern',
+        header: 'Nouvel horaire',
+        width: '240px',
+        render: ({ patternType, workSchedule, rotation, startOffset }) => {
+          const pattern = workSchedule ?? rotation;
+          return (
+            <StyledEmployee>
+              <span>{pattern?.name ?? 'Configuration indisponible'}</span>
+              <StyledMuted>
+                {patternType === 'WORK_SCHEDULE'
+                  ? `Horaire · ${pattern?.code ?? ''}`
+                  : `Rotation · ${pattern?.code ?? ''} · départ J${startOffset + 1}`}
+              </StyledMuted>
+            </StyledEmployee>
+          );
+        },
+      },
+      {
+        key: 'effectiveFrom',
+        header: "Date d'effet",
+        width: '130px',
+        render: ({ effectiveFrom }) => effectiveFrom,
+      },
+      {
+        key: 'reason',
+        header: 'Motif',
+        width: '260px',
+        render: ({ reason }) => reason,
+      },
+      {
+        key: 'status',
+        header: 'Statut',
+        width: '140px',
+        render: ({ status }) => (
+          <ErpStatusBadge
+            label={
+              status === 'PENDING'
+                ? 'À valider'
+                : status === 'APPROVED'
+                  ? 'Approuvée'
+                  : 'Refusée'
+            }
+            tone={
+              status === 'PENDING'
+                ? 'warning'
+                : status === 'APPROVED'
+                  ? 'success'
+                  : 'danger'
+            }
+          />
+        ),
+      },
+      {
+        key: 'review',
+        header: 'Validation',
+        width: '310px',
+        render: (request) =>
+          canWrite && request.status === 'PENDING' ? (
+            <StyledApprovalActions>
+              <StyledReviewInput
+                aria-label={`Commentaire pour ${request.employee.firstName} ${request.employee.lastName}`}
+                placeholder="Motif si refus"
+                value={reviewNotes[request.id] ?? ''}
+                onChange={(event) =>
+                  setReviewNotes((current) => ({
+                    ...current,
+                    [request.id]: event.target.value,
+                  }))
+                }
+              />
+              <Button
+                title="Approuver"
+                ariaLabel="Approuver le changement d'horaire"
+                Icon={IconCheck}
+                accent="blue"
+                disabled={busy}
+                onClick={() => void reviewChangeRequest(request, 'approve')}
+              />
+              <Button
+                title="Refuser"
+                ariaLabel="Refuser le changement d'horaire"
+                Icon={IconX}
+                accent="danger"
+                disabled={
+                  busy || (reviewNotes[request.id]?.trim().length ?? 0) < 3
+                }
+                onClick={() => void reviewChangeRequest(request, 'reject')}
+              />
+            </StyledApprovalActions>
+          ) : (
+            <StyledMuted>
+              {request.reviewNote ??
+                (request.status === 'PENDING'
+                  ? 'En attente'
+                  : 'Sans commentaire')}
+            </StyledMuted>
+          ),
+      },
+    ];
 
   return (
     <>
@@ -1551,6 +1822,165 @@ export const HrTimeAttendancePanel = ({
           </StyledCommand>
         </StyledRotationCommands>
       ) : null}
+
+      <StyledWorkflow>
+        <StyledWorkflowHeader>
+          <StyledWorkflowTitle>
+            Changements d&apos;horaire à valider
+          </StyledWorkflowTitle>
+          <StyledScheduleSummary>
+            {changeRequests.filter(({ status }) => status === 'PENDING').length}{' '}
+            demande(s) en attente
+          </StyledScheduleSummary>
+        </StyledWorkflowHeader>
+        {canWrite ? (
+          <StyledChangeForm
+            onSubmit={(event) => {
+              event.preventDefault();
+              void createChangeRequest();
+            }}
+          >
+            <StyledField>
+              Collaborateur
+              <StyledSelect
+                value={changeRequestForm.employeeId}
+                onChange={(event) =>
+                  setChangeRequestForm((current) => ({
+                    ...current,
+                    employeeId: event.target.value,
+                  }))
+                }
+              >
+                <option value="">Sélectionner</option>
+                {employees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.employeeNumber} · {employee.firstName}{' '}
+                    {employee.lastName}
+                  </option>
+                ))}
+              </StyledSelect>
+            </StyledField>
+            <StyledField>
+              Type
+              <StyledSelect
+                value={changeRequestForm.patternType}
+                onChange={(event) => {
+                  const patternType = event.target.value as HrWorkPatternType;
+                  const patterns =
+                    patternType === 'WORK_SCHEDULE' ? schedules : rotations;
+                  setChangeRequestForm((current) => ({
+                    ...current,
+                    patternType,
+                    patternId:
+                      patterns.find(({ isActive }) => isActive)?.id ?? '',
+                    startOffset: '0',
+                  }));
+                }}
+              >
+                <option value="WORK_SCHEDULE">Horaire hebdomadaire</option>
+                <option value="SHIFT_ROTATION">Cycle de rotation</option>
+              </StyledSelect>
+            </StyledField>
+            <StyledField>
+              Nouvel horaire
+              <StyledSelect
+                value={changeRequestForm.patternId}
+                onChange={(event) =>
+                  setChangeRequestForm((current) => ({
+                    ...current,
+                    patternId: event.target.value,
+                  }))
+                }
+              >
+                <option value="">Sélectionner</option>
+                {(changeRequestForm.patternType === 'WORK_SCHEDULE'
+                  ? schedules
+                  : rotations
+                )
+                  .filter(({ isActive }) => isActive)
+                  .map((pattern) => (
+                    <option key={pattern.id} value={pattern.id}>
+                      {pattern.code} · {pattern.name}
+                    </option>
+                  ))}
+              </StyledSelect>
+            </StyledField>
+            <StyledField>
+              Date d&apos;effet
+              <StyledInput
+                type="date"
+                value={changeRequestForm.effectiveFrom}
+                onChange={(event) =>
+                  setChangeRequestForm((current) => ({
+                    ...current,
+                    effectiveFrom: event.target.value,
+                  }))
+                }
+              />
+            </StyledField>
+            <StyledField>
+              Motif
+              <StyledInput
+                value={changeRequestForm.reason}
+                placeholder="Mutation, correction, besoin opérationnel"
+                onChange={(event) =>
+                  setChangeRequestForm((current) => ({
+                    ...current,
+                    reason: event.target.value,
+                  }))
+                }
+              />
+            </StyledField>
+            <StyledApprovalActions>
+              {changeRequestForm.patternType === 'SHIFT_ROTATION' ? (
+                <StyledField>
+                  Départ cycle
+                  <StyledInput
+                    type="number"
+                    min="0"
+                    max={
+                      (rotations.find(
+                        ({ id }) => id === changeRequestForm.patternId,
+                      )?.cycleLengthDays ?? 1) - 1
+                    }
+                    value={changeRequestForm.startOffset}
+                    onChange={(event) =>
+                      setChangeRequestForm((current) => ({
+                        ...current,
+                        startOffset: event.target.value,
+                      }))
+                    }
+                  />
+                </StyledField>
+              ) : null}
+              <Button
+                title="Soumettre"
+                ariaLabel="Soumettre le changement d'horaire"
+                Icon={IconPlus}
+                accent="blue"
+                disabled={
+                  busy ||
+                  !changeRequestForm.employeeId ||
+                  !changeRequestForm.patternId ||
+                  changeRequestForm.reason.trim().length < 3
+                }
+                type="submit"
+              />
+            </StyledApprovalActions>
+          </StyledChangeForm>
+        ) : null}
+        <ErpOperationalTable
+          ariaLabel="Demandes de changement d'horaire"
+          columns={changeRequestColumns}
+          rows={changeRequests}
+          getRowKey={(request) => request.id}
+          state={state}
+          loadingLabel="Chargement des demandes"
+          emptyLabel="Aucune demande de changement"
+          errorLabel="Impossible de charger les demandes"
+          onRetry={() => void load()}
+        />
+      </StyledWorkflow>
 
       {feedback === null ? null : (
         <StyledFeedback danger={feedback.danger} role="status">

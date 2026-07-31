@@ -79,6 +79,8 @@ import {
   hrWorkScheduleAssignmentSchema,
   hrWorkScheduleListSchema,
   hrWorkScheduleSchema,
+  hrWorkPatternChangeRequestListSchema,
+  hrWorkPatternChangeRequestSchema,
   marketingAutomationListSchema,
   marketingAutomationSchema,
   marketingCampaignListSchema,
@@ -218,6 +220,9 @@ const requiredIdempotencyRoutes = new Set([
   `POST /hr-attendance/work-calendars/${id}/morocco-national-holidays`,
   'POST /hr-attendance/work-schedules',
   'POST /hr-attendance/shift-rotations',
+  'POST /hr-attendance/work-pattern-change-requests',
+  `PATCH /hr-attendance/work-pattern-change-requests/${id}/approve`,
+  `PATCH /hr-attendance/work-pattern-change-requests/${id}/reject`,
   `POST /hr-attendance/employees/${id}/work-schedule-assignments`,
   `POST /hr-attendance/employees/${id}/shift-rotation-assignments`,
   'POST /hr-attendance/time-entries',
@@ -1026,6 +1031,30 @@ const approvedRoutes = [
     hrShiftRotationSchema,
   ],
   [
+    'GET',
+    '/hr-attendance/work-pattern-change-requests',
+    'hr-attendance.work-pattern-change-requests',
+    hrWorkPatternChangeRequestListSchema,
+  ],
+  [
+    'POST',
+    '/hr-attendance/work-pattern-change-requests',
+    'hr-attendance.work-pattern-change-requests',
+    hrWorkPatternChangeRequestSchema,
+  ],
+  [
+    'PATCH',
+    `/hr-attendance/work-pattern-change-requests/${id}/approve`,
+    'hr-attendance.work-pattern-change.approve',
+    hrWorkPatternChangeRequestSchema,
+  ],
+  [
+    'PATCH',
+    `/hr-attendance/work-pattern-change-requests/${id}/reject`,
+    'hr-attendance.work-pattern-change.reject',
+    hrWorkPatternChangeRequestSchema,
+  ],
+  [
     'POST',
     `/hr-attendance/employees/${id}/work-schedule-assignments`,
     'hr-attendance.employee.work-schedule-assignments',
@@ -1343,6 +1372,11 @@ describe('ERP Maroc route policy', () => {
       }).upstreamPath,
     ).toBe(`/hr-attendance/monthly?month=2026-07&employeeId=${id}`);
     expect(
+      resolveErpRoute('GET', '/hr-attendance/work-pattern-change-requests', {
+        status: 'PENDING',
+      }).upstreamPath,
+    ).toBe('/hr-attendance/work-pattern-change-requests?status=PENDING');
+    expect(
       resolveErpRoute('GET', '/hr-leave/requests', {
         year: '2026',
         status: 'MANAGER_APPROVED',
@@ -1392,6 +1426,7 @@ describe('ERP Maroc route policy', () => {
     ['/hr-attendance/monthly', {}],
     ['/hr-attendance/monthly', { month: '2026-13' }],
     ['/hr-attendance/monthly', { month: '2026-07', employeeId: 'invalid' }],
+    ['/hr-attendance/work-pattern-change-requests', { status: 'CANCELLED' }],
     ['/hr-leave/requests', {}],
     ['/hr-leave/requests', { year: '1999' }],
     ['/hr-leave/requests', { year: '2026', status: 'PENDING' }],
