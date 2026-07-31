@@ -16,6 +16,7 @@ import {
   hrOrganisationChartSchema,
   hrAttendanceMonthSchema,
   hrShiftRotationSchema,
+  hrTimeEntryCorrectionRequestSchema,
   hrWorkPatternChangeRequestSchema,
   hrWorkCalendarSchema,
   hrWorkScheduleSchema,
@@ -909,11 +910,55 @@ describe('hrEmployeeDetailSchema', () => {
         },
       ],
     });
+    const correctionRequest = hrTimeEntryCorrectionRequestSchema.parse({
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      organisationId,
+      societeId,
+      employeeId,
+      action: 'REPLACE',
+      originalTimeEntryId: entryId,
+      proposedType: 'CLOCK_IN',
+      proposedOccurredAt: '2026-07-29T07:30:00.000Z',
+      proposedLocalDate: '2026-07-29',
+      targetAttendanceDate: '2026-07-29',
+      proposedWorkMode: 'ONSITE',
+      proposedNotes: null,
+      reason: 'Erreur de badgeuse',
+      evidenceRequired: true,
+      supportingDocumentId: null,
+      status: 'REQUESTED',
+      requestedByTwentyUserId: 'manager-user',
+      requestedAt: now,
+      managerApprovedAt: null,
+      managerApprovedByTwentyUserId: null,
+      decidedAt: null,
+      decidedByTwentyUserId: null,
+      decisionReason: null,
+      appliedTimeEntryId: null,
+      createdAt: now,
+      updatedAt: now,
+      employee: {
+        id: employeeId,
+        employeeNumber: 'ZOW-001',
+        firstName: 'Salma',
+        lastName: 'Alaoui',
+      },
+      originalTimeEntry: month.employees[0]?.days[0]?.entries[0],
+      appliedTimeEntry: null,
+      supportingDocument: null,
+    });
 
     expect(month.employees[0]?.summary.lateMinutes).toBe(10);
     expect(calendar.code).toBe('MA');
     expect(rotation.days[0]?.endsNextDay).toBe(true);
     expect(changeRequest.status).toBe('PENDING');
+    expect(correctionRequest.status).toBe('REQUESTED');
+    expect(
+      hrTimeEntryCorrectionRequestSchema.safeParse({
+        ...correctionRequest,
+        status: 'MANAGER_APPROVED',
+      }).success,
+    ).toBe(false);
     expect(
       hrWorkPatternChangeRequestSchema.safeParse({
         ...changeRequest,

@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom';
 import {
   hrAttendanceMonthSchema,
   hrCalendarDaySchema,
+  hrEmployeeDocumentSchema,
   hrMoroccoHolidaySeedResultSchema,
   hrShiftRotationAssignmentSchema,
   hrShiftRotationListSchema,
@@ -18,6 +19,8 @@ import {
   hrWorkPatternChangeRequestListSchema,
   hrWorkPatternChangeRequestSchema,
   hrTimeEntrySchema,
+  hrTimeEntryCorrectionRequestListSchema,
+  hrTimeEntryCorrectionRequestSchema,
   hrWorkCalendarListSchema,
   hrWorkCalendarSchema,
   hrWorkScheduleAssignmentSchema,
@@ -30,6 +33,8 @@ import {
   type HrShiftRotation,
   type HrTeam,
   type HrTimeEntryType,
+  type HrTimeEntryCorrectionAction,
+  type HrTimeEntryCorrectionRequest,
   type HrTimeWorkMode,
   type HrWorkPatternChangeRequest,
   type HrWorkPatternType,
@@ -50,6 +55,8 @@ type Props = {
   employees: HrEmployeeListItem[];
   teams: HrTeam[];
   canWrite: boolean;
+  canWriteDocuments: boolean;
+  canApproveFinal: boolean;
   query: string;
 };
 
@@ -84,6 +91,11 @@ const currentLocalInstant = () => {
   const now = new Date();
   const offset = now.getTimezoneOffset() * 60_000;
   return new Date(now.getTime() - offset).toISOString().slice(0, 16);
+};
+const instantToLocalInput = (value: string) => {
+  const instant = new Date(value);
+  const offset = instant.getTimezoneOffset() * 60_000;
+  return new Date(instant.getTime() - offset).toISOString().slice(0, 16);
 };
 
 const StyledCommands = styled.section`
@@ -144,6 +156,19 @@ const StyledChangeForm = styled.form`
   grid-template-columns:
     minmax(190px, 1.1fr) minmax(145px, 0.8fr) minmax(210px, 1.1fr)
     minmax(135px, 0.7fr) minmax(240px, 1.4fr) auto;
+  overflow-x: auto;
+  padding: ${themeCssVariables.spacing[3]};
+`;
+
+const StyledCorrectionForm = styled.form`
+  align-items: end;
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
+  display: grid;
+  gap: ${themeCssVariables.spacing[2]};
+  grid-template-columns:
+    minmax(120px, 0.6fr) minmax(200px, 1fr) minmax(270px, 1.4fr)
+    minmax(130px, 0.7fr) minmax(190px, 1fr) minmax(135px, 0.7fr)
+    minmax(240px, 1.2fr) auto;
   overflow-x: auto;
   padding: ${themeCssVariables.spacing[3]};
 `;
@@ -220,6 +245,12 @@ const StyledApprovalActions = styled.div`
   align-items: center;
   display: flex;
   gap: ${themeCssVariables.spacing[1]};
+`;
+
+const StyledEvidenceInput = styled.input`
+  color: ${themeCssVariables.font.color.secondary};
+  font-size: ${themeCssVariables.font.size.xs};
+  max-width: 175px;
 `;
 
 const StyledDays = styled.div`
@@ -306,6 +337,12 @@ const typeLabels: Record<HrTimeEntryType, string> = {
   CLOCK_OUT: 'Sortie',
   BREAK_START: 'Début pause',
   BREAK_END: 'Fin pause',
+};
+
+const correctionActionLabels: Record<HrTimeEntryCorrectionAction, string> = {
+  ADD: 'Ajouter',
+  REPLACE: 'Remplacer',
+  CANCEL: 'Annuler',
 };
 
 const calendarDayTypeLabels: Record<HrCalendarDayType, string> = {
@@ -398,6 +435,8 @@ export const HrTimeAttendancePanel = ({
   employees,
   teams,
   canWrite,
+  canWriteDocuments,
+  canApproveFinal,
   query,
 }: Props) => {
   const { client } = useErpMarocContext();
@@ -408,6 +447,9 @@ export const HrTimeAttendancePanel = ({
   const [rotations, setRotations] = useState<HrShiftRotation[]>([]);
   const [changeRequests, setChangeRequests] = useState<
     HrWorkPatternChangeRequest[]
+  >([]);
+  const [correctionRequests, setCorrectionRequests] = useState<
+    HrTimeEntryCorrectionRequest[]
   >([]);
   const [calendars, setCalendars] = useState<HrWorkCalendar[]>([]);
   const [busy, setBusy] = useState(false);
@@ -487,6 +529,9 @@ export const HrTimeAttendancePanel = ({
     reason: '',
   });
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
+  const [correctionReviewNotes, setCorrectionReviewNotes] = useState<
+    Record<string, string>
+  >({});
   const [entryForm, setEntryForm] = useState<{
     employeeId: string;
     type: HrTimeEntryType;
@@ -498,6 +543,23 @@ export const HrTimeAttendancePanel = ({
     occurredAt: currentLocalInstant(),
     workMode: 'ONSITE',
   });
+  const [correctionForm, setCorrectionForm] = useState<{
+    action: HrTimeEntryCorrectionAction;
+    employeeId: string;
+    originalTimeEntryId: string;
+    proposedType: HrTimeEntryType;
+    proposedOccurredAt: string;
+    proposedWorkMode: HrTimeWorkMode;
+    reason: string;
+  }>({
+    action: 'REPLACE',
+    employeeId: '',
+    originalTimeEntryId: '',
+    proposedType: 'CLOCK_IN',
+    proposedOccurredAt: currentLocalInstant(),
+    proposedWorkMode: 'ONSITE',
+    reason: '',
+  });
 
   const load = useCallback(async () => {
     setState('loading');
@@ -508,6 +570,7 @@ export const HrTimeAttendancePanel = ({
         nextRotations,
         nextCalendars,
         nextChangeRequests,
+        nextCorrectionRequests,
       ] = await Promise.all([
         client.request({
           method: 'GET',
@@ -536,12 +599,19 @@ export const HrTimeAttendancePanel = ({
           path: '/hr-attendance/work-pattern-change-requests',
           schema: hrWorkPatternChangeRequestListSchema,
         }),
+        client.request({
+          method: 'GET',
+          path: '/hr-attendance/time-entry-correction-requests',
+          query: { month },
+          schema: hrTimeEntryCorrectionRequestListSchema,
+        }),
       ]);
       setAttendance(nextAttendance);
       setSchedules(nextSchedules);
       setRotations(nextRotations);
       setCalendars(nextCalendars);
       setChangeRequests(nextChangeRequests);
+      setCorrectionRequests(nextCorrectionRequests);
       setAssignmentForm((current) => ({
         ...current,
         employeeId: current.employeeId || employees[0]?.id || '',
@@ -551,6 +621,10 @@ export const HrTimeAttendancePanel = ({
           '',
       }));
       setEntryForm((current) => ({
+        ...current,
+        employeeId: current.employeeId || employees[0]?.id || '',
+      }));
+      setCorrectionForm((current) => ({
         ...current,
         employeeId: current.employeeId || employees[0]?.id || '',
       }));
@@ -843,6 +917,144 @@ export const HrTimeAttendancePanel = ({
     );
   };
 
+  const createCorrectionRequest = async () => {
+    const requiresOriginal = correctionForm.action !== 'ADD';
+    if (
+      !correctionForm.employeeId ||
+      (requiresOriginal && !correctionForm.originalTimeEntryId) ||
+      correctionForm.reason.trim().length < 3
+    ) {
+      return;
+    }
+    const succeeded = await execute(
+      {
+        method: 'POST',
+        path: '/hr-attendance/time-entry-correction-requests',
+        schema: hrTimeEntryCorrectionRequestSchema,
+        body: {
+          action: correctionForm.action,
+          employeeId:
+            correctionForm.action === 'ADD'
+              ? correctionForm.employeeId
+              : undefined,
+          originalTimeEntryId: requiresOriginal
+            ? correctionForm.originalTimeEntryId
+            : undefined,
+          proposedType:
+            correctionForm.action === 'CANCEL'
+              ? undefined
+              : correctionForm.proposedType,
+          proposedOccurredAt:
+            correctionForm.action === 'CANCEL'
+              ? undefined
+              : new Date(correctionForm.proposedOccurredAt).toISOString(),
+          proposedWorkMode:
+            correctionForm.action === 'CANCEL'
+              ? undefined
+              : correctionForm.proposedWorkMode,
+          proposedNotes: null,
+          reason: correctionForm.reason.trim(),
+        },
+      },
+      'Demande de correction envoyée au manager.',
+    );
+    if (succeeded) {
+      setCorrectionForm((current) => ({ ...current, reason: '' }));
+    }
+  };
+
+  const attachCorrectionEvidence = async (
+    request: HrTimeEntryCorrectionRequest,
+    file: File,
+  ) => {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const contentBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('File read failed'));
+        reader.onload = () => {
+          if (typeof reader.result !== 'string') {
+            reject(new Error('File read did not produce a data URL'));
+            return;
+          }
+          const result = reader.result;
+          resolve(result.slice(result.indexOf(',') + 1));
+        };
+        reader.readAsDataURL(file);
+      });
+      const document = await client
+        .createMutationIntent(
+          {
+            method: 'POST',
+            path: `/hr-core/employees/${request.employeeId}/documents`,
+            schema: hrEmployeeDocumentSchema,
+            body: {
+              category: 'OTHER',
+              title: `Justificatif correction pointage ${request.targetAttendanceDate}`,
+              isRequired: false,
+              reminderDays: 0,
+              filename: file.name,
+              contentBase64,
+            },
+          },
+          { idempotency: 'required' },
+        )
+        .execute();
+      await client
+        .createMutationIntent(
+          {
+            method: 'PATCH',
+            path: `/hr-attendance/time-entry-correction-requests/${request.id}/evidence`,
+            schema: hrTimeEntryCorrectionRequestSchema,
+            body: { documentId: document.id },
+          },
+          { idempotency: 'required' },
+        )
+        .execute();
+      setFeedback({
+        message: 'Justificatif rattaché à la correction.',
+        danger: false,
+      });
+      await load();
+    } catch {
+      setFeedback({
+        message:
+          "Le justificatif n'a pas pu être importé. Utilisez un PDF, PNG ou JPEG de moins de 20 Mo.",
+        danger: true,
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reviewCorrectionRequest = async (
+    request: HrTimeEntryCorrectionRequest,
+    decision: 'APPROVE' | 'REJECT',
+  ) => {
+    const reason = correctionReviewNotes[request.id]?.trim() ?? '';
+    if (decision === 'REJECT' && reason.length < 3) return;
+    const succeeded = await execute(
+      {
+        method: 'PATCH',
+        path: `/hr-attendance/time-entry-correction-requests/${request.id}/decision`,
+        schema: hrTimeEntryCorrectionRequestSchema,
+        body: { decision, reason: reason || null },
+      },
+      decision === 'REJECT'
+        ? 'La correction est refusée.'
+        : request.status === 'REQUESTED'
+          ? 'Validation manager enregistrée; la correction attend le RH.'
+          : 'Validation RH enregistrée; le pointage est corrigé.',
+    );
+    if (!succeeded) return;
+    setCorrectionReviewNotes((current) => {
+      const next = { ...current };
+      delete next[request.id];
+      return next;
+    });
+  };
+
   const normalizedQuery = query.trim().toLocaleLowerCase('fr');
   const rows = useMemo(
     () =>
@@ -870,6 +1082,41 @@ export const HrTimeAttendancePanel = ({
         )
         .sort((left, right) => left.day.date.localeCompare(right.day.date)),
     [calendars, month],
+  );
+  const activeTimeEntries = useMemo(
+    () =>
+      (attendance?.employees ?? []).flatMap(({ employee, days }) =>
+        days.flatMap(({ entries }) =>
+          entries
+            .filter(({ status }) => status === 'ACTIVE')
+            .map((entry) => ({ employee, entry })),
+        ),
+      ),
+    [attendance],
+  );
+  const employeeTimeEntries = useMemo(
+    () =>
+      activeTimeEntries.filter(
+        ({ employee }) => employee.id === correctionForm.employeeId,
+      ),
+    [activeTimeEntries, correctionForm.employeeId],
+  );
+  const filteredCorrectionRequests = useMemo(
+    () =>
+      correctionRequests.filter((request) =>
+        normalizedQuery === ''
+          ? true
+          : [
+              request.employee.employeeNumber,
+              request.employee.firstName,
+              request.employee.lastName,
+              request.reason,
+              request.status,
+            ].some((value) =>
+              value.toLocaleLowerCase('fr').includes(normalizedQuery),
+            ),
+      ),
+    [correctionRequests, normalizedQuery],
   );
 
   const columns: ErpOperationalTableColumn<HrAttendanceEmployeeMonth>[] = [
@@ -1067,6 +1314,163 @@ export const HrTimeAttendancePanel = ({
                 (request.status === 'PENDING'
                   ? 'En attente'
                   : 'Sans commentaire')}
+            </StyledMuted>
+          ),
+      },
+    ];
+
+  const correctionRequestColumns: ErpOperationalTableColumn<HrTimeEntryCorrectionRequest>[] =
+    [
+      {
+        key: 'employee',
+        header: 'Collaborateur',
+        width: '220px',
+        render: ({ employee }) => (
+          <StyledEmployee>
+            <span>
+              {employee.firstName} {employee.lastName}
+            </span>
+            <StyledMuted>{employee.employeeNumber}</StyledMuted>
+          </StyledEmployee>
+        ),
+      },
+      {
+        key: 'change',
+        header: 'Correction demandée',
+        width: '270px',
+        render: ({
+          action,
+          originalTimeEntry,
+          proposedType,
+          proposedOccurredAt,
+        }) => (
+          <StyledEmployee>
+            <span>{correctionActionLabels[action]}</span>
+            <StyledMuted>
+              {action === 'CANCEL'
+                ? originalTimeEntry
+                  ? `${typeLabels[originalTimeEntry.type]} · ${new Date(originalTimeEntry.occurredAt).toLocaleString('fr-MA')}`
+                  : 'Pointage indisponible'
+                : proposedType && proposedOccurredAt
+                  ? `${typeLabels[proposedType]} · ${new Date(proposedOccurredAt).toLocaleString('fr-MA')}`
+                  : 'Proposition indisponible'}
+            </StyledMuted>
+          </StyledEmployee>
+        ),
+      },
+      {
+        key: 'date',
+        header: 'Journée',
+        width: '130px',
+        render: ({ targetAttendanceDate }) => targetAttendanceDate,
+      },
+      {
+        key: 'reason',
+        header: 'Motif',
+        width: '240px',
+        render: ({ reason }) => reason,
+      },
+      {
+        key: 'evidence',
+        header: 'Justificatif',
+        width: '210px',
+        render: (request) =>
+          request.supportingDocument ? (
+            <ErpStatusBadge label="Reçu" tone="success" />
+          ) : request.evidenceRequired && canWriteDocuments ? (
+            <StyledEvidenceInput
+              type="file"
+              accept="application/pdf,image/png,image/jpeg"
+              aria-label={`Ajouter le justificatif de ${request.employee.firstName} ${request.employee.lastName}`}
+              disabled={busy}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void attachCorrectionEvidence(request, file);
+              }}
+            />
+          ) : (
+            <ErpStatusBadge
+              label={request.evidenceRequired ? 'Requis' : 'Non requis'}
+              tone={request.evidenceRequired ? 'warning' : 'neutral'}
+            />
+          ),
+      },
+      {
+        key: 'status',
+        header: 'Statut',
+        width: '165px',
+        render: ({ status }) => (
+          <ErpStatusBadge
+            label={
+              status === 'REQUESTED'
+                ? 'À valider manager'
+                : status === 'MANAGER_APPROVED'
+                  ? 'À valider RH'
+                  : status === 'APPROVED'
+                    ? 'Approuvée'
+                    : 'Refusée'
+            }
+            tone={
+              status === 'APPROVED'
+                ? 'success'
+                : status === 'REJECTED'
+                  ? 'danger'
+                  : 'warning'
+            }
+          />
+        ),
+      },
+      {
+        key: 'review',
+        header: 'Validation',
+        width: '315px',
+        render: (request) =>
+          canWrite &&
+          (request.status === 'REQUESTED' ||
+            (request.status === 'MANAGER_APPROVED' && canApproveFinal)) ? (
+            <StyledApprovalActions>
+              <StyledReviewInput
+                aria-label={`Motif de décision pour ${request.employee.firstName} ${request.employee.lastName}`}
+                placeholder="Motif si refus"
+                value={correctionReviewNotes[request.id] ?? ''}
+                onChange={(event) =>
+                  setCorrectionReviewNotes((current) => ({
+                    ...current,
+                    [request.id]: event.target.value,
+                  }))
+                }
+              />
+              <Button
+                title="Approuver"
+                ariaLabel="Approuver la correction de pointage"
+                Icon={IconCheck}
+                accent="blue"
+                disabled={
+                  busy ||
+                  (request.status === 'MANAGER_APPROVED' &&
+                    request.evidenceRequired &&
+                    request.supportingDocument === null)
+                }
+                onClick={() => void reviewCorrectionRequest(request, 'APPROVE')}
+              />
+              <Button
+                title="Refuser"
+                ariaLabel="Refuser la correction de pointage"
+                Icon={IconX}
+                accent="danger"
+                disabled={
+                  busy ||
+                  (correctionReviewNotes[request.id]?.trim().length ?? 0) < 3
+                }
+                onClick={() => void reviewCorrectionRequest(request, 'REJECT')}
+              />
+            </StyledApprovalActions>
+          ) : (
+            <StyledMuted>
+              {request.decisionReason ??
+                (request.status === 'MANAGER_APPROVED'
+                  ? 'En attente de validation RH'
+                  : 'Traitée')}
             </StyledMuted>
           ),
       },
@@ -1449,7 +1853,9 @@ export const HrTimeAttendancePanel = ({
                         ...current,
                         weekdays: current.weekdays.includes(weekday)
                           ? current.weekdays.filter((day) => day !== weekday)
-                          : [...current.weekdays, weekday].sort(),
+                          : [...current.weekdays, weekday].sort(
+                              (left, right) => left - right,
+                            ),
                       }))
                     }
                   />
@@ -1978,6 +2384,237 @@ export const HrTimeAttendancePanel = ({
           loadingLabel="Chargement des demandes"
           emptyLabel="Aucune demande de changement"
           errorLabel="Impossible de charger les demandes"
+          onRetry={() => void load()}
+        />
+      </StyledWorkflow>
+
+      <StyledWorkflow>
+        <StyledWorkflowHeader>
+          <StyledWorkflowTitle>
+            Corrections de pointage à valider
+          </StyledWorkflowTitle>
+          <StyledScheduleSummary>
+            {
+              correctionRequests.filter(
+                ({ status }) =>
+                  status === 'REQUESTED' || status === 'MANAGER_APPROVED',
+              ).length
+            }{' '}
+            demande(s) en attente
+          </StyledScheduleSummary>
+        </StyledWorkflowHeader>
+        {canWrite ? (
+          <StyledCorrectionForm
+            onSubmit={(event) => {
+              event.preventDefault();
+              void createCorrectionRequest();
+            }}
+          >
+            <StyledField>
+              Action
+              <StyledSelect
+                value={correctionForm.action}
+                onChange={(event) => {
+                  const action = event.target
+                    .value as HrTimeEntryCorrectionAction;
+                  const firstEntry = employeeTimeEntries[0]?.entry;
+                  setCorrectionForm((current) => ({
+                    ...current,
+                    action,
+                    originalTimeEntryId:
+                      action === 'ADD' ? '' : (firstEntry?.id ?? ''),
+                    proposedType:
+                      action === 'REPLACE' && firstEntry
+                        ? firstEntry.type
+                        : current.proposedType,
+                    proposedOccurredAt:
+                      action === 'REPLACE' && firstEntry
+                        ? instantToLocalInput(firstEntry.occurredAt)
+                        : current.proposedOccurredAt,
+                    proposedWorkMode:
+                      action === 'REPLACE' && firstEntry
+                        ? firstEntry.workMode
+                        : current.proposedWorkMode,
+                  }));
+                }}
+              >
+                {Object.entries(correctionActionLabels).map(
+                  ([action, label]) => (
+                    <option key={action} value={action}>
+                      {label}
+                    </option>
+                  ),
+                )}
+              </StyledSelect>
+            </StyledField>
+            <StyledField>
+              Collaborateur
+              <StyledSelect
+                value={correctionForm.employeeId}
+                onChange={(event) => {
+                  const employeeId = event.target.value;
+                  const firstEntry = activeTimeEntries.find(
+                    ({ employee }) => employee.id === employeeId,
+                  )?.entry;
+                  setCorrectionForm((current) => ({
+                    ...current,
+                    employeeId,
+                    originalTimeEntryId:
+                      current.action === 'ADD' ? '' : (firstEntry?.id ?? ''),
+                    proposedType:
+                      current.action === 'REPLACE' && firstEntry
+                        ? firstEntry.type
+                        : current.proposedType,
+                    proposedOccurredAt:
+                      current.action === 'REPLACE' && firstEntry
+                        ? instantToLocalInput(firstEntry.occurredAt)
+                        : current.proposedOccurredAt,
+                    proposedWorkMode:
+                      current.action === 'REPLACE' && firstEntry
+                        ? firstEntry.workMode
+                        : current.proposedWorkMode,
+                  }));
+                }}
+              >
+                <option value="">Sélectionner</option>
+                {employees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.employeeNumber} · {employee.firstName}{' '}
+                    {employee.lastName}
+                  </option>
+                ))}
+              </StyledSelect>
+            </StyledField>
+            {correctionForm.action === 'ADD' ? null : (
+              <StyledField>
+                Pointage d&apos;origine
+                <StyledSelect
+                  value={correctionForm.originalTimeEntryId}
+                  onChange={(event) => {
+                    const originalTimeEntryId = event.target.value;
+                    const entry = employeeTimeEntries.find(
+                      (candidate) => candidate.entry.id === originalTimeEntryId,
+                    )?.entry;
+                    setCorrectionForm((current) => ({
+                      ...current,
+                      originalTimeEntryId,
+                      proposedType:
+                        current.action === 'REPLACE' && entry
+                          ? entry.type
+                          : current.proposedType,
+                      proposedOccurredAt:
+                        current.action === 'REPLACE' && entry
+                          ? instantToLocalInput(entry.occurredAt)
+                          : current.proposedOccurredAt,
+                      proposedWorkMode:
+                        current.action === 'REPLACE' && entry
+                          ? entry.workMode
+                          : current.proposedWorkMode,
+                    }));
+                  }}
+                >
+                  <option value="">Sélectionner</option>
+                  {employeeTimeEntries.map(({ entry }) => (
+                    <option key={entry.id} value={entry.id}>
+                      {entry.attendanceDate} · {typeLabels[entry.type]} ·{' '}
+                      {new Date(entry.occurredAt).toLocaleTimeString('fr-MA', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </option>
+                  ))}
+                </StyledSelect>
+              </StyledField>
+            )}
+            {correctionForm.action === 'CANCEL' ? null : (
+              <>
+                <StyledField>
+                  Événement corrigé
+                  <StyledSelect
+                    value={correctionForm.proposedType}
+                    onChange={(event) =>
+                      setCorrectionForm((current) => ({
+                        ...current,
+                        proposedType: event.target.value as HrTimeEntryType,
+                      }))
+                    }
+                  >
+                    {Object.entries(typeLabels).map(([type, label]) => (
+                      <option key={type} value={type}>
+                        {label}
+                      </option>
+                    ))}
+                  </StyledSelect>
+                </StyledField>
+                <StyledField>
+                  Date et heure corrigées
+                  <StyledInput
+                    type="datetime-local"
+                    value={correctionForm.proposedOccurredAt}
+                    onChange={(event) =>
+                      setCorrectionForm((current) => ({
+                        ...current,
+                        proposedOccurredAt: event.target.value,
+                      }))
+                    }
+                  />
+                </StyledField>
+                <StyledField>
+                  Mode
+                  <StyledSelect
+                    value={correctionForm.proposedWorkMode}
+                    onChange={(event) =>
+                      setCorrectionForm((current) => ({
+                        ...current,
+                        proposedWorkMode: event.target.value as HrTimeWorkMode,
+                      }))
+                    }
+                  >
+                    <option value="ONSITE">Sur site</option>
+                    <option value="REMOTE">Télétravail</option>
+                    <option value="CLIENT_SITE">Site client</option>
+                  </StyledSelect>
+                </StyledField>
+              </>
+            )}
+            <StyledField>
+              Motif
+              <StyledInput
+                value={correctionForm.reason}
+                placeholder="Oubli, erreur de badgeuse, régularisation"
+                onChange={(event) =>
+                  setCorrectionForm((current) => ({
+                    ...current,
+                    reason: event.target.value,
+                  }))
+                }
+              />
+            </StyledField>
+            <Button
+              title="Soumettre"
+              ariaLabel="Soumettre la correction de pointage"
+              Icon={IconPlus}
+              accent="blue"
+              disabled={
+                busy ||
+                !correctionForm.employeeId ||
+                (correctionForm.action !== 'ADD' &&
+                  !correctionForm.originalTimeEntryId) ||
+                correctionForm.reason.trim().length < 3
+              }
+              type="submit"
+            />
+          </StyledCorrectionForm>
+        ) : null}
+        <ErpOperationalTable
+          ariaLabel="Demandes de correction de pointage"
+          columns={correctionRequestColumns}
+          rows={filteredCorrectionRequests}
+          getRowKey={(request) => request.id}
+          state={state}
+          loadingLabel="Chargement des corrections"
+          emptyLabel="Aucune demande de correction"
+          errorLabel="Impossible de charger les corrections"
           onRetry={() => void load()}
         />
       </StyledWorkflow>

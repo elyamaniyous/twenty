@@ -2937,6 +2937,9 @@ export const erpMarocRouteIds = {
     'hr-attendance.employee.shift-rotation-assignments',
   hrTimeEntries: 'hr-attendance.time-entries',
   hrTimeEntryCancel: 'hr-attendance.time-entry.cancel',
+  hrTimeEntryCorrectionRequests: 'hr-attendance.time-entry-correction-requests',
+  hrTimeEntryCorrectionEvidence: 'hr-attendance.time-entry-correction.evidence',
+  hrTimeEntryCorrectionDecision: 'hr-attendance.time-entry-correction.decision',
   hrAttendanceMonthly: 'hr-attendance.monthly',
   hrLeavePolicies: 'hr-leave.policies',
   hrLeavePolicySeedMorocco: 'hr-leave.policy.seed-morocco',
@@ -3346,6 +3349,12 @@ export const erpMarocUpstreamRoutes = {
     timeEntries: '/hr-attendance/time-entries',
     timeEntryCancel: (id: string) =>
       `/hr-attendance/time-entries/${encodeRouteId(id)}/cancel`,
+    timeEntryCorrectionRequests:
+      '/hr-attendance/time-entry-correction-requests',
+    timeEntryCorrectionEvidence: (id: string) =>
+      `/hr-attendance/time-entry-correction-requests/${encodeRouteId(id)}/evidence`,
+    timeEntryCorrectionDecision: (id: string) =>
+      `/hr-attendance/time-entry-correction-requests/${encodeRouteId(id)}/decision`,
     monthly: '/hr-attendance/monthly',
   },
   hrLeave: {

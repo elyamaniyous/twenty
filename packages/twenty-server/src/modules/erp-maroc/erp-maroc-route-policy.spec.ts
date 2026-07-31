@@ -76,6 +76,8 @@ import {
   hrShiftRotationListSchema,
   hrShiftRotationSchema,
   hrTimeEntrySchema,
+  hrTimeEntryCorrectionRequestListSchema,
+  hrTimeEntryCorrectionRequestSchema,
   hrWorkScheduleAssignmentSchema,
   hrWorkScheduleListSchema,
   hrWorkScheduleSchema,
@@ -227,6 +229,9 @@ const requiredIdempotencyRoutes = new Set([
   `POST /hr-attendance/employees/${id}/shift-rotation-assignments`,
   'POST /hr-attendance/time-entries',
   `PATCH /hr-attendance/time-entries/${id}/cancel`,
+  'POST /hr-attendance/time-entry-correction-requests',
+  `PATCH /hr-attendance/time-entry-correction-requests/${id}/evidence`,
+  `PATCH /hr-attendance/time-entry-correction-requests/${id}/decision`,
   'POST /hr-leave/policies',
   'POST /hr-leave/policies/seed-morocco',
   'POST /hr-leave/requests',
@@ -1080,6 +1085,30 @@ const approvedRoutes = [
   ],
   [
     'GET',
+    '/hr-attendance/time-entry-correction-requests',
+    'hr-attendance.time-entry-correction-requests',
+    hrTimeEntryCorrectionRequestListSchema,
+  ],
+  [
+    'POST',
+    '/hr-attendance/time-entry-correction-requests',
+    'hr-attendance.time-entry-correction-requests',
+    hrTimeEntryCorrectionRequestSchema,
+  ],
+  [
+    'PATCH',
+    `/hr-attendance/time-entry-correction-requests/${id}/evidence`,
+    'hr-attendance.time-entry-correction.evidence',
+    hrTimeEntryCorrectionRequestSchema,
+  ],
+  [
+    'PATCH',
+    `/hr-attendance/time-entry-correction-requests/${id}/decision`,
+    'hr-attendance.time-entry-correction.decision',
+    hrTimeEntryCorrectionRequestSchema,
+  ],
+  [
+    'GET',
     '/hr-attendance/monthly',
     'hr-attendance.monthly',
     hrAttendanceMonthSchema,
@@ -1185,33 +1214,39 @@ describe('ERP Maroc route policy', () => {
       const query =
         method === 'GET' && routeId === 'hr-attendance.work-calendars'
           ? { year: '2026' }
-          : routeId === 'hr-attendance.monthly'
+          : method === 'GET' &&
+              routeId === 'hr-attendance.time-entry-correction-requests'
             ? { month: '2026-07' }
-            : routeId === 'hr-leave.requests' && method === 'GET'
-              ? { year: '2026' }
-              : routeId === 'hr-leave.balances'
+            : routeId === 'hr-attendance.monthly'
+              ? { month: '2026-07' }
+              : routeId === 'hr-leave.requests' && method === 'GET'
                 ? { year: '2026' }
-                : routeId === 'hr-monthly-closing.periods' && method === 'GET'
+                : routeId === 'hr-leave.balances'
                   ? { year: '2026' }
-                  : requiresAccountCode
-                    ? { accountCode: '3421' }
-                    : {};
+                  : routeId === 'hr-monthly-closing.periods' && method === 'GET'
+                    ? { year: '2026' }
+                    : requiresAccountCode
+                      ? { accountCode: '3421' }
+                      : {};
       const resolved = resolveErpRoute(method, path, query);
 
       expect(resolved.routeId).toBe(routeId);
       expect(resolved.upstreamPath).toBe(
         method === 'GET' && routeId === 'hr-attendance.work-calendars'
           ? `${path}?year=2026`
-          : routeId === 'hr-attendance.monthly'
+          : method === 'GET' &&
+              routeId === 'hr-attendance.time-entry-correction-requests'
             ? `${path}?month=2026-07`
-            : (routeId === 'hr-leave.requests' && method === 'GET') ||
-                routeId === 'hr-leave.balances'
-              ? `${path}?year=2026`
-              : routeId === 'hr-monthly-closing.periods' && method === 'GET'
+            : routeId === 'hr-attendance.monthly'
+              ? `${path}?month=2026-07`
+              : (routeId === 'hr-leave.requests' && method === 'GET') ||
+                  routeId === 'hr-leave.balances'
                 ? `${path}?year=2026`
-                : requiresAccountCode
-                  ? `${path}?accountCode=3421`
-                  : path,
+                : routeId === 'hr-monthly-closing.periods' && method === 'GET'
+                  ? `${path}?year=2026`
+                  : requiresAccountCode
+                    ? `${path}?accountCode=3421`
+                    : path,
       );
       expect(resolved.kind).toBe(routeId === 'invoices.pdf' ? 'pdf' : 'json');
       expect(resolved.idempotency).toBe(
@@ -1377,6 +1412,15 @@ describe('ERP Maroc route policy', () => {
       }).upstreamPath,
     ).toBe('/hr-attendance/work-pattern-change-requests?status=PENDING');
     expect(
+      resolveErpRoute('GET', '/hr-attendance/time-entry-correction-requests', {
+        month: '2026-07',
+        status: 'MANAGER_APPROVED',
+        employeeId: id,
+      }).upstreamPath,
+    ).toBe(
+      `/hr-attendance/time-entry-correction-requests?month=2026-07&status=MANAGER_APPROVED&employeeId=${id}`,
+    );
+    expect(
       resolveErpRoute('GET', '/hr-leave/requests', {
         year: '2026',
         status: 'MANAGER_APPROVED',
@@ -1427,6 +1471,11 @@ describe('ERP Maroc route policy', () => {
     ['/hr-attendance/monthly', { month: '2026-13' }],
     ['/hr-attendance/monthly', { month: '2026-07', employeeId: 'invalid' }],
     ['/hr-attendance/work-pattern-change-requests', { status: 'CANCELLED' }],
+    ['/hr-attendance/time-entry-correction-requests', {}],
+    [
+      '/hr-attendance/time-entry-correction-requests',
+      { month: '2026-07', status: 'PENDING' },
+    ],
     ['/hr-leave/requests', {}],
     ['/hr-leave/requests', { year: '1999' }],
     ['/hr-leave/requests', { year: '2026', status: 'PENDING' }],

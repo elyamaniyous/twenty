@@ -124,6 +124,17 @@ export const hrTimeEntrySourceSchema = z.enum([
 ]);
 export const hrTimeEntryStatusSchema = z.enum(['ACTIVE', 'CANCELLED']);
 export const hrTimeWorkModeSchema = z.enum(['ONSITE', 'REMOTE', 'CLIENT_SITE']);
+export const hrTimeEntryCorrectionActionSchema = z.enum([
+  'ADD',
+  'REPLACE',
+  'CANCEL',
+]);
+export const hrTimeEntryCorrectionStatusSchema = z.enum([
+  'REQUESTED',
+  'MANAGER_APPROVED',
+  'APPROVED',
+  'REJECTED',
+]);
 export const hrCalendarDayTypeSchema = z.enum([
   'NATIONAL_HOLIDAY',
   'RELIGIOUS_HOLIDAY',
@@ -1277,6 +1288,134 @@ export const hrTimeEntrySchema = z.object({
   updatedAt: instantSchema,
 });
 
+export const hrTimeEntryCorrectionRequestSchema = z
+  .object({
+    id: uuidSchema,
+    organisationId: uuidSchema,
+    societeId: uuidSchema,
+    employeeId: uuidSchema,
+    action: hrTimeEntryCorrectionActionSchema,
+    originalTimeEntryId: uuidSchema.nullable(),
+    proposedType: hrTimeEntryTypeSchema.nullable(),
+    proposedOccurredAt: instantSchema.nullable(),
+    proposedLocalDate: nullableCivilDateHttpSchema,
+    targetAttendanceDate: civilDateHttpSchema,
+    proposedWorkMode: hrTimeWorkModeSchema.nullable(),
+    proposedNotes: nullableStringSchema,
+    reason: z.string(),
+    evidenceRequired: z.boolean(),
+    supportingDocumentId: uuidSchema.nullable(),
+    status: hrTimeEntryCorrectionStatusSchema,
+    requestedByTwentyUserId: z.string(),
+    requestedAt: instantSchema,
+    managerApprovedAt: instantSchema.nullable(),
+    managerApprovedByTwentyUserId: nullableStringSchema,
+    decidedAt: instantSchema.nullable(),
+    decidedByTwentyUserId: nullableStringSchema,
+    decisionReason: nullableStringSchema,
+    appliedTimeEntryId: uuidSchema.nullable(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+    employee: hrLeaveEmployeeSummarySchema,
+    originalTimeEntry: hrTimeEntrySchema.nullable(),
+    appliedTimeEntry: hrTimeEntrySchema.nullable(),
+    supportingDocument: z
+      .object({
+        id: uuidSchema,
+        title: z.string(),
+        category: hrDocumentCategorySchema,
+      })
+      .nullable(),
+  })
+  .superRefine((request, context) => {
+    const hasOriginal =
+      request.originalTimeEntryId !== null &&
+      request.originalTimeEntry !== null;
+    const hasNoOriginal =
+      request.originalTimeEntryId === null &&
+      request.originalTimeEntry === null;
+    const hasProposal =
+      request.proposedType !== null &&
+      request.proposedOccurredAt !== null &&
+      request.proposedLocalDate !== null &&
+      request.proposedWorkMode !== null;
+    const hasNoProposal =
+      request.proposedType === null &&
+      request.proposedOccurredAt === null &&
+      request.proposedLocalDate === null &&
+      request.proposedWorkMode === null &&
+      request.proposedNotes === null;
+    const targetIsConsistent =
+      (request.action === 'ADD' && hasNoOriginal && hasProposal) ||
+      (request.action === 'REPLACE' && hasOriginal && hasProposal) ||
+      (request.action === 'CANCEL' && hasOriginal && hasNoProposal);
+    if (!targetIsConsistent) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Time entry correction target is inconsistent',
+      });
+    }
+
+    const hasManagerApproval =
+      request.managerApprovedAt !== null &&
+      request.managerApprovedByTwentyUserId !== null;
+    const hasDecision =
+      request.decidedAt !== null && request.decidedByTwentyUserId !== null;
+    const hasAppliedEntry =
+      request.appliedTimeEntryId !== null && request.appliedTimeEntry !== null;
+    const hasNoAppliedEntry =
+      request.appliedTimeEntryId === null && request.appliedTimeEntry === null;
+    const supportingDocumentIsConsistent =
+      (request.supportingDocumentId === null &&
+        request.supportingDocument === null) ||
+      (request.supportingDocumentId !== null &&
+        request.supportingDocument !== null);
+    if (!supportingDocumentIsConsistent) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Time entry correction evidence relation is inconsistent',
+      });
+    }
+    const reviewIsConsistent =
+      (request.status === 'REQUESTED' &&
+        !hasManagerApproval &&
+        !hasDecision &&
+        hasNoAppliedEntry) ||
+      (request.status === 'MANAGER_APPROVED' &&
+        hasManagerApproval &&
+        !hasDecision &&
+        hasNoAppliedEntry) ||
+      (request.status === 'REJECTED' &&
+        hasDecision &&
+        request.decisionReason !== null &&
+        hasNoAppliedEntry) ||
+      (request.status === 'APPROVED' &&
+        hasManagerApproval &&
+        hasDecision &&
+        ((request.action === 'CANCEL' && hasNoAppliedEntry) ||
+          (request.action !== 'CANCEL' && hasAppliedEntry)));
+    if (!reviewIsConsistent) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Time entry correction review state is inconsistent',
+      });
+    }
+    if (
+      request.evidenceRequired &&
+      request.status === 'APPROVED' &&
+      (request.supportingDocumentId === null ||
+        request.supportingDocument === null)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Approved correction is missing required evidence',
+      });
+    }
+  });
+export const hrTimeEntryCorrectionRequestListSchema = z.array(
+  hrTimeEntryCorrectionRequestSchema,
+);
+
 export const hrAttendanceDaySchema = z.object({
   date: civilDateHttpSchema,
   schedule: z
@@ -1509,6 +1648,12 @@ export type HrTimeEntryType = z.infer<typeof hrTimeEntryTypeSchema>;
 export type HrTimeEntrySource = z.infer<typeof hrTimeEntrySourceSchema>;
 export type HrTimeEntryStatus = z.infer<typeof hrTimeEntryStatusSchema>;
 export type HrTimeWorkMode = z.infer<typeof hrTimeWorkModeSchema>;
+export type HrTimeEntryCorrectionAction = z.infer<
+  typeof hrTimeEntryCorrectionActionSchema
+>;
+export type HrTimeEntryCorrectionStatus = z.infer<
+  typeof hrTimeEntryCorrectionStatusSchema
+>;
 export type HrCalendarDayType = z.infer<typeof hrCalendarDayTypeSchema>;
 export type HrWorkPatternType = z.infer<typeof hrWorkPatternTypeSchema>;
 export type HrWorkPatternChangeStatus = z.infer<
@@ -1619,6 +1764,9 @@ export type HrWorkPatternChangeRequest = z.infer<
   typeof hrWorkPatternChangeRequestSchema
 >;
 export type HrTimeEntry = z.infer<typeof hrTimeEntrySchema>;
+export type HrTimeEntryCorrectionRequest = z.infer<
+  typeof hrTimeEntryCorrectionRequestSchema
+>;
 export type HrAttendanceDay = z.infer<typeof hrAttendanceDaySchema>;
 export type HrAttendanceEmployeeMonth = z.infer<
   typeof hrAttendanceEmployeeMonthSchema

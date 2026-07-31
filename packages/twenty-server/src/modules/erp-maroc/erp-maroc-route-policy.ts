@@ -72,6 +72,8 @@ import {
   hrWorkCalendarListSchema,
   hrWorkCalendarSchema,
   hrAttendanceMonthSchema,
+  hrTimeEntryCorrectionRequestListSchema,
+  hrTimeEntryCorrectionRequestSchema,
   hrTimeEntrySchema,
   hrShiftRotationAssignmentSchema,
   hrShiftRotationListSchema,
@@ -195,6 +197,11 @@ const grandLivreQuery = Object.freeze([
 const lettrageQuery = Object.freeze(['accountCode']);
 const workCalendarQuery = Object.freeze(['year']);
 const attendanceQuery = Object.freeze(['month', 'employeeId']);
+const timeEntryCorrectionQuery = Object.freeze([
+  'month',
+  'status',
+  'employeeId',
+]);
 const workPatternChangeQuery = Object.freeze(['status']);
 const leaveRequestQuery = Object.freeze(['year', 'status']);
 const leaveBalanceQuery = Object.freeze(['year']);
@@ -2097,6 +2104,54 @@ const routes: ErpMarocRoute[] = [
     idempotency: 'required',
   }),
   defineRoute({
+    routeId: erpMarocRouteIds.hrTimeEntryCorrectionRequests,
+    method: 'GET',
+    pattern: exact('/hr-attendance/time-entry-correction-requests'),
+    build: staticBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.timeEntryCorrectionRequests,
+    ),
+    queryKeys: timeEntryCorrectionQuery,
+    responseSchema: hrTimeEntryCorrectionRequestListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrTimeEntryCorrectionRequests,
+    method: 'POST',
+    pattern: exact('/hr-attendance/time-entry-correction-requests'),
+    build: staticBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.timeEntryCorrectionRequests,
+    ),
+    queryKeys: noQuery,
+    responseSchema: hrTimeEntryCorrectionRequestSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrTimeEntryCorrectionEvidence,
+    method: 'PATCH',
+    pattern: action('hr-attendance/time-entry-correction-requests', 'evidence'),
+    build: idBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.timeEntryCorrectionEvidence,
+    ),
+    queryKeys: noQuery,
+    responseSchema: hrTimeEntryCorrectionRequestSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrTimeEntryCorrectionDecision,
+    method: 'PATCH',
+    pattern: action('hr-attendance/time-entry-correction-requests', 'decision'),
+    build: idBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.timeEntryCorrectionDecision,
+    ),
+    queryKeys: noQuery,
+    responseSchema: hrTimeEntryCorrectionRequestSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
     routeId: erpMarocRouteIds.hrAttendanceMonthly,
     method: 'GET',
     pattern: exact('/hr-attendance/monthly'),
@@ -2454,6 +2509,22 @@ const assertNormalizedQueryValue = (
     return;
   }
   if (
+    routeId === erpMarocRouteIds.hrTimeEntryCorrectionRequests &&
+    key === 'month' &&
+    /^\d{4}-(?:0[1-9]|1[0-2])$/.test(value)
+  ) {
+    return;
+  }
+  if (
+    routeId === erpMarocRouteIds.hrTimeEntryCorrectionRequests &&
+    key === 'status' &&
+    new Set(['REQUESTED', 'MANAGER_APPROVED', 'APPROVED', 'REJECTED']).has(
+      value,
+    )
+  ) {
+    return;
+  }
+  if (
     routeId === erpMarocRouteIds.hrWorkPatternChangeRequests &&
     key === 'status' &&
     new Set(['PENDING', 'APPROVED', 'REJECTED']).has(value)
@@ -2515,6 +2586,13 @@ const buildQueryString = (
   }
   if (
     route.routeId === erpMarocRouteIds.hrAttendanceMonthly &&
+    !values.has('month')
+  ) {
+    rejectRoute();
+  }
+  if (
+    route.routeId === erpMarocRouteIds.hrTimeEntryCorrectionRequests &&
+    route.method === 'GET' &&
     !values.has('month')
   ) {
     rejectRoute();

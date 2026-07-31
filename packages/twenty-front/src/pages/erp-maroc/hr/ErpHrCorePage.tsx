@@ -1185,6 +1185,10 @@ export const ErpHrCorePage = () => {
         employees={employees}
         teams={teams}
         canWrite={access?.canWriteTime ?? false}
+        canWriteDocuments={access?.canWriteDocuments ?? false}
+        canApproveFinal={
+          (access?.canWriteTime ?? false) && access?.populationScope === 'ALL'
+        }
         query={query}
       />
     ) : view === 'leave' ? (
