@@ -15,6 +15,7 @@ import {
   hrMonthlyPeriodDetailSchema,
   hrOrganisationChartSchema,
   hrAttendanceMonthSchema,
+  hrBreastfeedingArrangementSchema,
   hrShiftRotationSchema,
   hrTimeEntryCorrectionRequestSchema,
   hrWorkPatternChangeRequestSchema,
@@ -159,6 +160,10 @@ describe('HR leave management contracts', () => {
       managerApprovalRequired: true,
       hrApprovalRequired: true,
       allowNegativeBalance: true,
+      eventDateRequired: false,
+      eventWindowDays: null,
+      allowFractionation: false,
+      maximumEventSegments: null,
       isActive: true,
       sourceReference: 'Code du travail marocain, articles 274 et 276',
       createdByTwentyUserId: 'admin-user',
@@ -178,6 +183,8 @@ describe('HR leave management contracts', () => {
       status: 'MANAGER_APPROVED',
       startDate: '2026-08-03T00:00:00.000Z',
       endDate: '2026-08-06T00:00:00.000Z',
+      eventDate: null,
+      eventReference: null,
       workingDays: 4,
       evidenceRequired: true,
       reason: 'Mariage',
@@ -227,6 +234,38 @@ describe('HR leave management contracts', () => {
     expect(request.delegateEmployee?.id).toBe(delegateEmployeeId);
     expect(policy.paidWorkingDaysLimit).toBe(2);
     expect(balance.movements[0]?.days).toBe(-0.5);
+  });
+
+  it('parses a paid breastfeeding work-time arrangement', () => {
+    const arrangement = hrBreastfeedingArrangementSchema.parse({
+      id: '77777777-7777-4777-8777-777777777777',
+      organisationId: '11111111-1111-4111-8111-111111111111',
+      societeId: '22222222-2222-4222-8222-222222222222',
+      employeeId: '33333333-3333-4333-8333-333333333333',
+      resumedWorkDate: '2026-08-03T00:00:00.000Z',
+      legalEndDate: '2027-08-02T00:00:00.000Z',
+      morningMinutes: 30,
+      afternoonMinutes: 30,
+      flexibleUse: false,
+      status: 'ACTIVE',
+      notes: null,
+      sourceReference: 'Code du travail marocain, article 161',
+      createdByTwentyUserId: 'hr-user',
+      updatedByTwentyUserId: 'hr-user',
+      endedAt: null,
+      endedByTwentyUserId: null,
+      endReason: null,
+      createdAt: '2026-08-03T08:00:00.000Z',
+      updatedAt: '2026-08-03T08:00:00.000Z',
+      employee: {
+        id: '33333333-3333-4333-8333-333333333333',
+        employeeNumber: 'ZOW-001',
+        firstName: 'Salma',
+        lastName: 'Alaoui',
+      },
+    });
+
+    expect(arrangement.morningMinutes + arrangement.afternoonMinutes).toBe(60);
   });
 });
 
@@ -858,7 +897,9 @@ describe('hrEmployeeDetailSchema', () => {
             lateCount: 1,
             lateMinutes: 10,
             workedMinutes: 480,
+            paidBreastfeedingRestMinutes: 0,
             overtimeMinutes: 0,
+            overtimeSourceDigest: 'a'.repeat(64),
             anomalyCount: 0,
           },
           days: [
@@ -878,6 +919,8 @@ describe('hrEmployeeDetailSchema', () => {
               workedMinutes: 480,
               scheduledMinutes: 480,
               overtimeMinutes: 0,
+              overtimeCategory: null,
+              paidBreastfeedingRestMinutes: 0,
               lateMinutes: 10,
               earlyLeaveMinutes: 0,
               breakMinutes: 60,

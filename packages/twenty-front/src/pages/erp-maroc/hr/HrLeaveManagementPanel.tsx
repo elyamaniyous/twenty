@@ -25,7 +25,7 @@ import { IconPlus, IconRefresh } from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
-type Props = {
+type HrLeaveManagementPanelProps = {
   employees: HrEmployeeListItem[];
   canWrite: boolean;
   canWriteDocuments: boolean;
@@ -205,7 +205,7 @@ export const HrLeaveManagementPanel = ({
   canWrite,
   canWriteDocuments,
   query,
-}: Props) => {
+}: HrLeaveManagementPanelProps) => {
   const { client } = useErpMarocContext();
   const [year, setYear] = useState(currentYear);
   const [state, setState] = useState<LoadState>('loading');
@@ -223,6 +223,8 @@ export const HrLeaveManagementPanel = ({
     policyId: '',
     startDate: casablancaToday(),
     endDate: casablancaToday(),
+    eventDate: '',
+    eventReference: '',
     reason: '',
   });
   const [reviewForm, setReviewForm] = useState({
@@ -240,6 +242,7 @@ export const HrLeaveManagementPanel = ({
     days: '',
     reason: '',
   });
+  const selectedPolicy = policies.find(({ id }) => id === requestForm.policyId);
 
   const load = useCallback(async () => {
     setState('loading');
@@ -339,6 +342,8 @@ export const HrLeaveManagementPanel = ({
           policyId: requestForm.policyId,
           startDate: requestForm.startDate,
           endDate: requestForm.endDate,
+          eventDate: requestForm.eventDate || null,
+          eventReference: requestForm.eventReference || null,
           reason: requestForm.reason || null,
         },
       },
@@ -568,7 +573,14 @@ export const HrLeaveManagementPanel = ({
       key: 'period',
       header: 'Période',
       width: '220px',
-      render: ({ startDate, endDate }) => `${startDate} au ${endDate}`,
+      render: ({ startDate, endDate, eventDate }) => (
+        <StyledPrimary>
+          <span>{`${startDate} au ${endDate}`}</span>
+          {eventDate === null ? null : (
+            <StyledMuted>Événement : {eventDate}</StyledMuted>
+          )}
+        </StyledPrimary>
+      ),
     },
     {
       key: 'delegate',
@@ -826,6 +838,47 @@ export const HrLeaveManagementPanel = ({
                 </StyledSelect>
               </StyledField>
             </StyledFields>
+            {selectedPolicy?.eventDateRequired ? (
+              <StyledFields>
+                <StyledField>
+                  Date de l’événement
+                  <StyledInput
+                    type="date"
+                    required
+                    value={requestForm.eventDate}
+                    onChange={(event) =>
+                      setRequestForm((current) => ({
+                        ...current,
+                        eventDate: event.target.value,
+                      }))
+                    }
+                  />
+                </StyledField>
+                <StyledField>
+                  Référence de l’événement
+                  <StyledInput
+                    value={requestForm.eventReference}
+                    onChange={(event) =>
+                      setRequestForm((current) => ({
+                        ...current,
+                        eventReference: event.target.value,
+                      }))
+                    }
+                  />
+                </StyledField>
+                <StyledField>
+                  Fractionnement
+                  <StyledInput
+                    readOnly
+                    value={
+                      selectedPolicy.allowFractionation
+                        ? `${selectedPolicy.maximumEventSegments ?? '—'} segments max.`
+                        : 'Non autorisé'
+                    }
+                  />
+                </StyledField>
+              </StyledFields>
+            ) : null}
             <StyledField>
               Motif
               <StyledInput

@@ -124,6 +124,28 @@ export const hrTimeEntrySourceSchema = z.enum([
 ]);
 export const hrTimeEntryStatusSchema = z.enum(['ACTIVE', 'CANCELLED']);
 export const hrTimeWorkModeSchema = z.enum(['ONSITE', 'REMOTE', 'CLIENT_SITE']);
+export const hrOvertimeCategorySchema = z.enum([
+  'DAY',
+  'NIGHT',
+  'REST_DAY',
+  'HOLIDAY',
+]);
+export const hrOvertimeSettlementSchema = z.enum([
+  'PAY',
+  'COMPENSATORY_REST',
+  'SPLIT',
+]);
+export const hrOvertimeApprovalStatusSchema = z.enum([
+  'REQUESTED',
+  'MANAGER_APPROVED',
+  'APPROVED',
+  'REJECTED',
+]);
+export const hrCompensatoryRestMovementTypeSchema = z.enum([
+  'EARNED',
+  'CONSUMED',
+  'EXPIRED',
+]);
 export const hrTimeEntryCorrectionActionSchema = z.enum([
   'ADD',
   'REPLACE',
@@ -159,6 +181,10 @@ export const hrAttendanceDayStatusSchema = z.enum([
   'HOLIDAY',
   'ANOMALY',
   'UNSCHEDULED',
+]);
+export const hrBreastfeedingArrangementStatusSchema = z.enum([
+  'ACTIVE',
+  'ENDED',
 ]);
 export const hrLeaveTypeSchema = z.enum([
   'ANNUAL',
@@ -911,35 +937,63 @@ export const hrEmployeeLeaveBalanceSchema = z.object({
   updatedAt: instantSchema,
 });
 
-export const hrLeavePolicySchema = z.object({
-  id: uuidSchema,
-  organisationId: uuidSchema,
-  societeId: uuidSchema,
-  code: z.string(),
-  name: z.string(),
-  type: hrLeaveTypeSchema,
-  isPaid: z.boolean(),
-  deductsAnnualBalance: z.boolean(),
-  adultMonthlyAccrualDays: z.number().finite().nonnegative(),
-  minorMonthlyAccrualDays: z.number().finite().nonnegative(),
-  eligibilityMonths: nonNegativeIntegerSchema,
-  seniorityStepYears: nonNegativeIntegerSchema,
-  seniorityBonusDays: z.number().finite().nonnegative(),
-  annualCapDays: z.number().finite().nonnegative().nullable(),
-  maximumWorkingDays: z.number().finite().positive().nullable(),
-  paidWorkingDaysLimit: z.number().finite().nonnegative().nullable(),
-  minimumNoticeDays: nonNegativeIntegerSchema,
-  evidenceRequiredAfterDays: z.number().finite().nonnegative().nullable(),
-  managerApprovalRequired: z.boolean(),
-  hrApprovalRequired: z.boolean(),
-  allowNegativeBalance: z.boolean(),
-  isActive: z.boolean(),
-  sourceReference: nullableStringSchema,
-  createdByTwentyUserId: z.string(),
-  createdAt: instantSchema,
-  updatedAt: instantSchema,
-  _count: z.object({ requests: nonNegativeIntegerSchema }).optional(),
-});
+export const hrLeavePolicySchema = z
+  .object({
+    id: uuidSchema,
+    organisationId: uuidSchema,
+    societeId: uuidSchema,
+    code: z.string(),
+    name: z.string(),
+    type: hrLeaveTypeSchema,
+    isPaid: z.boolean(),
+    deductsAnnualBalance: z.boolean(),
+    adultMonthlyAccrualDays: z.number().finite().nonnegative(),
+    minorMonthlyAccrualDays: z.number().finite().nonnegative(),
+    eligibilityMonths: nonNegativeIntegerSchema,
+    seniorityStepYears: nonNegativeIntegerSchema,
+    seniorityBonusDays: z.number().finite().nonnegative(),
+    annualCapDays: z.number().finite().nonnegative().nullable(),
+    maximumWorkingDays: z.number().finite().positive().nullable(),
+    paidWorkingDaysLimit: z.number().finite().nonnegative().nullable(),
+    minimumNoticeDays: nonNegativeIntegerSchema,
+    evidenceRequiredAfterDays: z.number().finite().nonnegative().nullable(),
+    managerApprovalRequired: z.boolean(),
+    hrApprovalRequired: z.boolean(),
+    allowNegativeBalance: z.boolean(),
+    eventDateRequired: z.boolean(),
+    eventWindowDays: z.number().int().min(1).max(366).nullable(),
+    allowFractionation: z.boolean(),
+    maximumEventSegments: z.number().int().min(1).max(100).nullable(),
+    isActive: z.boolean(),
+    sourceReference: nullableStringSchema,
+    createdByTwentyUserId: z.string(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+    _count: z.object({ requests: nonNegativeIntegerSchema }).optional(),
+  })
+  .superRefine((policy, context) => {
+    if (policy.eventWindowDays !== null && !policy.eventDateRequired) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An event window requires an event date',
+        path: ['eventWindowDays'],
+      });
+    }
+    if (policy.allowFractionation && !policy.eventDateRequired) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Fractionation requires an event date',
+        path: ['allowFractionation'],
+      });
+    }
+    if (policy.maximumEventSegments !== null && !policy.allowFractionation) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A segment limit requires fractionation',
+        path: ['maximumEventSegments'],
+      });
+    }
+  });
 export const hrLeavePolicyListSchema = z.array(hrLeavePolicySchema);
 
 const hrLeaveEmployeeSummarySchema = z.object({
@@ -974,6 +1028,8 @@ export const hrLeaveRequestSchema = z.object({
   status: hrLeaveRequestStatusSchema,
   startDate: civilDateHttpSchema,
   endDate: civilDateHttpSchema,
+  eventDate: civilDateHttpSchema.nullable(),
+  eventReference: nullableStringSchema,
   workingDays: z.number().finite().nonnegative(),
   evidenceRequired: z.boolean(),
   reason: nullableStringSchema,
@@ -991,6 +1047,67 @@ export const hrLeaveRequestSchema = z.object({
   supportingDocument: hrLeaveSupportingDocumentSchema.nullable(),
 });
 export const hrLeaveRequestListSchema = z.array(hrLeaveRequestSchema);
+
+export const hrBreastfeedingArrangementSchema = z
+  .object({
+    id: uuidSchema,
+    organisationId: uuidSchema,
+    societeId: uuidSchema,
+    employeeId: uuidSchema,
+    resumedWorkDate: civilDateHttpSchema,
+    legalEndDate: civilDateHttpSchema,
+    morningMinutes: z.number().int().min(0).max(60),
+    afternoonMinutes: z.number().int().min(0).max(60),
+    flexibleUse: z.boolean(),
+    status: hrBreastfeedingArrangementStatusSchema,
+    notes: nullableStringSchema,
+    sourceReference: z.string(),
+    createdByTwentyUserId: z.string(),
+    updatedByTwentyUserId: z.string(),
+    endedAt: instantSchema.nullable(),
+    endedByTwentyUserId: nullableStringSchema,
+    endReason: nullableStringSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+    employee: hrLeaveEmployeeSummarySchema,
+  })
+  .superRefine((arrangement, context) => {
+    if (arrangement.morningMinutes + arrangement.afternoonMinutes !== 60) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Daily paid rest must total 60 minutes',
+        path: ['afternoonMinutes'],
+      });
+    }
+    if (arrangement.legalEndDate < arrangement.resumedWorkDate) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Legal end date cannot precede return to work',
+        path: ['legalEndDate'],
+      });
+    }
+    const hasAnyEndMetadata =
+      arrangement.endedAt !== null ||
+      arrangement.endedByTwentyUserId !== null ||
+      arrangement.endReason !== null;
+    const hasAllEndMetadata =
+      arrangement.endedAt !== null &&
+      arrangement.endedByTwentyUserId !== null &&
+      arrangement.endReason !== null;
+    if (
+      (arrangement.status === 'ACTIVE' && hasAnyEndMetadata) ||
+      (arrangement.status === 'ENDED' && !hasAllEndMetadata)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Arrangement status and end metadata are inconsistent',
+        path: ['status'],
+      });
+    }
+  });
+export const hrBreastfeedingArrangementListSchema = z.array(
+  hrBreastfeedingArrangementSchema,
+);
 
 export const hrLeaveBalanceMovementSchema = z.object({
   id: uuidSchema,
@@ -1452,6 +1569,8 @@ export const hrAttendanceDaySchema = z.object({
   workedMinutes: nonNegativeIntegerSchema,
   scheduledMinutes: nonNegativeIntegerSchema,
   overtimeMinutes: nonNegativeIntegerSchema,
+  overtimeCategory: hrOvertimeCategorySchema.nullable(),
+  paidBreastfeedingRestMinutes: nonNegativeIntegerSchema,
   lateMinutes: nonNegativeIntegerSchema,
   earlyLeaveMinutes: nonNegativeIntegerSchema,
   breakMinutes: nonNegativeIntegerSchema,
@@ -1475,7 +1594,9 @@ export const hrAttendanceEmployeeMonthSchema = z.object({
     lateCount: nonNegativeIntegerSchema,
     lateMinutes: nonNegativeIntegerSchema,
     workedMinutes: nonNegativeIntegerSchema,
+    paidBreastfeedingRestMinutes: nonNegativeIntegerSchema,
     overtimeMinutes: nonNegativeIntegerSchema,
+    overtimeSourceDigest: z.string().length(64),
     anomalyCount: nonNegativeIntegerSchema,
   }),
   days: z.array(hrAttendanceDaySchema),
@@ -1485,6 +1606,172 @@ export const hrAttendanceMonthSchema = z.object({
   month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
   generatedAt: instantSchema,
   employees: z.array(hrAttendanceEmployeeMonthSchema),
+});
+
+export const hrOvertimePolicySchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  name: z.string(),
+  dailyWarningMinutes: nonNegativeIntegerSchema,
+  dailyMaximumMinutes: nonNegativeIntegerSchema,
+  weeklyMaximumMinutes: nonNegativeIntegerSchema,
+  annualMaximumMinutes: nonNegativeIntegerSchema,
+  defaultSettlement: hrOvertimeSettlementSchema,
+  restConversionBasisPoints: nonNegativeIntegerSchema,
+  restExpiryMonths: nonNegativeIntegerSchema,
+  blocksApprovalOnLimitExceeded: z.boolean(),
+  createdByTwentyUserId: z.string(),
+  updatedByTwentyUserId: z.string(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+export const hrNullableOvertimePolicySchema = hrOvertimePolicySchema.nullable();
+
+export const hrOvertimeLimitAlertSchema = z.object({
+  code: z.enum([
+    'DAILY_WARNING',
+    'DAILY_MAXIMUM',
+    'WEEKLY_MAXIMUM',
+    'ANNUAL_MAXIMUM',
+  ]),
+  date: civilDateHttpSchema.nullable(),
+  weekStart: civilDateHttpSchema.nullable(),
+  detectedMinutes: nonNegativeIntegerSchema,
+  limitMinutes: nonNegativeIntegerSchema,
+  excessMinutes: nonNegativeIntegerSchema,
+});
+
+export const hrCompensatoryRestMovementSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  employeeId: uuidSchema,
+  type: hrCompensatoryRestMovementTypeSchema,
+  minutes: nonNegativeIntegerSchema,
+  occurredOn: civilDateHttpSchema,
+  expiresOn: nullableCivilDateHttpSchema,
+  reason: z.string(),
+  overtimeApprovalId: uuidSchema.nullable(),
+  sourceMovementId: uuidSchema.nullable(),
+  createdByTwentyUserId: z.string(),
+  createdAt: instantSchema,
+});
+
+export const hrOvertimeApprovalSchema = z
+  .object({
+    id: uuidSchema,
+    organisationId: uuidSchema,
+    societeId: uuidSchema,
+    employeeId: uuidSchema,
+    policyId: uuidSchema,
+    month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+    sourceDigest: z.string().length(64),
+    detectedMinutes: nonNegativeIntegerSchema,
+    eligibleMinutes: nonNegativeIntegerSchema,
+    dayMinutes: nonNegativeIntegerSchema,
+    nightMinutes: nonNegativeIntegerSchema,
+    restDayMinutes: nonNegativeIntegerSchema,
+    holidayMinutes: nonNegativeIntegerSchema,
+    limitAlerts: z.array(hrOvertimeLimitAlertSchema),
+    policySnapshot: z.record(z.string(), z.unknown()),
+    status: hrOvertimeApprovalStatusSchema,
+    requestedByTwentyUserId: z.string(),
+    requestedAt: instantSchema,
+    managerApprovedAt: nullableInstantSchema,
+    managerApprovedByTwentyUserId: nullableStringSchema,
+    decidedAt: nullableInstantSchema,
+    decidedByTwentyUserId: nullableStringSchema,
+    decisionReason: nullableStringSchema,
+    settlement: hrOvertimeSettlementSchema.nullable(),
+    approvedMinutes: nonNegativeIntegerSchema,
+    payableMinutes: nonNegativeIntegerSchema,
+    restMinutes: nonNegativeIntegerSchema,
+    restCreditMinutes: nonNegativeIntegerSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+    employee: hrLeaveEmployeeSummarySchema,
+    policy: hrOvertimePolicySchema,
+    restMovement: hrCompensatoryRestMovementSchema.nullable(),
+  })
+  .superRefine((approval, context) => {
+    if (
+      approval.detectedMinutes !==
+      approval.dayMinutes +
+        approval.nightMinutes +
+        approval.restDayMinutes +
+        approval.holidayMinutes
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Overtime category totals are inconsistent',
+      });
+    }
+    const hasManagerApproval =
+      approval.managerApprovedAt !== null &&
+      approval.managerApprovedByTwentyUserId !== null;
+    const hasDecision =
+      approval.decidedAt !== null && approval.decidedByTwentyUserId !== null;
+    const isConsistent =
+      (approval.status === 'REQUESTED' &&
+        !hasManagerApproval &&
+        !hasDecision &&
+        approval.settlement === null) ||
+      (approval.status === 'MANAGER_APPROVED' &&
+        hasManagerApproval &&
+        !hasDecision &&
+        approval.settlement === null) ||
+      (approval.status === 'REJECTED' &&
+        hasDecision &&
+        approval.decisionReason !== null &&
+        approval.settlement === null) ||
+      (approval.status === 'APPROVED' &&
+        hasManagerApproval &&
+        hasDecision &&
+        approval.settlement !== null &&
+        approval.approvedMinutes === approval.eligibleMinutes &&
+        approval.approvedMinutes ===
+          approval.payableMinutes + approval.restMinutes);
+    if (!isConsistent) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Overtime approval state is inconsistent',
+      });
+    }
+  });
+export const hrOvertimeApprovalListSchema = z.array(hrOvertimeApprovalSchema);
+
+const hrCompensatoryRestCreditSchema = hrCompensatoryRestMovementSchema.extend({
+  employee: hrLeaveEmployeeSummarySchema,
+  overtimeApproval: z
+    .object({
+      id: uuidSchema,
+      month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+      settlement: hrOvertimeSettlementSchema.nullable(),
+    })
+    .nullable(),
+  allocations: z.array(hrCompensatoryRestMovementSchema),
+});
+
+export const hrCompensatoryRestBalanceResponseSchema = z.object({
+  asOf: civilDateHttpSchema,
+  balances: z.array(
+    z.object({
+      employee: hrLeaveEmployeeSummarySchema,
+      earnedMinutes: nonNegativeIntegerSchema,
+      consumedMinutes: nonNegativeIntegerSchema,
+      expiredMinutes: nonNegativeIntegerSchema,
+      pendingExpiryMinutes: nonNegativeIntegerSchema,
+      availableMinutes: nonNegativeIntegerSchema,
+    }),
+  ),
+  credits: z.array(hrCompensatoryRestCreditSchema),
+});
+
+export const hrCompensatoryRestExpirationResultSchema = z.object({
+  asOf: civilDateHttpSchema,
+  expiredCreditCount: nonNegativeIntegerSchema,
+  expiredMinutes: nonNegativeIntegerSchema,
 });
 
 const hrMonthlyEmployeeSchema = z.object({
@@ -1648,6 +1935,14 @@ export type HrTimeEntryType = z.infer<typeof hrTimeEntryTypeSchema>;
 export type HrTimeEntrySource = z.infer<typeof hrTimeEntrySourceSchema>;
 export type HrTimeEntryStatus = z.infer<typeof hrTimeEntryStatusSchema>;
 export type HrTimeWorkMode = z.infer<typeof hrTimeWorkModeSchema>;
+export type HrOvertimeCategory = z.infer<typeof hrOvertimeCategorySchema>;
+export type HrOvertimeSettlement = z.infer<typeof hrOvertimeSettlementSchema>;
+export type HrOvertimeApprovalStatus = z.infer<
+  typeof hrOvertimeApprovalStatusSchema
+>;
+export type HrCompensatoryRestMovementType = z.infer<
+  typeof hrCompensatoryRestMovementTypeSchema
+>;
 export type HrTimeEntryCorrectionAction = z.infer<
   typeof hrTimeEntryCorrectionActionSchema
 >;
@@ -1732,6 +2027,12 @@ export type HrEmployeeLeaveBalance = z.infer<
 >;
 export type HrLeavePolicy = z.infer<typeof hrLeavePolicySchema>;
 export type HrLeaveRequest = z.infer<typeof hrLeaveRequestSchema>;
+export type HrBreastfeedingArrangementStatus = z.infer<
+  typeof hrBreastfeedingArrangementStatusSchema
+>;
+export type HrBreastfeedingArrangement = z.infer<
+  typeof hrBreastfeedingArrangementSchema
+>;
 export type HrLeaveBalanceMovement = z.infer<
   typeof hrLeaveBalanceMovementSchema
 >;
@@ -1772,6 +2073,18 @@ export type HrAttendanceEmployeeMonth = z.infer<
   typeof hrAttendanceEmployeeMonthSchema
 >;
 export type HrAttendanceMonth = z.infer<typeof hrAttendanceMonthSchema>;
+export type HrOvertimePolicy = z.infer<typeof hrOvertimePolicySchema>;
+export type HrOvertimeLimitAlert = z.infer<typeof hrOvertimeLimitAlertSchema>;
+export type HrOvertimeApproval = z.infer<typeof hrOvertimeApprovalSchema>;
+export type HrCompensatoryRestMovement = z.infer<
+  typeof hrCompensatoryRestMovementSchema
+>;
+export type HrCompensatoryRestBalanceResponse = z.infer<
+  typeof hrCompensatoryRestBalanceResponseSchema
+>;
+export type HrCompensatoryRestExpirationResult = z.infer<
+  typeof hrCompensatoryRestExpirationResultSchema
+>;
 export type HrMonthlyPeriod = z.infer<typeof hrMonthlyPeriodSchema>;
 export type HrMonthlyPeriodDetail = z.infer<typeof hrMonthlyPeriodDetailSchema>;
 export type HrMonthlyEmployeeSnapshot = z.infer<

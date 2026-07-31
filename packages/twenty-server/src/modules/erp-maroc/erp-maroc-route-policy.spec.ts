@@ -72,6 +72,14 @@ import {
   hrWorkCalendarListSchema,
   hrWorkCalendarSchema,
   hrAttendanceMonthSchema,
+  hrBreastfeedingArrangementListSchema,
+  hrBreastfeedingArrangementSchema,
+  hrCompensatoryRestBalanceResponseSchema,
+  hrCompensatoryRestExpirationResultSchema,
+  hrNullableOvertimePolicySchema,
+  hrOvertimeApprovalListSchema,
+  hrOvertimeApprovalSchema,
+  hrOvertimePolicySchema,
   hrShiftRotationAssignmentSchema,
   hrShiftRotationListSchema,
   hrShiftRotationSchema,
@@ -232,6 +240,13 @@ const requiredIdempotencyRoutes = new Set([
   'POST /hr-attendance/time-entry-correction-requests',
   `PATCH /hr-attendance/time-entry-correction-requests/${id}/evidence`,
   `PATCH /hr-attendance/time-entry-correction-requests/${id}/decision`,
+  'POST /hr-attendance/breastfeeding-arrangements',
+  `PATCH /hr-attendance/breastfeeding-arrangements/${id}/end`,
+  'PUT /hr-attendance/overtime-policy',
+  'POST /hr-attendance/overtime-approvals/sync',
+  `PATCH /hr-attendance/overtime-approvals/${id}/decision`,
+  'POST /hr-attendance/compensatory-rest/consume',
+  'POST /hr-attendance/compensatory-rest/expire',
   'POST /hr-leave/policies',
   'POST /hr-leave/policies/seed-morocco',
   'POST /hr-leave/requests',
@@ -1113,6 +1128,72 @@ const approvedRoutes = [
     'hr-attendance.monthly',
     hrAttendanceMonthSchema,
   ],
+  [
+    'GET',
+    '/hr-attendance/breastfeeding-arrangements',
+    'hr-attendance.breastfeeding-arrangements',
+    hrBreastfeedingArrangementListSchema,
+  ],
+  [
+    'POST',
+    '/hr-attendance/breastfeeding-arrangements',
+    'hr-attendance.breastfeeding-arrangements',
+    hrBreastfeedingArrangementSchema,
+  ],
+  [
+    'PATCH',
+    `/hr-attendance/breastfeeding-arrangements/${id}/end`,
+    'hr-attendance.breastfeeding-arrangement.end',
+    hrBreastfeedingArrangementSchema,
+  ],
+  [
+    'GET',
+    '/hr-attendance/overtime-policy',
+    'hr-attendance.overtime-policy',
+    hrNullableOvertimePolicySchema,
+  ],
+  [
+    'PUT',
+    '/hr-attendance/overtime-policy',
+    'hr-attendance.overtime-policy',
+    hrOvertimePolicySchema,
+  ],
+  [
+    'GET',
+    '/hr-attendance/overtime-approvals',
+    'hr-attendance.overtime-approvals',
+    hrOvertimeApprovalListSchema,
+  ],
+  [
+    'POST',
+    '/hr-attendance/overtime-approvals/sync',
+    'hr-attendance.overtime-approval.sync',
+    hrOvertimeApprovalListSchema,
+  ],
+  [
+    'PATCH',
+    `/hr-attendance/overtime-approvals/${id}/decision`,
+    'hr-attendance.overtime-approval.decision',
+    hrOvertimeApprovalSchema,
+  ],
+  [
+    'GET',
+    '/hr-attendance/compensatory-rest-balances',
+    'hr-attendance.compensatory-rest-balances',
+    hrCompensatoryRestBalanceResponseSchema,
+  ],
+  [
+    'POST',
+    '/hr-attendance/compensatory-rest/consume',
+    'hr-attendance.compensatory-rest.consume',
+    hrCompensatoryRestBalanceResponseSchema,
+  ],
+  [
+    'POST',
+    '/hr-attendance/compensatory-rest/expire',
+    'hr-attendance.compensatory-rest.expire',
+    hrCompensatoryRestExpirationResultSchema,
+  ],
   ['GET', '/hr-leave/policies', 'hr-leave.policies', hrLeavePolicyListSchema],
   ['POST', '/hr-leave/policies', 'hr-leave.policies', hrLeavePolicySchema],
   [
@@ -1215,7 +1296,8 @@ describe('ERP Maroc route policy', () => {
         method === 'GET' && routeId === 'hr-attendance.work-calendars'
           ? { year: '2026' }
           : method === 'GET' &&
-              routeId === 'hr-attendance.time-entry-correction-requests'
+              (routeId === 'hr-attendance.time-entry-correction-requests' ||
+                routeId === 'hr-attendance.overtime-approvals')
             ? { month: '2026-07' }
             : routeId === 'hr-attendance.monthly'
               ? { month: '2026-07' }
@@ -1235,7 +1317,8 @@ describe('ERP Maroc route policy', () => {
         method === 'GET' && routeId === 'hr-attendance.work-calendars'
           ? `${path}?year=2026`
           : method === 'GET' &&
-              routeId === 'hr-attendance.time-entry-correction-requests'
+              (routeId === 'hr-attendance.time-entry-correction-requests' ||
+                routeId === 'hr-attendance.overtime-approvals')
             ? `${path}?month=2026-07`
             : routeId === 'hr-attendance.monthly'
               ? `${path}?month=2026-07`
@@ -1421,6 +1504,15 @@ describe('ERP Maroc route policy', () => {
       `/hr-attendance/time-entry-correction-requests?month=2026-07&status=MANAGER_APPROVED&employeeId=${id}`,
     );
     expect(
+      resolveErpRoute('GET', '/hr-attendance/overtime-approvals', {
+        month: '2026-07',
+        status: 'MANAGER_APPROVED',
+        employeeId: id,
+      }).upstreamPath,
+    ).toBe(
+      `/hr-attendance/overtime-approvals?month=2026-07&status=MANAGER_APPROVED&employeeId=${id}`,
+    );
+    expect(
       resolveErpRoute('GET', '/hr-leave/requests', {
         year: '2026',
         status: 'MANAGER_APPROVED',
@@ -1474,6 +1566,12 @@ describe('ERP Maroc route policy', () => {
     ['/hr-attendance/time-entry-correction-requests', {}],
     [
       '/hr-attendance/time-entry-correction-requests',
+      { month: '2026-07', status: 'PENDING' },
+    ],
+    ['/hr-attendance/overtime-approvals', {}],
+    ['/hr-attendance/overtime-approvals', { month: '2026-13' }],
+    [
+      '/hr-attendance/overtime-approvals',
       { month: '2026-07', status: 'PENDING' },
     ],
     ['/hr-leave/requests', {}],

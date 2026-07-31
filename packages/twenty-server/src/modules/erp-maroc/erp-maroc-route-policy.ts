@@ -72,6 +72,14 @@ import {
   hrWorkCalendarListSchema,
   hrWorkCalendarSchema,
   hrAttendanceMonthSchema,
+  hrBreastfeedingArrangementListSchema,
+  hrBreastfeedingArrangementSchema,
+  hrCompensatoryRestBalanceResponseSchema,
+  hrCompensatoryRestExpirationResultSchema,
+  hrNullableOvertimePolicySchema,
+  hrOvertimeApprovalListSchema,
+  hrOvertimeApprovalSchema,
+  hrOvertimePolicySchema,
   hrTimeEntryCorrectionRequestListSchema,
   hrTimeEntryCorrectionRequestSchema,
   hrTimeEntrySchema,
@@ -131,7 +139,7 @@ import {
 } from 'twenty-shared/erp-maroc';
 import { z, type ZodType } from 'zod';
 
-export type ErpMarocHttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+export type ErpMarocHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 export type ErpMarocRouteKind = 'json' | 'pdf';
 export type ErpMarocIdempotencyPolicy = 'forbidden' | 'required';
 export type ErpMarocQuery = Readonly<Record<string, unknown>> | URLSearchParams;
@@ -197,6 +205,9 @@ const grandLivreQuery = Object.freeze([
 const lettrageQuery = Object.freeze(['accountCode']);
 const workCalendarQuery = Object.freeze(['year']);
 const attendanceQuery = Object.freeze(['month', 'employeeId']);
+const breastfeedingArrangementQuery = Object.freeze(['employeeId']);
+const overtimeApprovalQuery = Object.freeze(['month', 'status', 'employeeId']);
+const compensatoryRestBalanceQuery = Object.freeze(['employeeId']);
 const timeEntryCorrectionQuery = Object.freeze([
   'month',
   'status',
@@ -2162,6 +2173,132 @@ const routes: ErpMarocRoute[] = [
     idempotency: 'forbidden',
   }),
   defineRoute({
+    routeId: erpMarocRouteIds.hrBreastfeedingArrangements,
+    method: 'GET',
+    pattern: exact('/hr-attendance/breastfeeding-arrangements'),
+    build: staticBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.breastfeedingArrangements,
+    ),
+    queryKeys: breastfeedingArrangementQuery,
+    responseSchema: hrBreastfeedingArrangementListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrBreastfeedingArrangements,
+    method: 'POST',
+    pattern: exact('/hr-attendance/breastfeeding-arrangements'),
+    build: staticBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.breastfeedingArrangements,
+    ),
+    queryKeys: noQuery,
+    responseSchema: hrBreastfeedingArrangementSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrBreastfeedingArrangementEnd,
+    method: 'PATCH',
+    pattern: action('hr-attendance/breastfeeding-arrangements', 'end'),
+    build: idBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.breastfeedingArrangementEnd,
+    ),
+    queryKeys: noQuery,
+    responseSchema: hrBreastfeedingArrangementSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrOvertimePolicy,
+    method: 'GET',
+    pattern: exact('/hr-attendance/overtime-policy'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrAttendance.overtimePolicy),
+    queryKeys: noQuery,
+    responseSchema: hrNullableOvertimePolicySchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrOvertimePolicy,
+    method: 'PUT',
+    pattern: exact('/hr-attendance/overtime-policy'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrAttendance.overtimePolicy),
+    queryKeys: noQuery,
+    responseSchema: hrOvertimePolicySchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrOvertimeApprovals,
+    method: 'GET',
+    pattern: exact('/hr-attendance/overtime-approvals'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrAttendance.overtimeApprovals),
+    queryKeys: overtimeApprovalQuery,
+    responseSchema: hrOvertimeApprovalListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrOvertimeApprovalSync,
+    method: 'POST',
+    pattern: exact('/hr-attendance/overtime-approvals/sync'),
+    build: staticBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.overtimeApprovalSync,
+    ),
+    queryKeys: noQuery,
+    responseSchema: hrOvertimeApprovalListSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrOvertimeApprovalDecision,
+    method: 'PATCH',
+    pattern: action('hr-attendance/overtime-approvals', 'decision'),
+    build: idBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.overtimeApprovalDecision,
+    ),
+    queryKeys: noQuery,
+    responseSchema: hrOvertimeApprovalSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrCompensatoryRestBalances,
+    method: 'GET',
+    pattern: exact('/hr-attendance/compensatory-rest-balances'),
+    build: staticBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.compensatoryRestBalances,
+    ),
+    queryKeys: compensatoryRestBalanceQuery,
+    responseSchema: hrCompensatoryRestBalanceResponseSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrCompensatoryRestConsume,
+    method: 'POST',
+    pattern: exact('/hr-attendance/compensatory-rest/consume'),
+    build: staticBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.compensatoryRestConsume,
+    ),
+    queryKeys: noQuery,
+    responseSchema: hrCompensatoryRestBalanceResponseSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrCompensatoryRestExpire,
+    method: 'POST',
+    pattern: exact('/hr-attendance/compensatory-rest/expire'),
+    build: staticBuilder(
+      erpMarocUpstreamRoutes.hrAttendance.compensatoryRestExpire,
+    ),
+    queryKeys: noQuery,
+    responseSchema: hrCompensatoryRestExpirationResultSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
     routeId: erpMarocRouteIds.hrLeavePolicies,
     method: 'GET',
     pattern: exact('/hr-leave/policies'),
@@ -2525,6 +2662,22 @@ const assertNormalizedQueryValue = (
     return;
   }
   if (
+    routeId === erpMarocRouteIds.hrOvertimeApprovals &&
+    key === 'month' &&
+    /^\d{4}-(?:0[1-9]|1[0-2])$/.test(value)
+  ) {
+    return;
+  }
+  if (
+    routeId === erpMarocRouteIds.hrOvertimeApprovals &&
+    key === 'status' &&
+    new Set(['REQUESTED', 'MANAGER_APPROVED', 'APPROVED', 'REJECTED']).has(
+      value,
+    )
+  ) {
+    return;
+  }
+  if (
     routeId === erpMarocRouteIds.hrWorkPatternChangeRequests &&
     key === 'status' &&
     new Set(['PENDING', 'APPROVED', 'REJECTED']).has(value)
@@ -2593,6 +2746,12 @@ const buildQueryString = (
   if (
     route.routeId === erpMarocRouteIds.hrTimeEntryCorrectionRequests &&
     route.method === 'GET' &&
+    !values.has('month')
+  ) {
+    rejectRoute();
+  }
+  if (
+    route.routeId === erpMarocRouteIds.hrOvertimeApprovals &&
     !values.has('month')
   ) {
     rejectRoute();

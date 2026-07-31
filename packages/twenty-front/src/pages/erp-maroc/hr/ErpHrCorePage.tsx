@@ -54,11 +54,13 @@ import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 import { HrAccessManagementPanel } from './HrAccessManagementPanel';
+import { HrBreastfeedingPanel } from './HrBreastfeedingPanel';
 import { HrEmployeeImportPanel } from './HrEmployeeImportPanel';
 import { HrLifecyclePanel } from './HrLifecyclePanel';
 import { HrLeaveManagementPanel } from './HrLeaveManagementPanel';
 import { HrMonthlyClosingPanel } from './HrMonthlyClosingPanel';
 import { HrOrganisationChartPanel } from './HrOrganisationChartPanel';
+import { HrOvertimePanel } from './HrOvertimePanel';
 import { HrTimeAttendancePanel } from './HrTimeAttendancePanel';
 
 const StyledActionLink = styled(Link)`
@@ -91,6 +93,8 @@ type View =
   | 'deadlines'
   | 'journeys'
   | 'attendance'
+  | 'overtime'
+  | 'breastfeeding'
   | 'leave'
   | 'monthlyClosing'
   | 'access';
@@ -103,6 +107,8 @@ type StructureView = Exclude<
   | 'journeys'
   | 'access'
   | 'attendance'
+  | 'overtime'
+  | 'breastfeeding'
   | 'leave'
   | 'monthlyClosing'
 >;
@@ -290,6 +296,8 @@ const viewLabels: Record<View, string> = {
   deadlines: 'Échéances',
   journeys: 'Parcours RH',
   attendance: 'Présences',
+  overtime: 'Heures supp.',
+  breastfeeding: 'Allaitement',
   leave: 'Congés',
   monthlyClosing: 'Clôture mensuelle',
   access: 'Accès RH',
@@ -301,6 +309,8 @@ const isStructureView = (view: View): view is StructureView =>
   view !== 'deadlines' &&
   view !== 'journeys' &&
   view !== 'attendance' &&
+  view !== 'overtime' &&
+  view !== 'breastfeeding' &&
   view !== 'leave' &&
   view !== 'monthlyClosing' &&
   view !== 'access';
@@ -1191,6 +1201,23 @@ export const ErpHrCorePage = () => {
         }
         query={query}
       />
+    ) : view === 'overtime' ? (
+      <HrOvertimePanel
+        employees={employees}
+        canWrite={access?.canWriteTime ?? false}
+        canApproveFinal={
+          (access?.canWriteTime ?? false) && access?.populationScope === 'ALL'
+        }
+        query={query}
+      />
+    ) : view === 'breastfeeding' ? (
+      <HrBreastfeedingPanel
+        employees={employees}
+        canWrite={
+          (access?.canWriteTime ?? false) && access?.populationScope === 'ALL'
+        }
+        query={query}
+      />
     ) : view === 'leave' ? (
       <HrLeaveManagementPanel
         employees={employees}
@@ -1214,6 +1241,8 @@ export const ErpHrCorePage = () => {
     (target) =>
       (target !== 'access' || access?.canAdministerAccess) &&
       (target !== 'attendance' || access?.canReadTime) &&
+      (target !== 'overtime' || access?.canReadTime) &&
+      (target !== 'breastfeeding' || access?.canReadTime) &&
       (target !== 'leave' || access?.canReadTime) &&
       (target !== 'monthlyClosing' || access?.canReadTime),
   );

@@ -2941,6 +2941,15 @@ export const erpMarocRouteIds = {
   hrTimeEntryCorrectionEvidence: 'hr-attendance.time-entry-correction.evidence',
   hrTimeEntryCorrectionDecision: 'hr-attendance.time-entry-correction.decision',
   hrAttendanceMonthly: 'hr-attendance.monthly',
+  hrBreastfeedingArrangements: 'hr-attendance.breastfeeding-arrangements',
+  hrBreastfeedingArrangementEnd: 'hr-attendance.breastfeeding-arrangement.end',
+  hrOvertimePolicy: 'hr-attendance.overtime-policy',
+  hrOvertimeApprovals: 'hr-attendance.overtime-approvals',
+  hrOvertimeApprovalSync: 'hr-attendance.overtime-approval.sync',
+  hrOvertimeApprovalDecision: 'hr-attendance.overtime-approval.decision',
+  hrCompensatoryRestBalances: 'hr-attendance.compensatory-rest-balances',
+  hrCompensatoryRestConsume: 'hr-attendance.compensatory-rest.consume',
+  hrCompensatoryRestExpire: 'hr-attendance.compensatory-rest.expire',
   hrLeavePolicies: 'hr-leave.policies',
   hrLeavePolicySeedMorocco: 'hr-leave.policy.seed-morocco',
   hrLeaveRequests: 'hr-leave.requests',
@@ -3356,6 +3365,17 @@ export const erpMarocUpstreamRoutes = {
     timeEntryCorrectionDecision: (id: string) =>
       `/hr-attendance/time-entry-correction-requests/${encodeRouteId(id)}/decision`,
     monthly: '/hr-attendance/monthly',
+    breastfeedingArrangements: '/hr-attendance/breastfeeding-arrangements',
+    breastfeedingArrangementEnd: (id: string) =>
+      `/hr-attendance/breastfeeding-arrangements/${encodeRouteId(id)}/end`,
+    overtimePolicy: '/hr-attendance/overtime-policy',
+    overtimeApprovals: '/hr-attendance/overtime-approvals',
+    overtimeApprovalSync: '/hr-attendance/overtime-approvals/sync',
+    overtimeApprovalDecision: (id: string) =>
+      `/hr-attendance/overtime-approvals/${encodeRouteId(id)}/decision`,
+    compensatoryRestBalances: '/hr-attendance/compensatory-rest-balances',
+    compensatoryRestConsume: '/hr-attendance/compensatory-rest/consume',
+    compensatoryRestExpire: '/hr-attendance/compensatory-rest/expire',
   },
   hrLeave: {
     policies: '/hr-leave/policies',

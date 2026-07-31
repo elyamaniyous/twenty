@@ -51,7 +51,7 @@ import {
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
-type Props = {
+type HrTimeAttendancePanelProps = {
   employees: HrEmployeeListItem[];
   teams: HrTeam[];
   canWrite: boolean;
@@ -438,7 +438,7 @@ export const HrTimeAttendancePanel = ({
   canWriteDocuments,
   canApproveFinal,
   query,
-}: Props) => {
+}: HrTimeAttendancePanelProps) => {
   const { client } = useErpMarocContext();
   const [month, setMonth] = useState(currentMonth);
   const [state, setState] = useState<LoadState>('loading');
@@ -1162,6 +1162,13 @@ export const HrTimeAttendancePanel = ({
       header: 'Heures',
       width: '170px',
       render: ({ summary }) => formatDuration(summary.workedMinutes),
+    },
+    {
+      key: 'breastfeedingRest',
+      header: 'Repos allaitement',
+      width: '170px',
+      render: ({ summary }) =>
+        formatDuration(summary.paidBreastfeedingRestMinutes),
     },
     {
       key: 'absence',
