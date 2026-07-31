@@ -11,6 +11,7 @@ import {
   IconBox,
   IconChartBar,
   IconCreditCard,
+  IconCurrencyDirham,
   IconFileText,
   IconListDetails,
   IconLink,
@@ -123,6 +124,12 @@ export const NavigationDrawerErpMarocSection = () => {
       path: erpMarocPaths.hrCore,
       activePaths: [erpMarocPaths.hrCore, erpMarocPaths.hrEmployeeDetail],
       Icon: IconUsers,
+    },
+    {
+      label: t`Cycle de paie`,
+      path: erpMarocPaths.payrollCycle,
+      activePaths: [erpMarocPaths.payrollCycle],
+      Icon: IconCurrencyDirham,
     },
     {
       label: t`Référentiel paie`,

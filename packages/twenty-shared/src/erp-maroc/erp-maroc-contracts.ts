@@ -2326,6 +2326,24 @@ export const erpPayslipSchema = z
   .passthrough();
 export const erpPayslipListSchema = z.array(erpPayslipSchema);
 
+export const erpPayrollPreviewWarningSchema = z.object({
+  employeeId: uuidSchema,
+  employeeNumber: z.string(),
+  code: z.string(),
+  message: z.string(),
+});
+
+export const erpPayrollPeriodPreviewSchema = z.object({
+  periodId: uuidSchema,
+  periodKey: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  generated: nonNegativeIntegerSchema,
+  totalGrossCents: centsSchema,
+  totalNetCents: centsSchema,
+  totalEmployerCostCents: centsSchema,
+  warnings: z.array(erpPayrollPreviewWarningSchema),
+  payslips: erpPayslipListSchema,
+});
+
 export const erpLeaveRequestSchema = z
   .object({
     id: uuidSchema,
@@ -2858,6 +2876,7 @@ export const erpMarocRouteIds = {
   payrollEmployeeTerminate: 'payroll.employee.terminate',
   payrollPayslips: 'payroll.payslips',
   payrollPayslipGenerate: 'payroll.payslip.generate',
+  payrollPeriodPreview: 'payroll.period.preview',
   payrollPayslipValidate: 'payroll.payslip.validate',
   payrollPayslipPay: 'payroll.payslip.pay',
   payrollLeaves: 'payroll.leaves',
@@ -3246,6 +3265,8 @@ export const erpMarocUpstreamRoutes = {
       `/payroll/employees/${encodeRouteId(id)}/terminate`,
     payslips: '/payroll/payslips',
     generatePayslip: '/payroll/payslips/generate',
+    previewPeriod: (id: string) =>
+      `/payroll/periods/${encodeRouteId(id)}/preview`,
     validatePayslip: (id: string) =>
       `/payroll/payslips/${encodeRouteId(id)}/validate`,
     payPayslip: (id: string) => `/payroll/payslips/${encodeRouteId(id)}/pay`,
@@ -3647,6 +3668,12 @@ export type ErpFinancialStatements = z.infer<
 >;
 export type ErpEmployee = z.infer<typeof erpEmployeeSchema>;
 export type ErpPayslip = z.infer<typeof erpPayslipSchema>;
+export type ErpPayrollPreviewWarning = z.infer<
+  typeof erpPayrollPreviewWarningSchema
+>;
+export type ErpPayrollPeriodPreview = z.infer<
+  typeof erpPayrollPeriodPreviewSchema
+>;
 export type ErpLeaveRequest = z.infer<typeof erpLeaveRequestSchema>;
 export type ErpLeaveBalance = z.infer<typeof erpLeaveBalanceSchema>;
 export type ErpDocument = z.infer<typeof erpDocumentSchema>;

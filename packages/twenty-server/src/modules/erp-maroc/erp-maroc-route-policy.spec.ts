@@ -109,6 +109,7 @@ import {
   payrollComponentListSchema,
   payrollControlDefinitionListSchema,
   payrollLegalSourceListSchema,
+  erpPayrollPeriodPreviewSchema,
   payrollRegulatorySeedResultSchema,
   payrollRegulatorySummarySchema,
   payrollRuleListSchema,
@@ -261,6 +262,7 @@ const requiredIdempotencyRoutes = new Set([
   `POST /hr-monthly-periods/${id}/freeze`,
   `POST /hr-monthly-periods/${id}/reopen`,
   `POST /hr-monthly-periods/${id}/transmit`,
+  `POST /payroll/periods/${id}/preview`,
 ]);
 
 const approvedRoutes = [
@@ -272,6 +274,12 @@ const approvedRoutes = [
   ['DELETE', `/products/${id}`, 'products.detail', erpProductSchema],
   ['GET', '/tiers', 'tiers.collection', erpTierListSchema],
   ['POST', '/tiers', 'tiers.collection', erpTierSchema],
+  [
+    'GET',
+    `/payroll/periods/${id}/preview`,
+    'payroll.period.preview',
+    erpPayrollPeriodPreviewSchema,
+  ],
   [
     'POST',
     '/tiers/sync-from-twenty-company',
@@ -293,6 +301,12 @@ const approvedRoutes = [
   ['POST', `/quotes/${id}/send`, 'quotes.send', erpQuoteSchema],
   ['POST', `/quotes/${id}/accept`, 'quotes.accept', erpQuoteSchema],
   ['POST', `/quotes/${id}/reject`, 'quotes.reject', erpQuoteSchema],
+  [
+    'POST',
+    `/payroll/periods/${id}/preview`,
+    'payroll.period.preview',
+    erpPayrollPeriodPreviewSchema,
+  ],
   [
     'GET',
     '/purchase-orders',
