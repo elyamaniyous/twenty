@@ -2344,6 +2344,36 @@ export const erpPayrollPeriodPreviewSchema = z.object({
   payslips: erpPayslipListSchema,
 });
 
+export const erpPayrollPaymentBatchSchema = z.object({
+  id: uuidSchema,
+  periodKey: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  status: z.enum(['READY', 'EXECUTED']),
+  plannedPaymentDate: civilDateHttpSchema,
+  employeeCount: positiveIntegerSchema,
+  totalNetCents: positiveIntegerSchema,
+  filename: nonBlankStringSchema,
+  payloadSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  preparedAt: instantSchema,
+  preparedByTwentyUserId: nonBlankStringSchema,
+  executedAt: nullableInstantSchema,
+  executedByTwentyUserId: nullableStringSchema,
+  paymentDate: nullableCivilDateHttpSchema,
+  bankReference: nullableStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+
+export const erpPayrollPaymentBatchNullableSchema =
+  erpPayrollPaymentBatchSchema.nullable();
+
+export const erpPayrollPaymentExportSchema = erpFileExportSchema.extend({
+  batchId: uuidSchema,
+  payloadSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  employeeCount: positiveIntegerSchema,
+  totalNetCents: positiveIntegerSchema,
+  plannedPaymentDate: civilDateHttpSchema,
+});
+
 export const erpLeaveRequestSchema = z
   .object({
     id: uuidSchema,
@@ -2877,6 +2907,11 @@ export const erpMarocRouteIds = {
   payrollPayslips: 'payroll.payslips',
   payrollPayslipGenerate: 'payroll.payslip.generate',
   payrollPeriodPreview: 'payroll.period.preview',
+  payrollPeriodValidate: 'payroll.period.validate',
+  payrollPaymentBatch: 'payroll.payment-batch',
+  payrollPaymentBatchPrepare: 'payroll.payment-batch.prepare',
+  payrollPaymentBatchExport: 'payroll.payment-batch.export',
+  payrollPaymentBatchConfirm: 'payroll.payment-batch.confirm',
   payrollPayslipValidate: 'payroll.payslip.validate',
   payrollPayslipPay: 'payroll.payslip.pay',
   payrollLeaves: 'payroll.leaves',
@@ -3267,6 +3302,16 @@ export const erpMarocUpstreamRoutes = {
     generatePayslip: '/payroll/payslips/generate',
     previewPeriod: (id: string) =>
       `/payroll/periods/${encodeRouteId(id)}/preview`,
+    validatePeriod: (id: string) =>
+      `/payroll/periods/${encodeRouteId(id)}/validate`,
+    paymentBatch: (id: string) =>
+      `/payroll/periods/${encodeRouteId(id)}/payment-batch`,
+    preparePaymentBatch: (id: string) =>
+      `/payroll/periods/${encodeRouteId(id)}/payment-batch/prepare`,
+    exportPaymentBatch: (id: string) =>
+      `/payroll/periods/${encodeRouteId(id)}/payment-batch/export`,
+    confirmPaymentBatch: (id: string) =>
+      `/payroll/periods/${encodeRouteId(id)}/payment-batch/confirm`,
     validatePayslip: (id: string) =>
       `/payroll/payslips/${encodeRouteId(id)}/validate`,
     payPayslip: (id: string) => `/payroll/payslips/${encodeRouteId(id)}/pay`,
@@ -3673,6 +3718,12 @@ export type ErpPayrollPreviewWarning = z.infer<
 >;
 export type ErpPayrollPeriodPreview = z.infer<
   typeof erpPayrollPeriodPreviewSchema
+>;
+export type ErpPayrollPaymentBatch = z.infer<
+  typeof erpPayrollPaymentBatchSchema
+>;
+export type ErpPayrollPaymentExport = z.infer<
+  typeof erpPayrollPaymentExportSchema
 >;
 export type ErpLeaveRequest = z.infer<typeof erpLeaveRequestSchema>;
 export type ErpLeaveBalance = z.infer<typeof erpLeaveBalanceSchema>;

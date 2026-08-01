@@ -10,12 +10,16 @@ import { styled } from '@linaria/react';
 import { csv2json } from 'json-2-csv';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  erpPayrollPaymentBatchNullableSchema,
+  erpPayrollPaymentBatchSchema,
+  erpPayrollPaymentExportSchema,
   erpPayrollPeriodPreviewSchema,
   hrAccessContextSchema,
   hrEmployeeListSchema,
   hrMonthlyPeriodDetailSchema,
   hrMonthlyPeriodListSchema,
   type ErpPayrollPeriodPreview,
+  type ErpPayrollPaymentBatch,
   type HrEmployeeListItem,
   type HrMonthlyEmployeeSnapshot,
   type HrMonthlyPeriodDetail,
@@ -23,6 +27,7 @@ import {
 } from 'twenty-shared/erp-maroc';
 import {
   IconCheck,
+  IconDownload,
   IconFileImport,
   IconListDetails,
   IconLock,
@@ -49,6 +54,14 @@ const previousMonth = () => {
   const month = Number(parts.find(({ type }) => type === 'month')?.value);
   return new Date(Date.UTC(year, month - 2, 1)).toISOString().slice(0, 7);
 };
+
+const currentDate = () =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Casablanca',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
 
 const money = (cents: number) =>
   new Intl.NumberFormat('fr-MA', {
@@ -171,6 +184,34 @@ const StyledFeedback = styled.div<{ danger: boolean }>`
   padding: ${themeCssVariables.spacing[2]} ${themeCssVariables.spacing[3]};
 `;
 
+const StyledPaymentPanel = styled.section`
+  align-items: center;
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: ${themeCssVariables.spacing[2]};
+  min-height: 52px;
+  padding: ${themeCssVariables.spacing[2]} ${themeCssVariables.spacing[3]};
+`;
+
+const StyledPaymentSummary = styled.div`
+  display: grid;
+  gap: 2px;
+  min-width: 210px;
+`;
+
+const StyledPaymentReference = styled.input`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: ${themeCssVariables.border.radius.sm};
+  color: ${themeCssVariables.font.color.primary};
+  font: inherit;
+  height: 30px;
+  min-width: 210px;
+  padding: 0 ${themeCssVariables.spacing[2]};
+`;
+
 const StyledEmployee = styled.div`
   display: grid;
   gap: 2px;
@@ -260,6 +301,10 @@ export const ErpPayrollCyclePage = () => {
     {},
   );
   const [preview, setPreview] = useState<ErpPayrollPeriodPreview | null>(null);
+  const [paymentBatch, setPaymentBatch] =
+    useState<ErpPayrollPaymentBatch | null>(null);
+  const [plannedPaymentDate, setPlannedPaymentDate] = useState(currentDate);
+  const [bankReference, setBankReference] = useState('');
   const [selectedPayslipId, setSelectedPayslipId] = useState<string | null>(
     null,
   );
@@ -267,7 +312,9 @@ export const ErpPayrollCyclePage = () => {
   const [busy, setBusy] = useState(false);
   const [canOperate, setCanOperate] = useState(false);
   const [canApprovePayroll, setCanApprovePayroll] = useState(false);
+  const [canManagePayments, setCanManagePayments] = useState(false);
   const [validationDialogOpen, setValidationDialogOpen] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [reopenReason, setReopenReason] = useState('');
   const [feedback, setFeedback] = useState<{
     message: string;
@@ -322,17 +369,35 @@ export const ErpPayrollCyclePage = () => {
           access.canReadCompensation,
       );
       setCanApprovePayroll(access.canApprovePayroll);
+      setCanManagePayments(access.canApprovePayroll && access.canReadBank);
       if (detail?.status === 'TRANSMITTED') {
-        const loadedPreview = await client.request({
-          method: 'GET',
-          path: `/payroll/periods/${detail.id}/preview`,
-          schema: erpPayrollPeriodPreviewSchema,
-        });
+        const [loadedPreview, loadedPaymentBatch] = await Promise.all([
+          client.request({
+            method: 'GET',
+            path: `/payroll/periods/${detail.id}/preview`,
+            schema: erpPayrollPeriodPreviewSchema,
+          }),
+          access.canApprovePayroll && access.canReadBank
+            ? client.request({
+                method: 'GET',
+                path: `/payroll/periods/${detail.id}/payment-batch`,
+                schema: erpPayrollPaymentBatchNullableSchema,
+              })
+            : Promise.resolve(null),
+        ]);
         setPreview(loadedPreview);
+        setPaymentBatch(loadedPaymentBatch);
+        setPlannedPaymentDate(
+          loadedPaymentBatch?.plannedPaymentDate ?? currentDate(),
+        );
+        setBankReference(loadedPaymentBatch?.bankReference ?? '');
         setSelectedPayslipId(loadedPreview.payslips[0]?.id ?? null);
         setAdjustments(adjustmentsFromPreview(loadedPreview));
       } else {
         setPreview(null);
+        setPaymentBatch(null);
+        setPlannedPaymentDate(currentDate());
+        setBankReference('');
         setSelectedPayslipId(null);
         setAdjustments({});
       }
@@ -367,6 +432,7 @@ export const ErpPayrollCyclePage = () => {
         .execute();
       setPeriod(updated);
       setPreview(null);
+      setPaymentBatch(null);
       setSelectedPayslipId(null);
       setFeedback({ message, danger: false });
       setReopenReason('');
@@ -402,6 +468,7 @@ export const ErpPayrollCyclePage = () => {
         )
         .execute();
       setPreview(generated);
+      setPaymentBatch(null);
       setSelectedPayslipId(generated.payslips[0]?.id ?? null);
       setAdjustments(adjustmentsFromPreview(generated));
       setFeedback({
@@ -435,6 +502,7 @@ export const ErpPayrollCyclePage = () => {
         )
         .execute();
       setPreview(validated);
+      setPaymentBatch(null);
       setSelectedPayslipId(validated.payslips[0]?.id ?? null);
       setFeedback({
         message: `${validated.generated} bulletin(s) validé(s) et comptabilisé(s).`,
@@ -449,6 +517,119 @@ export const ErpPayrollCyclePage = () => {
     } finally {
       setBusy(false);
       setValidationDialogOpen(false);
+    }
+  };
+
+  const preparePaymentBatch = async () => {
+    if (period === null) return;
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const prepared = await client
+        .createMutationIntent(
+          {
+            method: 'POST',
+            path: `/payroll/periods/${period.id}/payment-batch/prepare`,
+            body: { plannedPaymentDate },
+            schema: erpPayrollPaymentBatchSchema,
+          },
+          { idempotency: 'required' },
+        )
+        .execute();
+      setPaymentBatch(prepared);
+      setFeedback({
+        message: `${prepared.employeeCount} virement(s) préparé(s) pour ${money(prepared.totalNetCents)}.`,
+        danger: false,
+      });
+    } catch {
+      setFeedback({
+        message:
+          'Préparation refusée : chaque salarié payé doit avoir un RIB chiffré et vérifié.',
+        danger: true,
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const downloadPaymentBatch = async () => {
+    if (period === null || paymentBatch === null) return;
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const exported = await client.request({
+        method: 'GET',
+        path: `/payroll/periods/${period.id}/payment-batch/export`,
+        schema: erpPayrollPaymentExportSchema,
+      });
+      const url = URL.createObjectURL(
+        new Blob([exported.content], { type: exported.contentType }),
+      );
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = exported.filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setFeedback({
+        message: `Fichier ${exported.filename} téléchargé et prêt à être contrôlé.`,
+        danger: false,
+      });
+    } catch {
+      setFeedback({
+        message:
+          'Export refusé : les données de paie ou les coordonnées bancaires ont changé.',
+        danger: true,
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmPaymentBatch = async () => {
+    if (period === null || paymentBatch === null) return;
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const executed = await client
+        .createMutationIntent(
+          {
+            method: 'POST',
+            path: `/payroll/periods/${period.id}/payment-batch/confirm`,
+            body: {
+              payloadSha256: paymentBatch.payloadSha256,
+              bankReference: bankReference.trim(),
+            },
+            schema: erpPayrollPaymentBatchSchema,
+          },
+          { idempotency: 'required' },
+        )
+        .execute();
+      setPaymentBatch(executed);
+      setPreview((current) =>
+        current === null
+          ? current
+          : {
+              ...current,
+              payslips: current.payslips.map((payslip) => ({
+                ...payslip,
+                status: 'PAID' as const,
+                paidAt: executed.executedAt,
+              })),
+            },
+      );
+      setFeedback({
+        message: `${executed.employeeCount} salaire(s) confirmé(s) payé(s), référence ${executed.bankReference}.`,
+        danger: false,
+      });
+    } catch {
+      setFeedback({
+        message:
+          'Confirmation refusée : le lot préparé ne correspond plus aux bulletins validés.',
+        danger: true,
+      });
+    } finally {
+      setBusy(false);
+      setPaymentDialogOpen(false);
     }
   };
 
@@ -531,6 +712,11 @@ export const ErpPayrollCyclePage = () => {
     preview?.payslips.filter(
       ({ status }) => status === 'VALIDATED' || status === 'PAID',
     ).length ?? 0;
+  const paidPayslipCount =
+    preview?.payslips.filter(({ status }) => status === 'PAID').length ?? 0;
+  const validatedOnlyPayslipCount =
+    preview?.payslips.filter(({ status }) => status === 'VALIDATED').length ??
+    0;
   const hasProtectedPayslips = validatedPayslipCount > 0;
   const payrollIsValidated =
     period !== null &&
@@ -545,6 +731,12 @@ export const ErpPayrollCyclePage = () => {
     preview.generated === period.employeeCount &&
     preview.warnings.length === 0 &&
     draftPayslipCount > 0;
+  const canPreparePaymentBatch =
+    canManagePayments &&
+    paymentBatch === null &&
+    preview !== null &&
+    preview.payslips.length > 0 &&
+    preview.payslips.every(({ status }) => status === 'VALIDATED');
 
   const populationColumns: ErpOperationalTableColumn<HrEmployeeListItem>[] = [
     {
@@ -876,6 +1068,8 @@ export const ErpPayrollCyclePage = () => {
               setMonth(event.target.value);
               setFeedback(null);
               setAdjustments({});
+              setPaymentBatch(null);
+              setBankReference('');
             }}
           />
           {period === null ? (
@@ -1055,8 +1249,8 @@ export const ErpPayrollCyclePage = () => {
               ['Population', period.employeeCount],
               ['Anomalies bloquantes', period.totalAnomalyCount],
               [
-                'Brouillons / validés',
-                `${draftPayslipCount} / ${validatedPayslipCount}`,
+                'Brouillons / validés / payés',
+                `${draftPayslipCount} / ${validatedOnlyPayslipCount} / ${paidPayslipCount}`,
               ],
               ['Net à payer', money(preview?.totalNetCents ?? 0)],
               ['Coût employeur', money(preview?.totalEmployerCostCents ?? 0)],
@@ -1068,6 +1262,87 @@ export const ErpPayrollCyclePage = () => {
             ))}
           </StyledMetrics>
         )}
+
+        {payrollIsValidated && canManagePayments ? (
+          <StyledPaymentPanel aria-label="Virements salariaux">
+            <StyledPaymentSummary>
+              <strong>Virements salariaux</strong>
+              <StyledMuted>
+                {paymentBatch === null
+                  ? 'Préparation bancaire contrôlée'
+                  : `${paymentBatch.employeeCount} transfert(s) · ${money(paymentBatch.totalNetCents)}`}
+              </StyledMuted>
+            </StyledPaymentSummary>
+            <ErpStatusBadge
+              label={
+                paymentBatch === null
+                  ? 'À préparer'
+                  : paymentBatch.status === 'READY'
+                    ? 'Fichier prêt'
+                    : 'Paiement confirmé'
+              }
+              tone={
+                paymentBatch?.status === 'EXECUTED'
+                  ? 'success'
+                  : paymentBatch?.status === 'READY'
+                    ? 'info'
+                    : 'warning'
+              }
+            />
+            <StyledSpacer />
+            {paymentBatch === null ? (
+              <>
+                <StyledMonth
+                  type="date"
+                  value={plannedPaymentDate}
+                  aria-label="Date prévue des virements"
+                  onChange={(event) =>
+                    setPlannedPaymentDate(event.target.value)
+                  }
+                />
+                <Button
+                  title="Préparer les virements"
+                  ariaLabel="Préparer le fichier de virements salariaux"
+                  Icon={IconSend}
+                  accent="blue"
+                  disabled={busy || !canPreparePaymentBatch}
+                  onClick={() => void preparePaymentBatch()}
+                />
+              </>
+            ) : paymentBatch.status === 'READY' ? (
+              <>
+                <StyledMuted>{paymentBatch.plannedPaymentDate}</StyledMuted>
+                <Button
+                  title="Télécharger CSV"
+                  ariaLabel="Télécharger le fichier de virements salariaux"
+                  Icon={IconDownload}
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void downloadPaymentBatch()}
+                />
+                <StyledPaymentReference
+                  value={bankReference}
+                  maxLength={150}
+                  placeholder="Référence remise bancaire"
+                  aria-label="Référence de la remise bancaire"
+                  onChange={(event) => setBankReference(event.target.value)}
+                />
+                <Button
+                  title="Confirmer le paiement"
+                  ariaLabel="Confirmer le paiement groupé des salaires"
+                  Icon={IconCheck}
+                  accent="blue"
+                  disabled={busy || bankReference.trim() === ''}
+                  onClick={() => setPaymentDialogOpen(true)}
+                />
+              </>
+            ) : (
+              <StyledMuted>
+                {paymentBatch.paymentDate} · réf. {paymentBatch.bankReference}
+              </StyledMuted>
+            )}
+          </StyledPaymentPanel>
+        ) : null}
 
         {feedback === null ? null : (
           <StyledFeedback danger={feedback.danger}>
@@ -1137,6 +1412,19 @@ export const ErpPayrollCyclePage = () => {
         isConfirming={busy}
         onCancel={() => setValidationDialogOpen(false)}
         onConfirm={() => void validatePayrollPeriod()}
+      />
+      <ErpConfirmDialog
+        isOpen={paymentDialogOpen}
+        title="Confirmer la remise bancaire"
+        message={`Vous confirmez que le fichier ${paymentBatch?.filename ?? ''} de ${money(
+          paymentBatch?.totalNetCents ?? 0,
+        )} a été remis à la banque sous la référence ${bankReference.trim()}. Les bulletins seront marqués payés.`}
+        confirmLabel="Confirmer le paiement"
+        cancelLabel="Annuler"
+        isConfirming={busy}
+        confirmDisabled={bankReference.trim() === ''}
+        onCancel={() => setPaymentDialogOpen(false)}
+        onConfirm={() => void confirmPaymentBatch()}
       />
     </ErpPageShell>
   );
