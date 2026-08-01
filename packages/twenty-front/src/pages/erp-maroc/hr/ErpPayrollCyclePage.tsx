@@ -23,6 +23,7 @@ import {
 import {
   IconCheck,
   IconFileImport,
+  IconListDetails,
   IconLock,
   IconPlus,
   IconRefresh,
@@ -54,6 +55,13 @@ const money = (cents: number) =>
     currency: 'MAD',
     maximumFractionDigits: 2,
   }).format(cents / 100);
+
+const rate = (basisPoints: number) =>
+  basisPoints === 0
+    ? '—'
+    : `${new Intl.NumberFormat('fr-MA', {
+        maximumFractionDigits: 2,
+      }).format(basisPoints / 100)} %`;
 
 const statusLabels: Record<HrMonthlyPeriodStatus, string> = {
   OPEN: 'Population',
@@ -188,6 +196,29 @@ const StyledHiddenInput = styled.input`
   display: none;
 `;
 
+const StyledRubricPanel = styled.section`
+  border-top: 1px solid ${themeCssVariables.border.color.medium};
+  display: flex;
+  flex: 0 0 240px;
+  flex-direction: column;
+  min-height: 180px;
+`;
+
+const StyledRubricHeader = styled.div`
+  align-items: center;
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
+  display: flex;
+  flex: 0 0 40px;
+  gap: ${themeCssVariables.spacing[2]};
+  padding: 0 ${themeCssVariables.spacing[3]};
+`;
+
+const StyledRubricTitle = styled.strong`
+  color: ${themeCssVariables.font.color.primary};
+  font-size: ${themeCssVariables.font.size.md};
+  letter-spacing: 0;
+`;
+
 const centsFromMad = (value: unknown): number => {
   const normalized = String(value ?? '')
     .trim()
@@ -228,6 +259,9 @@ export const ErpPayrollCyclePage = () => {
     {},
   );
   const [preview, setPreview] = useState<ErpPayrollPeriodPreview | null>(null);
+  const [selectedPayslipId, setSelectedPayslipId] = useState<string | null>(
+    null,
+  );
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [busy, setBusy] = useState(false);
   const [canOperate, setCanOperate] = useState(false);
@@ -291,9 +325,11 @@ export const ErpPayrollCyclePage = () => {
           schema: erpPayrollPeriodPreviewSchema,
         });
         setPreview(loadedPreview);
+        setSelectedPayslipId(loadedPreview.payslips[0]?.id ?? null);
         setAdjustments(adjustmentsFromPreview(loadedPreview));
       } else {
         setPreview(null);
+        setSelectedPayslipId(null);
         setAdjustments({});
       }
       setLoadState('ready');
@@ -327,6 +363,7 @@ export const ErpPayrollCyclePage = () => {
         .execute();
       setPeriod(updated);
       setPreview(null);
+      setSelectedPayslipId(null);
       setFeedback({ message, danger: false });
       setReopenReason('');
     } catch {
@@ -361,6 +398,7 @@ export const ErpPayrollCyclePage = () => {
         )
         .execute();
       setPreview(generated);
+      setSelectedPayslipId(generated.payslips[0]?.id ?? null);
       setAdjustments(adjustmentsFromPreview(generated));
       setFeedback({
         message: `${generated.generated} bulletin(s) brouillon généré(s), sans écriture comptable.`,
@@ -443,6 +481,11 @@ export const ErpPayrollCyclePage = () => {
         ]),
       ),
     [preview],
+  );
+
+  const selectedPayslip = useMemo(
+    () => preview?.payslips.find(({ id }) => id === selectedPayslipId) ?? null,
+    [preview, selectedPayslipId],
   );
 
   const populationColumns: ErpOperationalTableColumn<HrEmployeeListItem>[] = [
@@ -581,6 +624,44 @@ export const ErpPayrollCyclePage = () => {
         ),
       },
       {
+        key: 'seniority',
+        header: 'Ancienneté',
+        width: '145px',
+        align: 'right',
+        render: (row) => {
+          const amount = payslipByEmployee
+            .get(row.employeeId)
+            ?.lines?.find(({ code }) => code === 'ANC001')?.amountCents;
+          return amount === undefined ? '—' : money(amount);
+        },
+      },
+      {
+        key: 'valued-overtime',
+        header: 'HS valorisées',
+        width: '150px',
+        align: 'right',
+        render: (row) => {
+          const payslip = payslipByEmployee.get(row.employeeId);
+          return payslip === undefined
+            ? '—'
+            : money(
+                (payslip.lines ?? [])
+                  .filter(({ code }) => code.startsWith('HS'))
+                  .reduce((total, line) => total + line.amountCents, 0),
+              );
+        },
+      },
+      {
+        key: 'gross',
+        header: 'Brut',
+        width: '150px',
+        align: 'right',
+        render: (row) => {
+          const payslip = payslipByEmployee.get(row.employeeId);
+          return payslip === undefined ? '—' : money(payslip.grossSalaryCents);
+        },
+      },
+      {
         key: 'net',
         header: 'Net prévisualisé',
         width: '170px',
@@ -588,6 +669,24 @@ export const ErpPayrollCyclePage = () => {
         render: (row) => {
           const payslip = payslipByEmployee.get(row.employeeId);
           return payslip === undefined ? '—' : money(payslip.netSalaryCents);
+        },
+      },
+      {
+        key: 'details',
+        header: '',
+        width: '110px',
+        align: 'center',
+        render: (row) => {
+          const payslip = payslipByEmployee.get(row.employeeId);
+          return payslip === undefined ? null : (
+            <Button
+              title="Rubriques"
+              ariaLabel={`Afficher les rubriques de ${row.employee.employeeNumber}`}
+              Icon={IconListDetails}
+              variant="secondary"
+              onClick={() => setSelectedPayslipId(payslip.id)}
+            />
+          );
         },
       },
       {
@@ -629,6 +728,55 @@ export const ErpPayrollCyclePage = () => {
 
   const periodId = period?.id;
   const tableRows = period?.snapshots ?? [];
+  const rubricColumns: ErpOperationalTableColumn<
+    NonNullable<ErpPayrollPeriodPreview['payslips'][number]['lines']>[number]
+  >[] = [
+    {
+      key: 'code',
+      header: 'Code',
+      width: '130px',
+      render: ({ code }) => code,
+    },
+    {
+      key: 'label',
+      header: 'Rubrique',
+      width: '300px',
+      render: ({ label }) => label,
+    },
+    {
+      key: 'kind',
+      header: 'Nature',
+      width: '140px',
+      render: ({ kind }) =>
+        ({
+          EARNING: 'Gain',
+          DEDUCTION: 'Retenue',
+          EMPLOYER: 'Employeur',
+          INFORMATION: 'Information',
+        })[kind] ?? kind,
+    },
+    {
+      key: 'base',
+      header: 'Assiette',
+      width: '160px',
+      align: 'right',
+      render: ({ baseCents }) => money(baseCents),
+    },
+    {
+      key: 'rate',
+      header: 'Taux',
+      width: '120px',
+      align: 'right',
+      render: ({ rateBasisPoints }) => rate(rateBasisPoints),
+    },
+    {
+      key: 'amount',
+      header: 'Montant',
+      width: '170px',
+      align: 'right',
+      render: ({ amountCents }) => money(amountCents),
+    },
+  ];
 
   return (
     <ErpPageShell
@@ -841,8 +989,8 @@ export const ErpPayrollCyclePage = () => {
         )}
         {preview !== null && preview.warnings.length > 0 ? (
           <StyledFeedback danger>
-            {preview.warnings.length} valorisation(s) d'heures supplémentaires
-            restent à contrôler avant validation.
+            {preview.warnings.length} contrôle(s) de paie restent à traiter
+            avant validation.
           </StyledFeedback>
         ) : null}
 
@@ -864,6 +1012,31 @@ export const ErpPayrollCyclePage = () => {
             state="ready"
             emptyLabel="Aucune variable de paie"
           />
+        )}
+        {selectedPayslip === null ? null : (
+          <StyledRubricPanel aria-label="Détail des rubriques de paie">
+            <StyledRubricHeader>
+              <IconListDetails size={16} />
+              <StyledRubricTitle>
+                {selectedPayslip.employee?.firstName}{' '}
+                {selectedPayslip.employee?.lastName} ·{' '}
+                {selectedPayslip.periodKey}
+              </StyledRubricTitle>
+              <StyledSpacer />
+              <ErpStatusBadge
+                label={selectedPayslip.status}
+                tone={selectedPayslip.status === 'DRAFT' ? 'info' : 'success'}
+              />
+            </StyledRubricHeader>
+            <ErpOperationalTable
+              ariaLabel="Rubriques du bulletin sélectionné"
+              columns={rubricColumns}
+              rows={selectedPayslip.lines ?? []}
+              getRowKey={(row) => row.id}
+              state="ready"
+              emptyLabel="Aucune rubrique"
+            />
+          </StyledRubricPanel>
         )}
       </StyledWorkspace>
     </ErpPageShell>
