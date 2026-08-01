@@ -290,10 +290,21 @@ const candidateLabel = (candidate: ErpBankReconciliationCandidate) =>
 
 const reconciliationLabel = (line: ErpBankStatementLine) => {
   if (line.reconciliation === null) return '';
-  return line.reconciliation.kind === 'SUPPLIER'
-    ? `${line.reconciliation.supplierName} · ${line.reconciliation.supplierInvoiceReference}`
-    : `${line.reconciliation.customerName} · ${line.reconciliation.invoiceReferences.join(', ') || 'encaissement client'}`;
+  if (line.reconciliation.kind === 'SUPPLIER') {
+    return `${line.reconciliation.supplierName} · ${line.reconciliation.supplierInvoiceReference}`;
+  }
+  if (line.reconciliation.kind === 'CUSTOMER') {
+    return `${line.reconciliation.customerName} · ${line.reconciliation.invoiceReferences.join(', ') || 'encaissement client'}`;
+  }
+  if (line.reconciliation.kind === 'OPENING_ITEM') {
+    return `${line.reconciliation.tierName} · ${line.reconciliation.openItemReference}`;
+  }
+  return `Paie ${line.reconciliation.periodKey} · ${line.reconciliation.bankReference}`;
 };
+
+const canDirectlyUnreconcile = (line: ErpBankStatementLine) =>
+  line.reconciliation?.kind === 'SUPPLIER' ||
+  line.reconciliation?.kind === 'CUSTOMER';
 
 const downloadCsv = (statement: ErpBankStatementDetail) => {
   const blob = new Blob([bankStatementLinesToCsv(statement.lines)], {
@@ -659,6 +670,7 @@ export const ErpBankStatementsPage = () => {
     if (
       !reconciliationLine ||
       reconciliationLine.reconciliation === null ||
+      !canDirectlyUnreconcile(reconciliationLine) ||
       reconciliationReason.trim().length < 10
     )
       return;
@@ -982,24 +994,27 @@ export const ErpBankStatementsPage = () => {
                       </StyledSelectInput>
                     </StyledReconciliationField>
                   ) : null}
-                  <StyledReconciliationField>
-                    <span>
-                      {reconciliationLine.reconciliation !== null ||
-                      reconciliationLine.review !== null
-                        ? 'Motif d’annulation'
-                        : 'Motif du contrôle manuel'}
-                    </span>
-                    <StyledInput
-                      value={reconciliationReason}
-                      minLength={10}
-                      maxLength={500}
-                      placeholder="Ex. opération vérifiée sur le justificatif"
-                      disabled={reconciling}
-                      onChange={(event) =>
-                        setReconciliationReason(event.target.value)
-                      }
-                    />
-                  </StyledReconciliationField>
+                  {reconciliationLine.reconciliation === null ||
+                  canDirectlyUnreconcile(reconciliationLine) ? (
+                    <StyledReconciliationField>
+                      <span>
+                        {reconciliationLine.reconciliation !== null ||
+                        reconciliationLine.review !== null
+                          ? 'Motif d’annulation'
+                          : 'Motif du contrôle manuel'}
+                      </span>
+                      <StyledInput
+                        value={reconciliationReason}
+                        minLength={10}
+                        maxLength={500}
+                        placeholder="Ex. opération vérifiée sur le justificatif"
+                        disabled={reconciling}
+                        onChange={(event) =>
+                          setReconciliationReason(event.target.value)
+                        }
+                      />
+                    </StyledReconciliationField>
+                  ) : null}
                   {reconciliationLine.reconciliation !== null ? (
                     <StyledReconciliationField>
                       <span>Rapprochement actuel</span>
@@ -1017,17 +1032,20 @@ export const ErpBankStatementsPage = () => {
                   ) : null}
                   <StyledReconciliationActions>
                     {reconciliationLine.reconciliation !== null ? (
-                      <Button
-                        title="Annuler le rapprochement"
-                        ariaLabel="Annuler le rapprochement bancaire"
-                        Icon={IconUnlink}
-                        accent="danger"
-                        disabled={
-                          reconciliationReason.trim().length < 10 || reconciling
-                        }
-                        isLoading={reconciling}
-                        onClick={() => void unreconcile()}
-                      />
+                      canDirectlyUnreconcile(reconciliationLine) ? (
+                        <Button
+                          title="Annuler le rapprochement"
+                          ariaLabel="Annuler le rapprochement bancaire"
+                          Icon={IconUnlink}
+                          accent="danger"
+                          disabled={
+                            reconciliationReason.trim().length < 10 ||
+                            reconciling
+                          }
+                          isLoading={reconciling}
+                          onClick={() => void unreconcile()}
+                        />
+                      ) : null
                     ) : reconciliationLine.review !== null ? (
                       <Button
                         title="Annuler le contrôle"

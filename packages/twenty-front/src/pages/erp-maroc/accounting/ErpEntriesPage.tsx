@@ -35,15 +35,22 @@ const STATUS: Record<
 > = {
   DRAFT: { label: 'À contrôler', tone: 'warning' },
   VALIDATED: { label: 'Validée', tone: 'success' },
+  LOCKED: { label: 'Verrouillée', tone: 'neutral' },
   REJECTED: { label: 'Rejetée', tone: 'danger' },
 };
 
 const SOURCE: Record<ErpAccountingEntry['sourceType'], string> = {
+  MANUAL: 'Manuelle',
   INVOICE: 'Facture',
   PAYMENT: 'Règlement',
   CREDIT_NOTE: 'Avoir',
   SUPPLIER_INVOICE: 'Facture fournisseur',
   SUPPLIER_PAYMENT: 'Paiement fournisseur',
+  PAYROLL: 'Paie',
+  PAYROLL_PAYMENT: 'Paiement salaires',
+  EXPENSE_NOTE: 'Note de frais',
+  CLOSING: 'Clôture',
+  OPENING_BALANCE: 'À-nouveau',
 };
 
 const formatDate = (value: string) => value.split('-').reverse().join('/');

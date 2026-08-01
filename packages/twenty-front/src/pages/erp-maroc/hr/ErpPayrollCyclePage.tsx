@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   erpPayrollPaymentBatchNullableSchema,
   erpPayrollPaymentBatchSchema,
+  erpPayrollPaymentReconciliationSchema,
   erpPayrollPaymentExportSchema,
   erpPayrollPeriodPreviewSchema,
   hrAccessContextSchema,
@@ -20,6 +21,8 @@ import {
   hrMonthlyPeriodListSchema,
   type ErpPayrollPeriodPreview,
   type ErpPayrollPaymentBatch,
+  type ErpPayrollPaymentCandidate,
+  type ErpPayrollPaymentReconciliation,
   type HrEmployeeListItem,
   type HrMonthlyEmployeeSnapshot,
   type HrMonthlyPeriodDetail,
@@ -30,6 +33,7 @@ import {
   IconDownload,
   IconFileImport,
   IconListDetails,
+  IconLink,
   IconLock,
   IconPlus,
   IconRefresh,
@@ -212,6 +216,49 @@ const StyledPaymentReference = styled.input`
   padding: 0 ${themeCssVariables.spacing[2]};
 `;
 
+const StyledReconciliationPanel = styled.section`
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+`;
+
+const StyledReconciliationHeader = styled.div`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${themeCssVariables.spacing[2]};
+  min-height: 52px;
+  padding: ${themeCssVariables.spacing[2]} ${themeCssVariables.spacing[3]};
+`;
+
+const StyledReconciliationTable = styled.div`
+  border-top: 1px solid ${themeCssVariables.border.color.light};
+  display: flex;
+  height: 240px;
+  min-height: 180px;
+`;
+
+const StyledReconciliationFooter = styled.div`
+  align-items: center;
+  border-top: 1px solid ${themeCssVariables.border.color.light};
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${themeCssVariables.spacing[3]};
+  min-height: 48px;
+  padding: ${themeCssVariables.spacing[2]} ${themeCssVariables.spacing[3]};
+`;
+
+const StyledReconciliationEvidence = styled.div`
+  align-items: center;
+  border-top: 1px solid ${themeCssVariables.border.color.light};
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${themeCssVariables.spacing[3]};
+  min-height: 48px;
+  padding: ${themeCssVariables.spacing[2]} ${themeCssVariables.spacing[3]};
+`;
+
 const StyledEmployee = styled.div`
   display: grid;
   gap: 2px;
@@ -303,6 +350,11 @@ export const ErpPayrollCyclePage = () => {
   const [preview, setPreview] = useState<ErpPayrollPeriodPreview | null>(null);
   const [paymentBatch, setPaymentBatch] =
     useState<ErpPayrollPaymentBatch | null>(null);
+  const [paymentReconciliation, setPaymentReconciliation] =
+    useState<ErpPayrollPaymentReconciliation | null>(null);
+  const [selectedBankLineIds, setSelectedBankLineIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [plannedPaymentDate, setPlannedPaymentDate] = useState(currentDate);
   const [bankReference, setBankReference] = useState('');
   const [selectedPayslipId, setSelectedPayslipId] = useState<string | null>(
@@ -313,8 +365,11 @@ export const ErpPayrollCyclePage = () => {
   const [canOperate, setCanOperate] = useState(false);
   const [canApprovePayroll, setCanApprovePayroll] = useState(false);
   const [canManagePayments, setCanManagePayments] = useState(false);
+  const [canReconcilePayments, setCanReconcilePayments] = useState(false);
   const [validationDialogOpen, setValidationDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [reconciliationDialogOpen, setReconciliationDialogOpen] =
+    useState(false);
   const [reopenReason, setReopenReason] = useState('');
   const [feedback, setFeedback] = useState<{
     message: string;
@@ -370,6 +425,11 @@ export const ErpPayrollCyclePage = () => {
       );
       setCanApprovePayroll(access.canApprovePayroll);
       setCanManagePayments(access.canApprovePayroll && access.canReadBank);
+      const userCanReconcilePayments =
+        access.canApprovePayroll &&
+        access.canReadBank &&
+        ['OWNER', 'ADMIN', 'COMPTABLE'].includes(access.globalRole);
+      setCanReconcilePayments(userCanReconcilePayments);
       if (detail?.status === 'TRANSMITTED') {
         const [loadedPreview, loadedPaymentBatch] = await Promise.all([
           client.request({
@@ -387,6 +447,16 @@ export const ErpPayrollCyclePage = () => {
         ]);
         setPreview(loadedPreview);
         setPaymentBatch(loadedPaymentBatch);
+        const loadedReconciliation =
+          loadedPaymentBatch?.status === 'EXECUTED' && userCanReconcilePayments
+            ? await client.request({
+                method: 'GET',
+                path: `/payroll/periods/${detail.id}/payment-batch/reconciliation`,
+                schema: erpPayrollPaymentReconciliationSchema,
+              })
+            : null;
+        setPaymentReconciliation(loadedReconciliation);
+        setSelectedBankLineIds(new Set());
         setPlannedPaymentDate(
           loadedPaymentBatch?.plannedPaymentDate ?? currentDate(),
         );
@@ -396,6 +466,8 @@ export const ErpPayrollCyclePage = () => {
       } else {
         setPreview(null);
         setPaymentBatch(null);
+        setPaymentReconciliation(null);
+        setSelectedBankLineIds(new Set());
         setPlannedPaymentDate(currentDate());
         setBankReference('');
         setSelectedPayslipId(null);
@@ -433,6 +505,8 @@ export const ErpPayrollCyclePage = () => {
       setPeriod(updated);
       setPreview(null);
       setPaymentBatch(null);
+      setPaymentReconciliation(null);
+      setSelectedBankLineIds(new Set());
       setSelectedPayslipId(null);
       setFeedback({ message, danger: false });
       setReopenReason('');
@@ -469,6 +543,8 @@ export const ErpPayrollCyclePage = () => {
         .execute();
       setPreview(generated);
       setPaymentBatch(null);
+      setPaymentReconciliation(null);
+      setSelectedBankLineIds(new Set());
       setSelectedPayslipId(generated.payslips[0]?.id ?? null);
       setAdjustments(adjustmentsFromPreview(generated));
       setFeedback({
@@ -503,6 +579,8 @@ export const ErpPayrollCyclePage = () => {
         .execute();
       setPreview(validated);
       setPaymentBatch(null);
+      setPaymentReconciliation(null);
+      setSelectedBankLineIds(new Set());
       setSelectedPayslipId(validated.payslips[0]?.id ?? null);
       setFeedback({
         message: `${validated.generated} bulletin(s) validé(s) et comptabilisé(s).`,
@@ -605,6 +683,19 @@ export const ErpPayrollCyclePage = () => {
         )
         .execute();
       setPaymentBatch(executed);
+      if (canReconcilePayments) {
+        try {
+          const reconciliation = await client.request({
+            method: 'GET',
+            path: `/payroll/periods/${period.id}/payment-batch/reconciliation`,
+            schema: erpPayrollPaymentReconciliationSchema,
+          });
+          setPaymentReconciliation(reconciliation);
+          setSelectedBankLineIds(new Set());
+        } catch {
+          setPaymentReconciliation(null);
+        }
+      }
       setPreview((current) =>
         current === null
           ? current
@@ -630,6 +721,68 @@ export const ErpPayrollCyclePage = () => {
     } finally {
       setBusy(false);
       setPaymentDialogOpen(false);
+    }
+  };
+
+  const refreshPaymentReconciliation = async () => {
+    if (period === null || paymentBatch?.status !== 'EXECUTED') return;
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const reconciliation = await client.request({
+        method: 'GET',
+        path: `/payroll/periods/${period.id}/payment-batch/reconciliation`,
+        schema: erpPayrollPaymentReconciliationSchema,
+      });
+      setPaymentReconciliation(reconciliation);
+      setSelectedBankLineIds(new Set());
+    } catch {
+      setFeedback({
+        message:
+          'Les mouvements bancaires de paie ne peuvent pas être chargés.',
+        danger: true,
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reconcilePaymentBatch = async () => {
+    if (
+      period === null ||
+      paymentReconciliation === null ||
+      selectedBankLineIds.size === 0
+    )
+      return;
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const reconciliation = await client
+        .createMutationIntent(
+          {
+            method: 'POST',
+            path: `/payroll/periods/${period.id}/payment-batch/reconciliation`,
+            body: { bankStatementLineIds: [...selectedBankLineIds] },
+            schema: erpPayrollPaymentReconciliationSchema,
+          },
+          { idempotency: 'required' },
+        )
+        .execute();
+      setPaymentReconciliation(reconciliation);
+      setSelectedBankLineIds(new Set());
+      setFeedback({
+        message: `Paie rapprochée et règlement comptabilisé pour ${money(reconciliation.totalReconciledCents)}.`,
+        danger: false,
+      });
+    } catch {
+      setFeedback({
+        message:
+          'Rapprochement refusé : vérifiez le total, le compte bancaire et la période comptable.',
+        danger: true,
+      });
+    } finally {
+      setBusy(false);
+      setReconciliationDialogOpen(false);
     }
   };
 
@@ -706,6 +859,28 @@ export const ErpPayrollCyclePage = () => {
     [preview, selectedPayslipId],
   );
 
+  const selectedBankLines = useMemo(
+    () =>
+      (paymentReconciliation?.candidates ?? []).filter(({ id }) =>
+        selectedBankLineIds.has(id),
+      ),
+    [paymentReconciliation, selectedBankLineIds],
+  );
+  const selectedBankTotalCents = selectedBankLines.reduce(
+    (total, { debitCents }) => total + debitCents,
+    0,
+  );
+  const selectedBankAccountIds = new Set(
+    selectedBankLines.map(({ bankAccount }) => bankAccount?.id ?? ''),
+  );
+  const selectedBankDifferenceCents =
+    (paymentReconciliation?.totalNetCents ?? 0) - selectedBankTotalCents;
+  const canConfirmReconciliation =
+    selectedBankLines.length > 0 &&
+    selectedBankAccountIds.size === 1 &&
+    !selectedBankAccountIds.has('') &&
+    selectedBankDifferenceCents === 0;
+
   const draftPayslipCount =
     preview?.payslips.filter(({ status }) => status === 'DRAFT').length ?? 0;
   const validatedPayslipCount =
@@ -737,6 +912,97 @@ export const ErpPayrollCyclePage = () => {
     preview !== null &&
     preview.payslips.length > 0 &&
     preview.payslips.every(({ status }) => status === 'VALIDATED');
+
+  const reconciliationColumns: ErpOperationalTableColumn<ErpPayrollPaymentCandidate>[] =
+    [
+      {
+        key: 'selected',
+        header: '',
+        width: '48px',
+        render: (line) => (
+          <input
+            type="checkbox"
+            aria-label={`Sélectionner le débit ${line.description}`}
+            checked={selectedBankLineIds.has(line.id)}
+            disabled={busy}
+            onChange={(event) =>
+              setSelectedBankLineIds((current) => {
+                const next = new Set(current);
+                if (event.target.checked) next.add(line.id);
+                else next.delete(line.id);
+                return next;
+              })
+            }
+          />
+        ),
+      },
+      {
+        key: 'date',
+        header: 'Date',
+        width: '120px',
+        render: ({ transactionDate }) => transactionDate,
+      },
+      {
+        key: 'account',
+        header: 'Compte',
+        width: '190px',
+        render: ({ bankAccount }) =>
+          bankAccount === null ? (
+            'Non affecté'
+          ) : (
+            <StyledEmployee>
+              <span>{bankAccount.name}</span>
+              <StyledMuted>{bankAccount.bankName}</StyledMuted>
+            </StyledEmployee>
+          ),
+      },
+      {
+        key: 'description',
+        header: 'Libellé bancaire',
+        width: '330px',
+        render: ({ description, reference }) => (
+          <StyledEmployee title={description}>
+            <span>{description}</span>
+            <StyledMuted>{reference ?? 'Sans référence'}</StyledMuted>
+          </StyledEmployee>
+        ),
+      },
+      {
+        key: 'match',
+        header: 'Correspondance',
+        width: '240px',
+        render: ({ matchedEmployees, reasons }) =>
+          reasons.includes('BATCH_AMOUNT_EXACT')
+            ? 'Remise globale'
+            : matchedEmployees.length > 0
+              ? matchedEmployees
+                  .map(
+                    ({ employeeName, employeeNumber }) =>
+                      `${employeeName} (${employeeNumber})`,
+                  )
+                  .join(', ')
+              : 'Référence de remise',
+      },
+      {
+        key: 'score',
+        header: 'Score',
+        width: '105px',
+        align: 'center',
+        render: ({ score }) => (
+          <ErpStatusBadge
+            label={`${score}/100`}
+            tone={score >= 75 ? 'success' : score >= 50 ? 'info' : 'warning'}
+          />
+        ),
+      },
+      {
+        key: 'amount',
+        header: 'Débit',
+        width: '165px',
+        align: 'right',
+        render: ({ debitCents }) => money(debitCents),
+      },
+    ];
 
   const populationColumns: ErpOperationalTableColumn<HrEmployeeListItem>[] = [
     {
@@ -1069,6 +1335,8 @@ export const ErpPayrollCyclePage = () => {
               setFeedback(null);
               setAdjustments({});
               setPaymentBatch(null);
+              setPaymentReconciliation(null);
+              setSelectedBankLineIds(new Set());
               setBankReference('');
             }}
           />
@@ -1344,6 +1612,96 @@ export const ErpPayrollCyclePage = () => {
           </StyledPaymentPanel>
         ) : null}
 
+        {paymentBatch?.status === 'EXECUTED' && canReconcilePayments ? (
+          <StyledReconciliationPanel aria-label="Rapprochement paie-banque">
+            <StyledReconciliationHeader>
+              <IconLink size={16} />
+              <StyledPaymentSummary>
+                <strong>Rapprochement paie-banque</strong>
+                <StyledMuted>
+                  {paymentReconciliation === null
+                    ? 'Mouvements bancaires à charger'
+                    : `${money(paymentReconciliation.totalNetCents)} · ${paymentReconciliation.candidates.length} suggestion(s)`}
+                </StyledMuted>
+              </StyledPaymentSummary>
+              <ErpStatusBadge
+                label={
+                  paymentReconciliation?.status === 'RECONCILED'
+                    ? 'Rapproché et comptabilisé'
+                    : 'À rapprocher'
+                }
+                tone={
+                  paymentReconciliation?.status === 'RECONCILED'
+                    ? 'success'
+                    : 'warning'
+                }
+              />
+              <StyledSpacer />
+              {paymentReconciliation?.status === 'RECONCILED' ? null : (
+                <Button
+                  title="Actualiser"
+                  ariaLabel="Actualiser les mouvements bancaires candidats"
+                  Icon={IconRefresh}
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void refreshPaymentReconciliation()}
+                />
+              )}
+            </StyledReconciliationHeader>
+            {paymentReconciliation?.status === 'RECONCILED' ? (
+              <StyledReconciliationEvidence>
+                <ErpStatusBadge label="Écriture validée" tone="success" />
+                <StyledMuted>
+                  {paymentReconciliation.lines.length} mouvement(s) ·{' '}
+                  {money(paymentReconciliation.totalReconciledCents)}
+                </StyledMuted>
+                <StyledMuted>
+                  Pièce comptable{' '}
+                  {paymentReconciliation.settlementAccountingEntryId}
+                </StyledMuted>
+              </StyledReconciliationEvidence>
+            ) : paymentReconciliation === null ? null : (
+              <>
+                <StyledReconciliationTable>
+                  <ErpOperationalTable
+                    ariaLabel="Mouvements bancaires candidats de la paie"
+                    columns={reconciliationColumns}
+                    rows={paymentReconciliation.candidates}
+                    getRowKey={(row) => row.id}
+                    state="ready"
+                    emptyLabel="Aucun débit bancaire confirmé ne correspond au lot"
+                  />
+                </StyledReconciliationTable>
+                <StyledReconciliationFooter>
+                  <StyledPaymentSummary>
+                    <StyledMuted>Total sélectionné</StyledMuted>
+                    <strong>{money(selectedBankTotalCents)}</strong>
+                  </StyledPaymentSummary>
+                  <StyledPaymentSummary>
+                    <StyledMuted>Écart</StyledMuted>
+                    <strong>{money(selectedBankDifferenceCents)}</strong>
+                  </StyledPaymentSummary>
+                  <ErpStatusBadge
+                    label={
+                      canConfirmReconciliation ? 'Équilibré' : 'À compléter'
+                    }
+                    tone={canConfirmReconciliation ? 'success' : 'warning'}
+                  />
+                  <StyledSpacer />
+                  <Button
+                    title="Rapprocher et comptabiliser"
+                    ariaLabel="Rapprocher le lot de paie et générer son écriture de règlement"
+                    Icon={IconLink}
+                    accent="blue"
+                    disabled={busy || !canConfirmReconciliation}
+                    onClick={() => setReconciliationDialogOpen(true)}
+                  />
+                </StyledReconciliationFooter>
+              </>
+            )}
+          </StyledReconciliationPanel>
+        ) : null}
+
         {feedback === null ? null : (
           <StyledFeedback danger={feedback.danger}>
             {feedback.message}
@@ -1425,6 +1783,19 @@ export const ErpPayrollCyclePage = () => {
         confirmDisabled={bankReference.trim() === ''}
         onCancel={() => setPaymentDialogOpen(false)}
         onConfirm={() => void confirmPaymentBatch()}
+      />
+      <ErpConfirmDialog
+        isOpen={reconciliationDialogOpen}
+        title="Comptabiliser le règlement des salaires"
+        message={`Vous rapprochez ${selectedBankLines.length} mouvement(s) bancaire(s) pour ${money(
+          selectedBankTotalCents,
+        )}. Une écriture validée débitera le compte 4432 et créditera le compte bancaire affecté.`}
+        confirmLabel="Rapprocher et comptabiliser"
+        cancelLabel="Annuler"
+        isConfirming={busy}
+        confirmDisabled={!canConfirmReconciliation}
+        onCancel={() => setReconciliationDialogOpen(false)}
+        onConfirm={() => void reconcilePaymentBatch()}
       />
     </ErpPageShell>
   );

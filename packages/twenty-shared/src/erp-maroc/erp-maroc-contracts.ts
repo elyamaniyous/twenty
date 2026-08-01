@@ -1396,6 +1396,7 @@ export const erpAccountingSourceTypeSchema = z.enum([
   'SUPPLIER_INVOICE',
   'SUPPLIER_PAYMENT',
   'PAYROLL',
+  'PAYROLL_PAYMENT',
   'EXPENSE_NOTE',
   'CLOSING',
   'OPENING_BALANCE',
@@ -1810,10 +1811,24 @@ export const erpOpeningItemBankReconciliationSchema = z.object({
   reconciledByTwentyUserId: nonBlankStringSchema,
 });
 
+export const erpPayrollBankReconciliationSchema = z.object({
+  kind: z.literal('PAYROLL'),
+  payrollPaymentBatchId: uuidSchema,
+  periodKey: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  paymentDate: civilDateSchema,
+  bankReference: nonBlankStringSchema,
+  totalNetCents: positiveIntegerSchema,
+  accountingEntryId: uuidSchema,
+  accountingEntryStatus: erpAccountingEntryStatusSchema,
+  reconciledAt: instantSchema,
+  reconciledByTwentyUserId: nonBlankStringSchema,
+});
+
 export const erpBankReconciliationSchema = z.discriminatedUnion('kind', [
   erpSupplierBankReconciliationSchema,
   erpCustomerBankReconciliationSchema,
   erpOpeningItemBankReconciliationSchema,
+  erpPayrollBankReconciliationSchema,
 ]);
 
 export const erpBankReconciliationReasonSchema = z.enum([
@@ -2366,6 +2381,106 @@ export const erpPayrollPaymentBatchSchema = z.object({
 export const erpPayrollPaymentBatchNullableSchema =
   erpPayrollPaymentBatchSchema.nullable();
 
+export const erpPayrollPaymentReconciliationReasonSchema = z.enum([
+  'BATCH_AMOUNT_EXACT',
+  'EMPLOYEE_AMOUNT_EXACT',
+  'DATE_EXACT',
+  'DATE_NEAR',
+  'REFERENCE_MATCH',
+]);
+
+export const erpPayrollPaymentBankLineSchema = z.object({
+  id: uuidSchema,
+  statementImportId: uuidSchema,
+  transactionDate: civilDateHttpSchema,
+  valueDate: nullableCivilDateHttpSchema,
+  description: nonBlankStringSchema,
+  reference: nullableStringSchema,
+  debitCents: positiveIntegerSchema,
+  bankAccount: z
+    .object({
+      id: uuidSchema,
+      name: nonBlankStringSchema,
+      bankName: nonBlankStringSchema,
+      accountingAccountCode: nonBlankStringSchema,
+    })
+    .nullable(),
+});
+
+export const erpPayrollPaymentCandidateSchema =
+  erpPayrollPaymentBankLineSchema.extend({
+    score: nonNegativeIntegerSchema.max(100),
+    dateDistanceDays: nonNegativeIntegerSchema,
+    reasons: z.array(erpPayrollPaymentReconciliationReasonSchema).min(1),
+    matchedEmployees: z.array(
+      z.object({
+        payslipId: uuidSchema,
+        employeeId: uuidSchema,
+        employeeNumber: nonBlankStringSchema,
+        employeeName: nonBlankStringSchema,
+        netSalaryCents: positiveIntegerSchema,
+      }),
+    ),
+  });
+
+export const erpPayrollPaymentReconciliationSchema = z
+  .object({
+    batchId: uuidSchema,
+    periodKey: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+    status: z.enum(['UNRECONCILED', 'RECONCILED']),
+    totalNetCents: positiveIntegerSchema,
+    totalReconciledCents: centsSchema,
+    differenceCents: signedCentsSchema,
+    reconciledAt: nullableInstantSchema,
+    reconciledByTwentyUserId: nullableStringSchema,
+    settlementAccountingEntryId: nullableUuidSchema,
+    settlementAccountingEntryStatus: erpAccountingEntryStatusSchema.nullable(),
+    lines: z.array(erpPayrollPaymentBankLineSchema),
+    candidates: z.array(erpPayrollPaymentCandidateSchema),
+  })
+  .superRefine((reconciliation, context) => {
+    if (
+      reconciliation.differenceCents !==
+      reconciliation.totalNetCents - reconciliation.totalReconciledCents
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Payroll reconciliation difference is inconsistent',
+        path: ['differenceCents'],
+      });
+    }
+
+    if (reconciliation.status === 'RECONCILED') {
+      if (
+        reconciliation.differenceCents !== 0 ||
+        reconciliation.lines.length === 0 ||
+        reconciliation.reconciledAt === null ||
+        reconciliation.reconciledByTwentyUserId === null ||
+        reconciliation.settlementAccountingEntryId === null ||
+        reconciliation.settlementAccountingEntryStatus === null
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'A reconciled payroll batch requires complete evidence',
+          path: ['status'],
+        });
+      }
+    } else if (
+      reconciliation.totalReconciledCents !== 0 ||
+      reconciliation.lines.length !== 0 ||
+      reconciliation.reconciledAt !== null ||
+      reconciliation.reconciledByTwentyUserId !== null ||
+      reconciliation.settlementAccountingEntryId !== null ||
+      reconciliation.settlementAccountingEntryStatus !== null
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'An unreconciled payroll batch cannot contain posted evidence',
+        path: ['status'],
+      });
+    }
+  });
+
 export const erpPayrollPaymentExportSchema = erpFileExportSchema.extend({
   batchId: uuidSchema,
   payloadSha256: z.string().regex(/^[0-9a-f]{64}$/),
@@ -2912,6 +3027,8 @@ export const erpMarocRouteIds = {
   payrollPaymentBatchPrepare: 'payroll.payment-batch.prepare',
   payrollPaymentBatchExport: 'payroll.payment-batch.export',
   payrollPaymentBatchConfirm: 'payroll.payment-batch.confirm',
+  payrollPaymentReconciliation: 'payroll.payment-batch.reconciliation',
+  payrollPaymentReconcile: 'payroll.payment-batch.reconcile',
   payrollPayslipValidate: 'payroll.payslip.validate',
   payrollPayslipPay: 'payroll.payslip.pay',
   payrollLeaves: 'payroll.leaves',
@@ -3312,6 +3429,10 @@ export const erpMarocUpstreamRoutes = {
       `/payroll/periods/${encodeRouteId(id)}/payment-batch/export`,
     confirmPaymentBatch: (id: string) =>
       `/payroll/periods/${encodeRouteId(id)}/payment-batch/confirm`,
+    paymentReconciliation: (id: string) =>
+      `/payroll/periods/${encodeRouteId(id)}/payment-batch/reconciliation`,
+    reconcilePaymentBatch: (id: string) =>
+      `/payroll/periods/${encodeRouteId(id)}/payment-batch/reconciliation`,
     validatePayslip: (id: string) =>
       `/payroll/payslips/${encodeRouteId(id)}/validate`,
     payPayslip: (id: string) => `/payroll/payslips/${encodeRouteId(id)}/pay`,
@@ -3721,6 +3842,15 @@ export type ErpPayrollPeriodPreview = z.infer<
 >;
 export type ErpPayrollPaymentBatch = z.infer<
   typeof erpPayrollPaymentBatchSchema
+>;
+export type ErpPayrollPaymentBankLine = z.infer<
+  typeof erpPayrollPaymentBankLineSchema
+>;
+export type ErpPayrollPaymentCandidate = z.infer<
+  typeof erpPayrollPaymentCandidateSchema
+>;
+export type ErpPayrollPaymentReconciliation = z.infer<
+  typeof erpPayrollPaymentReconciliationSchema
 >;
 export type ErpPayrollPaymentExport = z.infer<
   typeof erpPayrollPaymentExportSchema
