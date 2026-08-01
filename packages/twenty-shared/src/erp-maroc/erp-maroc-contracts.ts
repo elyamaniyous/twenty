@@ -1397,6 +1397,7 @@ export const erpAccountingSourceTypeSchema = z.enum([
   'SUPPLIER_PAYMENT',
   'PAYROLL',
   'PAYROLL_PAYMENT',
+  'PAYROLL_PAYMENT_REVERSAL',
   'EXPENSE_NOTE',
   'CLOSING',
   'OPENING_BALANCE',
@@ -1824,11 +1825,17 @@ export const erpPayrollBankReconciliationSchema = z.object({
   reconciledByTwentyUserId: nonBlankStringSchema,
 });
 
+export const erpPayrollReturnBankReconciliationSchema =
+  erpPayrollBankReconciliationSchema.extend({
+    kind: z.literal('PAYROLL_RETURN'),
+  });
+
 export const erpBankReconciliationSchema = z.discriminatedUnion('kind', [
   erpSupplierBankReconciliationSchema,
   erpCustomerBankReconciliationSchema,
   erpOpeningItemBankReconciliationSchema,
   erpPayrollBankReconciliationSchema,
+  erpPayrollReturnBankReconciliationSchema,
 ]);
 
 export const erpBankReconciliationReasonSchema = z.enum([
@@ -2362,7 +2369,8 @@ export const erpPayrollPeriodPreviewSchema = z.object({
 export const erpPayrollPaymentBatchSchema = z.object({
   id: uuidSchema,
   periodKey: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
-  status: z.enum(['READY', 'EXECUTED']),
+  attemptNumber: positiveIntegerSchema,
+  status: z.enum(['READY', 'EXECUTED', 'REJECTED', 'RETURNED']),
   plannedPaymentDate: civilDateHttpSchema,
   employeeCount: positiveIntegerSchema,
   totalNetCents: positiveIntegerSchema,
@@ -2374,6 +2382,11 @@ export const erpPayrollPaymentBatchSchema = z.object({
   executedByTwentyUserId: nullableStringSchema,
   paymentDate: nullableCivilDateHttpSchema,
   bankReference: nullableStringSchema,
+  failureKind: z.enum(['BANK_REJECTED', 'BANK_RETURNED']).nullable(),
+  failedAt: nullableInstantSchema,
+  failedByTwentyUserId: nullableStringSchema,
+  failureReason: nullableStringSchema,
+  reversalAccountingEntryId: nullableUuidSchema,
   createdAt: instantSchema,
   updatedAt: instantSchema,
 });
@@ -2476,6 +2489,89 @@ export const erpPayrollPaymentReconciliationSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'An unreconciled payroll batch cannot contain posted evidence',
+        path: ['status'],
+      });
+    }
+  });
+
+export const erpPayrollPaymentReturnBankLineSchema = z.object({
+  id: uuidSchema,
+  statementImportId: uuidSchema,
+  transactionDate: civilDateHttpSchema,
+  valueDate: nullableCivilDateHttpSchema,
+  description: nonBlankStringSchema,
+  reference: nullableStringSchema,
+  creditCents: positiveIntegerSchema,
+  bankAccount: z
+    .object({
+      id: uuidSchema,
+      name: nonBlankStringSchema,
+      bankName: nonBlankStringSchema,
+      accountingAccountCode: nonBlankStringSchema,
+    })
+    .nullable(),
+});
+
+export const erpPayrollPaymentReturnCandidateSchema =
+  erpPayrollPaymentReturnBankLineSchema.extend({
+    score: nonNegativeIntegerSchema.max(100),
+    dateDistanceDays: nonNegativeIntegerSchema,
+    reasons: z.array(erpPayrollPaymentReconciliationReasonSchema).min(1),
+    matchedPayslipIds: z.array(uuidSchema),
+    matchedEmployees: z.array(
+      z.object({
+        payslipId: uuidSchema,
+        employeeId: uuidSchema,
+        employeeNumber: nonBlankStringSchema,
+        employeeName: nonBlankStringSchema,
+        netSalaryCents: positiveIntegerSchema,
+      }),
+    ),
+  });
+
+export const erpPayrollPaymentFailureSchema = z
+  .object({
+    batchId: uuidSchema,
+    attemptNumber: positiveIntegerSchema,
+    periodKey: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+    status: z.enum(['EXECUTED', 'REJECTED', 'RETURNED']),
+    totalNetCents: positiveIntegerSchema,
+    canReportRejected: z.boolean(),
+    canReportReturned: z.boolean(),
+    failureKind: z.enum(['BANK_REJECTED', 'BANK_RETURNED']).nullable(),
+    failedAt: nullableInstantSchema,
+    failedByTwentyUserId: nullableStringSchema,
+    failureReason: nullableStringSchema,
+    reversalAccountingEntryId: nullableUuidSchema,
+    reversalAccountingEntryStatus: erpAccountingEntryStatusSchema.nullable(),
+    totalReturnedCents: centsSchema,
+    returnLines: z.array(erpPayrollPaymentReturnBankLineSchema),
+    candidates: z.array(erpPayrollPaymentReturnCandidateSchema),
+  })
+  .superRefine((failure, context) => {
+    const hasFailure =
+      failure.status === 'REJECTED' || failure.status === 'RETURNED';
+    if (
+      hasFailure !== (failure.failureKind !== null) ||
+      hasFailure !== (failure.failedAt !== null) ||
+      hasFailure !== (failure.failureReason !== null)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Payroll payment failure evidence is incomplete',
+        path: ['status'],
+      });
+    }
+    if (
+      failure.status === 'RETURNED' &&
+      (failure.reversalAccountingEntryId === null ||
+        failure.reversalAccountingEntryStatus === null ||
+        failure.totalReturnedCents !== failure.totalNetCents ||
+        failure.returnLines.length === 0)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'A returned payroll batch requires complete reversal evidence',
         path: ['status'],
       });
     }
@@ -3029,6 +3125,8 @@ export const erpMarocRouteIds = {
   payrollPaymentBatchConfirm: 'payroll.payment-batch.confirm',
   payrollPaymentReconciliation: 'payroll.payment-batch.reconciliation',
   payrollPaymentReconcile: 'payroll.payment-batch.reconcile',
+  payrollPaymentFailure: 'payroll.payment-batch.failure',
+  payrollPaymentFailureReport: 'payroll.payment-batch.failure.report',
   payrollPayslipValidate: 'payroll.payslip.validate',
   payrollPayslipPay: 'payroll.payslip.pay',
   payrollLeaves: 'payroll.leaves',
@@ -3433,6 +3531,10 @@ export const erpMarocUpstreamRoutes = {
       `/payroll/periods/${encodeRouteId(id)}/payment-batch/reconciliation`,
     reconcilePaymentBatch: (id: string) =>
       `/payroll/periods/${encodeRouteId(id)}/payment-batch/reconciliation`,
+    paymentFailure: (id: string) =>
+      `/payroll/periods/${encodeRouteId(id)}/payment-batch/failure`,
+    reportPaymentFailure: (id: string) =>
+      `/payroll/periods/${encodeRouteId(id)}/payment-batch/failure`,
     validatePayslip: (id: string) =>
       `/payroll/payslips/${encodeRouteId(id)}/validate`,
     payPayslip: (id: string) => `/payroll/payslips/${encodeRouteId(id)}/pay`,
@@ -3851,6 +3953,15 @@ export type ErpPayrollPaymentCandidate = z.infer<
 >;
 export type ErpPayrollPaymentReconciliation = z.infer<
   typeof erpPayrollPaymentReconciliationSchema
+>;
+export type ErpPayrollPaymentReturnBankLine = z.infer<
+  typeof erpPayrollPaymentReturnBankLineSchema
+>;
+export type ErpPayrollPaymentReturnCandidate = z.infer<
+  typeof erpPayrollPaymentReturnCandidateSchema
+>;
+export type ErpPayrollPaymentFailure = z.infer<
+  typeof erpPayrollPaymentFailureSchema
 >;
 export type ErpPayrollPaymentExport = z.infer<
   typeof erpPayrollPaymentExportSchema

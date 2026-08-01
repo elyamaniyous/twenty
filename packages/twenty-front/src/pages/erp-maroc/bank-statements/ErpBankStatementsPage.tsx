@@ -299,6 +299,9 @@ const reconciliationLabel = (line: ErpBankStatementLine) => {
   if (line.reconciliation.kind === 'OPENING_ITEM') {
     return `${line.reconciliation.tierName} · ${line.reconciliation.openItemReference}`;
   }
+  if (line.reconciliation.kind === 'PAYROLL_RETURN') {
+    return `Retour paie ${line.reconciliation.periodKey} · ${line.reconciliation.bankReference}`;
+  }
   return `Paie ${line.reconciliation.periodKey} · ${line.reconciliation.bankReference}`;
 };
 

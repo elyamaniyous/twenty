@@ -13,6 +13,7 @@ import {
   erpPayrollPaymentBatchNullableSchema,
   erpPayrollPaymentBatchSchema,
   erpPayrollPaymentReconciliationSchema,
+  erpPayrollPaymentFailureSchema,
   erpPayrollPaymentExportSchema,
   erpPayrollPeriodPreviewSchema,
   hrAccessContextSchema,
@@ -23,6 +24,8 @@ import {
   type ErpPayrollPaymentBatch,
   type ErpPayrollPaymentCandidate,
   type ErpPayrollPaymentReconciliation,
+  type ErpPayrollPaymentFailure,
+  type ErpPayrollPaymentReturnCandidate,
   type HrEmployeeListItem,
   type HrMonthlyEmployeeSnapshot,
   type HrMonthlyPeriodDetail,
@@ -30,6 +33,7 @@ import {
 } from 'twenty-shared/erp-maroc';
 import {
   IconCheck,
+  IconAlertTriangle,
   IconDownload,
   IconFileImport,
   IconListDetails,
@@ -37,6 +41,7 @@ import {
   IconLock,
   IconPlus,
   IconRefresh,
+  IconRotate,
   IconSend,
 } from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
@@ -352,9 +357,18 @@ export const ErpPayrollCyclePage = () => {
     useState<ErpPayrollPaymentBatch | null>(null);
   const [paymentReconciliation, setPaymentReconciliation] =
     useState<ErpPayrollPaymentReconciliation | null>(null);
+  const [paymentFailure, setPaymentFailure] =
+    useState<ErpPayrollPaymentFailure | null>(null);
   const [selectedBankLineIds, setSelectedBankLineIds] = useState<Set<string>>(
     new Set(),
   );
+  const [selectedReturnLineIds, setSelectedReturnLineIds] = useState<
+    Set<string>
+  >(new Set());
+  const [paymentFailureReason, setPaymentFailureReason] = useState('');
+  const [paymentFailureKind, setPaymentFailureKind] = useState<
+    'BANK_REJECTED' | 'BANK_RETURNED'
+  >('BANK_REJECTED');
   const [plannedPaymentDate, setPlannedPaymentDate] = useState(currentDate);
   const [bankReference, setBankReference] = useState('');
   const [selectedPayslipId, setSelectedPayslipId] = useState<string | null>(
@@ -369,6 +383,8 @@ export const ErpPayrollCyclePage = () => {
   const [validationDialogOpen, setValidationDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [reconciliationDialogOpen, setReconciliationDialogOpen] =
+    useState(false);
+  const [paymentFailureDialogOpen, setPaymentFailureDialogOpen] =
     useState(false);
   const [reopenReason, setReopenReason] = useState('');
   const [feedback, setFeedback] = useState<{
@@ -447,18 +463,35 @@ export const ErpPayrollCyclePage = () => {
         ]);
         setPreview(loadedPreview);
         setPaymentBatch(loadedPaymentBatch);
-        const loadedReconciliation =
+        const [loadedReconciliation, loadedPaymentFailure] = await Promise.all([
           loadedPaymentBatch?.status === 'EXECUTED' && userCanReconcilePayments
-            ? await client.request({
+            ? client.request({
                 method: 'GET',
                 path: `/payroll/periods/${detail.id}/payment-batch/reconciliation`,
                 schema: erpPayrollPaymentReconciliationSchema,
               })
-            : null;
+            : Promise.resolve(null),
+          loadedPaymentBatch !== null &&
+          loadedPaymentBatch.status !== 'READY' &&
+          userCanReconcilePayments
+            ? client.request({
+                method: 'GET',
+                path: `/payroll/periods/${detail.id}/payment-batch/failure`,
+                schema: erpPayrollPaymentFailureSchema,
+              })
+            : Promise.resolve(null),
+        ]);
         setPaymentReconciliation(loadedReconciliation);
+        setPaymentFailure(loadedPaymentFailure);
         setSelectedBankLineIds(new Set());
+        setSelectedReturnLineIds(new Set());
+        setPaymentFailureReason('');
         setPlannedPaymentDate(
-          loadedPaymentBatch?.plannedPaymentDate ?? currentDate(),
+          loadedPaymentBatch === null ||
+            loadedPaymentBatch.status === 'REJECTED' ||
+            loadedPaymentBatch.status === 'RETURNED'
+            ? currentDate()
+            : loadedPaymentBatch.plannedPaymentDate,
         );
         setBankReference(loadedPaymentBatch?.bankReference ?? '');
         setSelectedPayslipId(loadedPreview.payslips[0]?.id ?? null);
@@ -467,7 +500,10 @@ export const ErpPayrollCyclePage = () => {
         setPreview(null);
         setPaymentBatch(null);
         setPaymentReconciliation(null);
+        setPaymentFailure(null);
         setSelectedBankLineIds(new Set());
+        setSelectedReturnLineIds(new Set());
+        setPaymentFailureReason('');
         setPlannedPaymentDate(currentDate());
         setBankReference('');
         setSelectedPayslipId(null);
@@ -506,7 +542,9 @@ export const ErpPayrollCyclePage = () => {
       setPreview(null);
       setPaymentBatch(null);
       setPaymentReconciliation(null);
+      setPaymentFailure(null);
       setSelectedBankLineIds(new Set());
+      setSelectedReturnLineIds(new Set());
       setSelectedPayslipId(null);
       setFeedback({ message, danger: false });
       setReopenReason('');
@@ -544,7 +582,9 @@ export const ErpPayrollCyclePage = () => {
       setPreview(generated);
       setPaymentBatch(null);
       setPaymentReconciliation(null);
+      setPaymentFailure(null);
       setSelectedBankLineIds(new Set());
+      setSelectedReturnLineIds(new Set());
       setSelectedPayslipId(generated.payslips[0]?.id ?? null);
       setAdjustments(adjustmentsFromPreview(generated));
       setFeedback({
@@ -580,7 +620,9 @@ export const ErpPayrollCyclePage = () => {
       setPreview(validated);
       setPaymentBatch(null);
       setPaymentReconciliation(null);
+      setPaymentFailure(null);
       setSelectedBankLineIds(new Set());
+      setSelectedReturnLineIds(new Set());
       setSelectedPayslipId(validated.payslips[0]?.id ?? null);
       setFeedback({
         message: `${validated.generated} bulletin(s) validé(s) et comptabilisé(s).`,
@@ -615,6 +657,11 @@ export const ErpPayrollCyclePage = () => {
         )
         .execute();
       setPaymentBatch(prepared);
+      setPaymentReconciliation(null);
+      setPaymentFailure(null);
+      setSelectedBankLineIds(new Set());
+      setSelectedReturnLineIds(new Set());
+      setPaymentFailureReason('');
       setFeedback({
         message: `${prepared.employeeCount} virement(s) préparé(s) pour ${money(prepared.totalNetCents)}.`,
         danger: false,
@@ -683,6 +730,8 @@ export const ErpPayrollCyclePage = () => {
         )
         .execute();
       setPaymentBatch(executed);
+      setPaymentFailure(null);
+      setSelectedReturnLineIds(new Set());
       if (canReconcilePayments) {
         try {
           const reconciliation = await client.request({
@@ -692,6 +741,12 @@ export const ErpPayrollCyclePage = () => {
           });
           setPaymentReconciliation(reconciliation);
           setSelectedBankLineIds(new Set());
+          const failure = await client.request({
+            method: 'GET',
+            path: `/payroll/periods/${period.id}/payment-batch/failure`,
+            schema: erpPayrollPaymentFailureSchema,
+          });
+          setPaymentFailure(failure);
         } catch {
           setPaymentReconciliation(null);
         }
@@ -736,6 +791,12 @@ export const ErpPayrollCyclePage = () => {
       });
       setPaymentReconciliation(reconciliation);
       setSelectedBankLineIds(new Set());
+      const failure = await client.request({
+        method: 'GET',
+        path: `/payroll/periods/${period.id}/payment-batch/failure`,
+        schema: erpPayrollPaymentFailureSchema,
+      });
+      setPaymentFailure(failure);
     } catch {
       setFeedback({
         message:
@@ -783,6 +844,108 @@ export const ErpPayrollCyclePage = () => {
     } finally {
       setBusy(false);
       setReconciliationDialogOpen(false);
+    }
+  };
+
+  const refreshPaymentFailure = async () => {
+    if (
+      period === null ||
+      paymentBatch === null ||
+      paymentBatch.status === 'READY'
+    )
+      return;
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const failure = await client.request({
+        method: 'GET',
+        path: `/payroll/periods/${period.id}/payment-batch/failure`,
+        schema: erpPayrollPaymentFailureSchema,
+      });
+      setPaymentFailure(failure);
+      setSelectedReturnLineIds(new Set());
+    } catch {
+      setFeedback({
+        message: 'Les retours bancaires ne peuvent pas être chargés.',
+        danger: true,
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reportPaymentFailure = async () => {
+    if (
+      period === null ||
+      paymentBatch?.status !== 'EXECUTED' ||
+      paymentFailureReason.trim().length < 10
+    )
+      return;
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const failure = await client
+        .createMutationIntent(
+          {
+            method: 'POST',
+            path: `/payroll/periods/${period.id}/payment-batch/failure`,
+            body: {
+              kind: paymentFailureKind,
+              reason: paymentFailureReason.trim(),
+              bankStatementLineIds:
+                paymentFailureKind === 'BANK_RETURNED'
+                  ? [...selectedReturnLineIds]
+                  : [],
+            },
+            schema: erpPayrollPaymentFailureSchema,
+          },
+          { idempotency: 'required' },
+        )
+        .execute();
+      setPaymentFailure(failure);
+      setPaymentBatch((current) =>
+        current === null
+          ? current
+          : {
+              ...current,
+              status: failure.status,
+              failureKind: failure.failureKind,
+              failedAt: failure.failedAt,
+              failedByTwentyUserId: failure.failedByTwentyUserId,
+              failureReason: failure.failureReason,
+              reversalAccountingEntryId: failure.reversalAccountingEntryId,
+            },
+      );
+      setPreview((current) =>
+        current === null
+          ? current
+          : {
+              ...current,
+              payslips: current.payslips.map((payslip) => ({
+                ...payslip,
+                status: 'VALIDATED' as const,
+                paidAt: null,
+              })),
+            },
+      );
+      setSelectedReturnLineIds(new Set());
+      setPaymentFailureReason('');
+      setFeedback({
+        message:
+          failure.status === 'RETURNED'
+            ? `Retour bancaire comptabilisé pour ${money(failure.totalReturnedCents)}. Un nouveau lot peut être préparé.`
+            : 'Rejet bancaire enregistré. Les salaires sont prêts pour une nouvelle tentative.',
+        danger: false,
+      });
+    } catch {
+      setFeedback({
+        message:
+          'Incident refusé : vérifiez le type, le motif, les mouvements sélectionnés et la période comptable.',
+        danger: true,
+      });
+    } finally {
+      setBusy(false);
+      setPaymentFailureDialogOpen(false);
     }
   };
 
@@ -880,6 +1043,26 @@ export const ErpPayrollCyclePage = () => {
     selectedBankAccountIds.size === 1 &&
     !selectedBankAccountIds.has('') &&
     selectedBankDifferenceCents === 0;
+  const selectedReturnLines = useMemo(
+    () =>
+      (paymentFailure?.candidates ?? []).filter(({ id }) =>
+        selectedReturnLineIds.has(id),
+      ),
+    [paymentFailure, selectedReturnLineIds],
+  );
+  const selectedReturnTotalCents = selectedReturnLines.reduce(
+    (total, { creditCents }) => total + creditCents,
+    0,
+  );
+  const selectedReturnDifferenceCents =
+    (paymentFailure?.totalNetCents ?? 0) - selectedReturnTotalCents;
+  const canConfirmPaymentFailure =
+    paymentFailureReason.trim().length >= 10 &&
+    (paymentFailureKind === 'BANK_REJECTED'
+      ? paymentFailure?.canReportRejected === true
+      : paymentFailure?.canReportReturned === true &&
+        selectedReturnLines.length > 0 &&
+        selectedReturnDifferenceCents === 0);
 
   const draftPayslipCount =
     preview?.payslips.filter(({ status }) => status === 'DRAFT').length ?? 0;
@@ -908,7 +1091,9 @@ export const ErpPayrollCyclePage = () => {
     draftPayslipCount > 0;
   const canPreparePaymentBatch =
     canManagePayments &&
-    paymentBatch === null &&
+    (paymentBatch === null ||
+      paymentBatch.status === 'REJECTED' ||
+      paymentBatch.status === 'RETURNED') &&
     preview !== null &&
     preview.payslips.length > 0 &&
     preview.payslips.every(({ status }) => status === 'VALIDATED');
@@ -1001,6 +1186,83 @@ export const ErpPayrollCyclePage = () => {
         width: '165px',
         align: 'right',
         render: ({ debitCents }) => money(debitCents),
+      },
+    ];
+
+  const returnColumns: ErpOperationalTableColumn<ErpPayrollPaymentReturnCandidate>[] =
+    [
+      {
+        key: 'selected',
+        header: '',
+        width: '48px',
+        render: (line) => (
+          <input
+            type="checkbox"
+            aria-label={`Sélectionner le retour ${line.description}`}
+            checked={selectedReturnLineIds.has(line.id)}
+            disabled={busy}
+            onChange={(event) =>
+              setSelectedReturnLineIds((current) => {
+                const next = new Set(current);
+                if (event.target.checked) next.add(line.id);
+                else next.delete(line.id);
+                return next;
+              })
+            }
+          />
+        ),
+      },
+      {
+        key: 'date',
+        header: 'Date',
+        width: '120px',
+        render: ({ transactionDate }) => transactionDate,
+      },
+      {
+        key: 'description',
+        header: 'Retour bancaire',
+        width: '350px',
+        render: ({ description, reference }) => (
+          <StyledEmployee title={description}>
+            <span>{description}</span>
+            <StyledMuted>{reference ?? 'Sans référence'}</StyledMuted>
+          </StyledEmployee>
+        ),
+      },
+      {
+        key: 'match',
+        header: 'Correspondance',
+        width: '240px',
+        render: ({ matchedEmployees, reasons }) =>
+          reasons.includes('BATCH_AMOUNT_EXACT')
+            ? 'Retour global'
+            : matchedEmployees.length > 0
+              ? matchedEmployees
+                  .map(
+                    ({ employeeName, employeeNumber }) =>
+                      `${employeeName} (${employeeNumber})`,
+                  )
+                  .join(', ')
+              : 'Référence de remise',
+      },
+      {
+        key: 'score',
+        header: 'Score',
+        width: '105px',
+        align: 'center',
+        render: ({ score }) => (
+          <ErpStatusBadge
+            label={`${score}/100`}
+            tone={score >= 75 ? 'success' : score >= 50 ? 'info' : 'warning'}
+          />
+        ),
+      },
+      {
+        key: 'amount',
+        header: 'Crédit',
+        width: '165px',
+        align: 'right',
+        render: ({ creditCents }) => money(creditCents),
       },
     ];
 
@@ -1336,7 +1598,9 @@ export const ErpPayrollCyclePage = () => {
               setAdjustments({});
               setPaymentBatch(null);
               setPaymentReconciliation(null);
+              setPaymentFailure(null);
               setSelectedBankLineIds(new Set());
+              setSelectedReturnLineIds(new Set());
               setBankReference('');
             }}
           />
@@ -1538,7 +1802,7 @@ export const ErpPayrollCyclePage = () => {
               <StyledMuted>
                 {paymentBatch === null
                   ? 'Préparation bancaire contrôlée'
-                  : `${paymentBatch.employeeCount} transfert(s) · ${money(paymentBatch.totalNetCents)}`}
+                  : `Tentative ${paymentBatch.attemptNumber} · ${paymentBatch.employeeCount} transfert(s) · ${money(paymentBatch.totalNetCents)}`}
               </StyledMuted>
             </StyledPaymentSummary>
             <ErpStatusBadge
@@ -1547,7 +1811,11 @@ export const ErpPayrollCyclePage = () => {
                   ? 'À préparer'
                   : paymentBatch.status === 'READY'
                     ? 'Fichier prêt'
-                    : 'Paiement confirmé'
+                    : paymentBatch.status === 'EXECUTED'
+                      ? 'Paiement confirmé'
+                      : paymentBatch.status === 'REJECTED'
+                        ? 'Rejeté par la banque'
+                        : 'Retourné et contrepassé'
               }
               tone={
                 paymentBatch?.status === 'EXECUTED'
@@ -1558,8 +1826,13 @@ export const ErpPayrollCyclePage = () => {
               }
             />
             <StyledSpacer />
-            {paymentBatch === null ? (
+            {paymentBatch === null ||
+            paymentBatch.status === 'REJECTED' ||
+            paymentBatch.status === 'RETURNED' ? (
               <>
+                {paymentBatch === null ? null : (
+                  <StyledMuted>{paymentBatch.failureReason}</StyledMuted>
+                )}
                 <StyledMonth
                   type="date"
                   value={plannedPaymentDate}
@@ -1569,9 +1842,13 @@ export const ErpPayrollCyclePage = () => {
                   }
                 />
                 <Button
-                  title="Préparer les virements"
-                  ariaLabel="Préparer le fichier de virements salariaux"
-                  Icon={IconSend}
+                  title={
+                    paymentBatch === null
+                      ? 'Préparer les virements'
+                      : 'Préparer une nouvelle tentative'
+                  }
+                  ariaLabel="Préparer un nouveau fichier de virements salariaux"
+                  Icon={paymentBatch === null ? IconSend : IconRotate}
                   accent="blue"
                   disabled={busy || !canPreparePaymentBatch}
                   onClick={() => void preparePaymentBatch()}
@@ -1702,6 +1979,157 @@ export const ErpPayrollCyclePage = () => {
           </StyledReconciliationPanel>
         ) : null}
 
+        {paymentBatch !== null &&
+        paymentBatch.status !== 'READY' &&
+        canReconcilePayments ? (
+          <StyledReconciliationPanel aria-label="Incidents de paiement de paie">
+            <StyledReconciliationHeader>
+              <IconAlertTriangle size={16} />
+              <StyledPaymentSummary>
+                <strong>Incident bancaire</strong>
+                <StyledMuted>
+                  {paymentFailure === null
+                    ? 'Contrôle des rejets et retours'
+                    : paymentFailure.status === 'REJECTED'
+                      ? 'Remise rejetée avant débit'
+                      : paymentFailure.status === 'RETURNED'
+                        ? 'Fonds retournés après débit'
+                        : paymentFailure.canReportReturned
+                          ? `${paymentFailure.candidates.length} retour(s) suggéré(s)`
+                          : 'Aucun débit bancaire rapproché'}
+                </StyledMuted>
+              </StyledPaymentSummary>
+              <ErpStatusBadge
+                label={
+                  paymentFailure?.status === 'REJECTED'
+                    ? 'Rejet enregistré'
+                    : paymentFailure?.status === 'RETURNED'
+                      ? 'Retour contrepassé'
+                      : 'Sous surveillance'
+                }
+                tone={
+                  paymentFailure?.status === 'REJECTED' ||
+                  paymentFailure?.status === 'RETURNED'
+                    ? 'warning'
+                    : 'info'
+                }
+              />
+              <StyledSpacer />
+              {paymentFailure?.status === 'REJECTED' ||
+              paymentFailure?.status === 'RETURNED' ? null : (
+                <Button
+                  title="Actualiser les incidents"
+                  ariaLabel="Actualiser les rejets et retours bancaires"
+                  Icon={IconRefresh}
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void refreshPaymentFailure()}
+                />
+              )}
+            </StyledReconciliationHeader>
+            {paymentFailure?.status === 'REJECTED' ||
+            paymentFailure?.status === 'RETURNED' ? (
+              <StyledReconciliationEvidence>
+                <ErpStatusBadge
+                  label={
+                    paymentFailure.status === 'RETURNED'
+                      ? 'Contrepassation validée'
+                      : 'Sans débit comptabilisé'
+                  }
+                  tone={
+                    paymentFailure.status === 'RETURNED' ? 'success' : 'warning'
+                  }
+                />
+                <StyledMuted>{paymentFailure.failureReason}</StyledMuted>
+                {paymentFailure.status === 'RETURNED' ? (
+                  <>
+                    <StyledMuted>
+                      {paymentFailure.returnLines.length} crédit(s) ·{' '}
+                      {money(paymentFailure.totalReturnedCents)}
+                    </StyledMuted>
+                    <StyledMuted>
+                      Pièce {paymentFailure.reversalAccountingEntryId}
+                    </StyledMuted>
+                  </>
+                ) : null}
+              </StyledReconciliationEvidence>
+            ) : paymentFailure?.canReportReturned ? (
+              <>
+                <StyledReconciliationTable>
+                  <ErpOperationalTable
+                    ariaLabel="Crédits bancaires candidats au retour de paie"
+                    columns={returnColumns}
+                    rows={paymentFailure.candidates}
+                    getRowKey={(row) => row.id}
+                    state="ready"
+                    emptyLabel="Aucun crédit bancaire confirmé ne correspond au lot"
+                  />
+                </StyledReconciliationTable>
+                <StyledReconciliationFooter>
+                  <StyledPaymentSummary>
+                    <StyledMuted>Total sélectionné</StyledMuted>
+                    <strong>{money(selectedReturnTotalCents)}</strong>
+                  </StyledPaymentSummary>
+                  <StyledPaymentSummary>
+                    <StyledMuted>Écart</StyledMuted>
+                    <strong>{money(selectedReturnDifferenceCents)}</strong>
+                  </StyledPaymentSummary>
+                  <StyledPaymentReference
+                    value={paymentFailureReason}
+                    maxLength={500}
+                    placeholder="Motif du retour bancaire"
+                    aria-label="Motif du retour bancaire"
+                    onChange={(event) =>
+                      setPaymentFailureReason(event.target.value)
+                    }
+                  />
+                  <StyledSpacer />
+                  <Button
+                    title="Contrepasser le retour"
+                    ariaLabel="Enregistrer le retour bancaire et contrepasser le paiement"
+                    Icon={IconRotate}
+                    accent="blue"
+                    disabled={
+                      busy ||
+                      paymentFailureReason.trim().length < 10 ||
+                      selectedReturnLines.length === 0 ||
+                      selectedReturnDifferenceCents !== 0
+                    }
+                    onClick={() => {
+                      setPaymentFailureKind('BANK_RETURNED');
+                      setPaymentFailureDialogOpen(true);
+                    }}
+                  />
+                </StyledReconciliationFooter>
+              </>
+            ) : paymentFailure?.canReportRejected ? (
+              <StyledReconciliationEvidence>
+                <StyledPaymentReference
+                  value={paymentFailureReason}
+                  maxLength={500}
+                  placeholder="Motif du rejet bancaire"
+                  aria-label="Motif du rejet bancaire"
+                  onChange={(event) =>
+                    setPaymentFailureReason(event.target.value)
+                  }
+                />
+                <StyledSpacer />
+                <Button
+                  title="Enregistrer le rejet"
+                  ariaLabel="Enregistrer le rejet de la remise bancaire"
+                  Icon={IconAlertTriangle}
+                  variant="secondary"
+                  disabled={busy || paymentFailureReason.trim().length < 10}
+                  onClick={() => {
+                    setPaymentFailureKind('BANK_REJECTED');
+                    setPaymentFailureDialogOpen(true);
+                  }}
+                />
+              </StyledReconciliationEvidence>
+            ) : null}
+          </StyledReconciliationPanel>
+        ) : null}
+
         {feedback === null ? null : (
           <StyledFeedback danger={feedback.danger}>
             {feedback.message}
@@ -1796,6 +2224,31 @@ export const ErpPayrollCyclePage = () => {
         confirmDisabled={!canConfirmReconciliation}
         onCancel={() => setReconciliationDialogOpen(false)}
         onConfirm={() => void reconcilePaymentBatch()}
+      />
+      <ErpConfirmDialog
+        isOpen={paymentFailureDialogOpen}
+        title={
+          paymentFailureKind === 'BANK_RETURNED'
+            ? 'Contrepasser le retour bancaire'
+            : 'Enregistrer le rejet bancaire'
+        }
+        message={
+          paymentFailureKind === 'BANK_RETURNED'
+            ? `Vous rattachez ${selectedReturnLines.length} crédit(s) pour ${money(
+                selectedReturnTotalCents,
+              )}. Zowka débitera le compte bancaire, créditera le compte 4432 et remettra les salaires à payer.`
+            : `Vous confirmez que la tentative ${paymentBatch?.attemptNumber ?? ''} a été rejetée avant tout débit. Les bulletins redeviendront validés et un nouveau lot pourra être préparé.`
+        }
+        confirmLabel={
+          paymentFailureKind === 'BANK_RETURNED'
+            ? 'Contrepasser et remettre à payer'
+            : 'Enregistrer le rejet'
+        }
+        cancelLabel="Annuler"
+        isConfirming={busy}
+        confirmDisabled={!canConfirmPaymentFailure}
+        onCancel={() => setPaymentFailureDialogOpen(false)}
+        onConfirm={() => void reportPaymentFailure()}
       />
     </ErpPageShell>
   );
