@@ -2,6 +2,7 @@ import {
   ErpOperationalTable,
   type ErpOperationalTableColumn,
 } from '@/erp-maroc/components/ErpOperationalTable';
+import { ErpConfirmDialog } from '@/erp-maroc/components/ErpConfirmDialog';
 import { ErpPageShell } from '@/erp-maroc/components/ErpPageShell';
 import { ErpStatusBadge } from '@/erp-maroc/components/ErpStatusBadge';
 import { useErpMarocContext } from '@/erp-maroc/context/useErpMarocContext';
@@ -118,7 +119,7 @@ const StyledChecklist = styled.section`
   border-bottom: 1px solid ${themeCssVariables.border.color.light};
   display: grid;
   flex: 0 0 auto;
-  grid-template-columns: repeat(6, minmax(150px, 1fr));
+  grid-template-columns: repeat(7, minmax(150px, 1fr));
   overflow-x: auto;
 `;
 
@@ -265,6 +266,8 @@ export const ErpPayrollCyclePage = () => {
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [busy, setBusy] = useState(false);
   const [canOperate, setCanOperate] = useState(false);
+  const [canApprovePayroll, setCanApprovePayroll] = useState(false);
+  const [validationDialogOpen, setValidationDialogOpen] = useState(false);
   const [reopenReason, setReopenReason] = useState('');
   const [feedback, setFeedback] = useState<{
     message: string;
@@ -318,6 +321,7 @@ export const ErpPayrollCyclePage = () => {
           access.canWriteTime &&
           access.canReadCompensation,
       );
+      setCanApprovePayroll(access.canApprovePayroll);
       if (detail?.status === 'TRANSMITTED') {
         const loadedPreview = await client.request({
           method: 'GET',
@@ -415,6 +419,39 @@ export const ErpPayrollCyclePage = () => {
     }
   };
 
+  const validatePayrollPeriod = async () => {
+    if (period === null) return;
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const validated = await client
+        .createMutationIntent(
+          {
+            method: 'POST',
+            path: `/payroll/periods/${period.id}/validate`,
+            schema: erpPayrollPeriodPreviewSchema,
+          },
+          { idempotency: 'required' },
+        )
+        .execute();
+      setPreview(validated);
+      setSelectedPayslipId(validated.payslips[0]?.id ?? null);
+      setFeedback({
+        message: `${validated.generated} bulletin(s) validé(s) et comptabilisé(s).`,
+        danger: false,
+      });
+    } catch {
+      setFeedback({
+        message:
+          'Validation refusée : contrôlez les avertissements, la période comptable et le journal PA.',
+        danger: true,
+      });
+    } finally {
+      setBusy(false);
+      setValidationDialogOpen(false);
+    }
+  };
+
   const importAdjustments = async (file: File) => {
     try {
       const rows = csv2json(await file.text()) as Array<
@@ -487,6 +524,27 @@ export const ErpPayrollCyclePage = () => {
     () => preview?.payslips.find(({ id }) => id === selectedPayslipId) ?? null,
     [preview, selectedPayslipId],
   );
+
+  const draftPayslipCount =
+    preview?.payslips.filter(({ status }) => status === 'DRAFT').length ?? 0;
+  const validatedPayslipCount =
+    preview?.payslips.filter(
+      ({ status }) => status === 'VALIDATED' || status === 'PAID',
+    ).length ?? 0;
+  const hasProtectedPayslips = validatedPayslipCount > 0;
+  const payrollIsValidated =
+    period !== null &&
+    preview !== null &&
+    preview.generated === period.employeeCount &&
+    preview.generated > 0 &&
+    validatedPayslipCount === preview.generated;
+  const canValidatePreview =
+    canApprovePayroll &&
+    period !== null &&
+    preview !== null &&
+    preview.generated === period.employeeCount &&
+    preview.warnings.length === 0 &&
+    draftPayslipCount > 0;
 
   const populationColumns: ErpOperationalTableColumn<HrEmployeeListItem>[] = [
     {
@@ -588,7 +646,11 @@ export const ErpPayrollCyclePage = () => {
             value={
               (adjustments[row.employeeId]?.taxableAllowancesCents ?? 0) / 100
             }
-            disabled={!canOperate || period?.status !== 'TRANSMITTED'}
+            disabled={
+              !canOperate ||
+              period?.status !== 'TRANSMITTED' ||
+              hasProtectedPayslips
+            }
             onChange={(event) =>
               updateAdjustment(
                 row.employeeId,
@@ -612,7 +674,11 @@ export const ErpPayrollCyclePage = () => {
             value={
               (adjustments[row.employeeId]?.otherDeductionsCents ?? 0) / 100
             }
-            disabled={!canOperate || period?.status !== 'TRANSMITTED'}
+            disabled={
+              !canOperate ||
+              period?.status !== 'TRANSMITTED' ||
+              hasProtectedPayslips
+            }
             onChange={(event) =>
               updateAdjustment(
                 row.employeeId,
@@ -721,9 +787,10 @@ export const ErpPayrollCyclePage = () => {
     ],
     ['Variables transmises', period?.status === 'TRANSMITTED'],
     [
-      'Brouillons complets',
+      'Bulletins générés',
       period !== null && preview?.generated === period.employeeCount,
     ],
+    ['Écritures validées', payrollIsValidated],
   ] as const;
 
   const periodId = period?.id;
@@ -781,7 +848,7 @@ export const ErpPayrollCyclePage = () => {
   return (
     <ErpPageShell
       title="Cycle de paie"
-      description="Population, variables figées, contrôles et prévisualisation sans impact comptable"
+      description="Population, variables figées, contrôle des bulletins et validation comptable"
       state={loadState}
       loadingLabel="Chargement du cycle de paie"
       errorLabel="Impossible de charger le cycle de paie"
@@ -815,7 +882,11 @@ export const ErpPayrollCyclePage = () => {
             <ErpStatusBadge label="Non ouverte" />
           ) : (
             <ErpStatusBadge
-              label={statusLabels[period.status]}
+              label={
+                payrollIsValidated
+                  ? 'Paie validée'
+                  : statusLabels[period.status]
+              }
               tone={period.status === 'TRANSMITTED' ? 'success' : 'info'}
             />
           )}
@@ -914,7 +985,7 @@ export const ErpPayrollCyclePage = () => {
                 ariaLabel="Importer les variables CSV"
                 Icon={IconFileImport}
                 variant="secondary"
-                disabled={busy}
+                disabled={busy || hasProtectedPayslips}
                 onClick={() => fileInputRef.current?.click()}
               />
               <Button
@@ -922,12 +993,25 @@ export const ErpPayrollCyclePage = () => {
                 ariaLabel="Générer les bulletins brouillons"
                 Icon={IconCheck}
                 accent="blue"
-                disabled={busy}
+                disabled={busy || hasProtectedPayslips}
                 onClick={() => void generatePreview()}
               />
+              {canApprovePayroll && preview !== null ? (
+                <Button
+                  title="Valider la paie"
+                  ariaLabel="Valider tous les bulletins et leurs écritures comptables"
+                  Icon={IconLock}
+                  accent="blue"
+                  disabled={busy || !canValidatePreview}
+                  onClick={() => setValidationDialogOpen(true)}
+                />
+              ) : null}
             </>
           ) : null}
-          {canOperate && period !== null && period.status !== 'OPEN' ? (
+          {canOperate &&
+          period !== null &&
+          period.status !== 'OPEN' &&
+          !hasProtectedPayslips ? (
             <>
               <StyledReason
                 value={reopenReason}
@@ -970,7 +1054,10 @@ export const ErpPayrollCyclePage = () => {
             {[
               ['Population', period.employeeCount],
               ['Anomalies bloquantes', period.totalAnomalyCount],
-              ['Bulletins brouillons', preview?.generated ?? 0],
+              [
+                'Brouillons / validés',
+                `${draftPayslipCount} / ${validatedPayslipCount}`,
+              ],
               ['Net à payer', money(preview?.totalNetCents ?? 0)],
               ['Coût employeur', money(preview?.totalEmployerCostCents ?? 0)],
             ].map(([label, value]) => (
@@ -1039,6 +1126,18 @@ export const ErpPayrollCyclePage = () => {
           </StyledRubricPanel>
         )}
       </StyledWorkspace>
+      <ErpConfirmDialog
+        isOpen={validationDialogOpen}
+        title="Valider la paie du mois"
+        message={`Cette validation verrouille ${draftPayslipCount} bulletin(s), génère leurs écritures comptables et confirme un net à payer de ${money(
+          preview?.totalNetCents ?? 0,
+        )}.`}
+        confirmLabel="Valider et comptabiliser"
+        cancelLabel="Annuler"
+        isConfirming={busy}
+        onCancel={() => setValidationDialogOpen(false)}
+        onConfirm={() => void validatePayrollPeriod()}
+      />
     </ErpPageShell>
   );
 };

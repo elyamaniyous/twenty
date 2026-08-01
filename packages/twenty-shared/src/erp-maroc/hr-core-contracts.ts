@@ -240,6 +240,7 @@ export const hrAccessContextSchema = z.object({
   canReadBank: z.boolean(),
   canWriteBank: z.boolean(),
   canReadCompensation: z.boolean(),
+  canApprovePayroll: z.boolean(),
   canWriteContracts: z.boolean(),
   canReadDocuments: z.boolean(),
   canWriteDocuments: z.boolean(),

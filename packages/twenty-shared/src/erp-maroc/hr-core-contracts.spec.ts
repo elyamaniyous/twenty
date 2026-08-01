@@ -442,6 +442,7 @@ describe('hrEmployeeDetailSchema', () => {
         canReadBank: true,
         canWriteBank: false,
         canReadCompensation: false,
+        canApprovePayroll: false,
         canWriteContracts: false,
         canReadDocuments: true,
         canWriteDocuments: true,
