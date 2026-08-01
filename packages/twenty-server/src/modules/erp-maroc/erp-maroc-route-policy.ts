@@ -109,6 +109,10 @@ import {
   payrollComponentListSchema,
   payrollControlDefinitionListSchema,
   payrollLegalSourceListSchema,
+  payrollDeclarationEvidenceSchema,
+  payrollDeclarationExportSchema,
+  payrollDeclarationListSchema,
+  payrollDeclarationSchema,
   erpPayrollPaymentBatchNullableSchema,
   erpPayrollPaymentBatchSchema,
   erpPayrollPaymentReconciliationSchema,
@@ -223,6 +227,7 @@ const workPatternChangeQuery = Object.freeze(['status']);
 const leaveRequestQuery = Object.freeze(['year', 'status']);
 const leaveBalanceQuery = Object.freeze(['year']);
 const monthlyClosingQuery = Object.freeze(['year']);
+const payrollDeclarationExportQuery = Object.freeze(['periodKey', 'format']);
 const pdfSchema = z.instanceof(Uint8Array);
 
 const exact = (path: string) => new RegExp(`^${path}$`);
@@ -1466,6 +1471,66 @@ const routes: ErpMarocRoute[] = [
     responseSchema: erpPayrollPaymentFailureSchema,
     kind: 'json',
     idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollCnssBds,
+    method: 'GET',
+    pattern: exact('/payroll/cnss/bds'),
+    build: staticBuilder(erpMarocUpstreamRoutes.payroll.cnssBds),
+    queryKeys: payrollDeclarationExportQuery,
+    responseSchema: payrollDeclarationExportSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollIrExport,
+    method: 'GET',
+    pattern: exact('/payroll/ir/export'),
+    build: staticBuilder(erpMarocUpstreamRoutes.payroll.irExport),
+    queryKeys: payrollDeclarationExportQuery,
+    responseSchema: payrollDeclarationExportSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollDeclarations,
+    method: 'GET',
+    pattern: exact('/payroll/declarations'),
+    build: staticBuilder(erpMarocUpstreamRoutes.payroll.declarations),
+    queryKeys: noQuery,
+    responseSchema: payrollDeclarationListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollDeclarationSubmit,
+    method: 'POST',
+    pattern: new RegExp(`^/payroll/declarations/${uuidSource}/submit$`),
+    build: idBuilder(erpMarocUpstreamRoutes.payroll.submitDeclaration),
+    queryKeys: noQuery,
+    responseSchema: payrollDeclarationSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollDeclarationReceipt,
+    method: 'POST',
+    pattern: new RegExp(`^/payroll/declarations/${uuidSource}/receipts$`),
+    build: idBuilder(erpMarocUpstreamRoutes.payroll.recordDeclarationReceipt),
+    queryKeys: noQuery,
+    responseSchema: payrollDeclarationSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollDeclarationEvidence,
+    method: 'GET',
+    pattern: new RegExp(`^/payroll/declaration-events/${uuidSource}/evidence$`),
+    build: idBuilder(erpMarocUpstreamRoutes.payroll.declarationEvidence),
+    queryKeys: noQuery,
+    responseSchema: payrollDeclarationEvidenceSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
   }),
   defineRoute({
     routeId: erpMarocRouteIds.payrollRegulatorySummary,

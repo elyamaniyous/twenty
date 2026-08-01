@@ -3135,6 +3135,11 @@ export const erpMarocRouteIds = {
   payrollLeaveBalanceUpdate: 'payroll.leave-balance.update',
   payrollCnssExport: 'payroll.cnss.export',
   payrollCnssBds: 'payroll.cnss.bds',
+  payrollIrExport: 'payroll.ir.export',
+  payrollDeclarations: 'payroll.declarations',
+  payrollDeclarationSubmit: 'payroll.declaration.submit',
+  payrollDeclarationReceipt: 'payroll.declaration.receipt',
+  payrollDeclarationEvidence: 'payroll.declaration.evidence',
   payrollPayslipPdf: 'payroll.payslip.pdf',
   payrollEmployeeAttestation: 'payroll.employee.attestation',
   payrollFinalSettlementPdf: 'payroll.employee.final-settlement.pdf',
@@ -3546,6 +3551,14 @@ export const erpMarocUpstreamRoutes = {
       `/payroll/employees/${encodeRouteId(id)}/leave-balances/${encodeURIComponent(year)}`,
     cnssExport: '/payroll/cnss/export',
     cnssBds: '/payroll/cnss/bds',
+    irExport: '/payroll/ir/export',
+    declarations: '/payroll/declarations',
+    submitDeclaration: (id: string) =>
+      `/payroll/declarations/${encodeRouteId(id)}/submit`,
+    recordDeclarationReceipt: (id: string) =>
+      `/payroll/declarations/${encodeRouteId(id)}/receipts`,
+    declarationEvidence: (id: string) =>
+      `/payroll/declaration-events/${encodeRouteId(id)}/evidence`,
     payslipPdf: (id: string) => `/payroll/payslips/${encodeRouteId(id)}/pdf`,
     employeeAttestation: (id: string) =>
       `/payroll/employees/${encodeRouteId(id)}/attestation`,

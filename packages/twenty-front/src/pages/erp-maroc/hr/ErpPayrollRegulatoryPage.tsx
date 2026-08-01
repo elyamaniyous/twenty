@@ -27,8 +27,14 @@ import {
 import { IconRefresh, IconSearch, IconUpload } from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
+import { PayrollDeclarationsPanel } from './PayrollDeclarationsPanel';
 
-type View = 'parameters' | 'components' | 'controls' | 'sources';
+type View =
+  | 'parameters'
+  | 'components'
+  | 'controls'
+  | 'sources'
+  | 'declarations';
 type LoadState = 'loading' | 'ready' | 'error';
 
 const EMPTY_SUMMARY: PayrollRegulatorySummary = {
@@ -626,6 +632,7 @@ export const ErpPayrollRegulatoryPage = () => {
               ['components', 'Rubriques'],
               ['controls', 'Contrôles'],
               ['sources', 'Sources'],
+              ['declarations', 'Déclarations'],
             ] as const
           ).map(([key, label]) => (
             <StyledTab
@@ -677,7 +684,7 @@ export const ErpPayrollRegulatoryPage = () => {
           getRowKey={(control) => control.id}
           emptyLabel="Aucun contrôle de paie"
         />
-      ) : (
+      ) : view === 'sources' ? (
         <ErpOperationalTable
           ariaLabel="Sources réglementaires de paie"
           columns={sourceColumns}
@@ -685,6 +692,8 @@ export const ErpPayrollRegulatoryPage = () => {
           getRowKey={(source) => source.id}
           emptyLabel="Aucune source réglementaire"
         />
+      ) : (
+        <PayrollDeclarationsPanel query={query} />
       )}
     </ErpPageShell>
   );

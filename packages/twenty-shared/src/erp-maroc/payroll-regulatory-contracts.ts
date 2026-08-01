@@ -9,6 +9,7 @@ import {
 
 const nullableStringSchema = z.string().nullable();
 const countSchema = z.number().int().nonnegative();
+const sha256Schema = z.string().regex(/^[0-9a-f]{64}$/);
 const civilDateHttpSchema = z
   .union([civilDateSchema, instantSchema])
   .transform((value) => value.slice(0, 10));
@@ -212,6 +213,90 @@ export const payrollRegulatorySeedResultSchema = z.object({
 
 export const payrollLegalSourceListSchema = z.array(payrollLegalSourceSchema);
 
+export const payrollDeclarationStatusSchema = z.enum([
+  'GENERATED',
+  'INTERNALLY_VALIDATED',
+  'SUBMITTED',
+  'ACKNOWLEDGED',
+  'EXTERNALLY_ACCEPTED',
+  'REJECTED',
+]);
+
+export const payrollDeclarationEventSchema = z.object({
+  id: uuidSchema,
+  type: z.enum(['SUBMITTED', 'ACKNOWLEDGED', 'ACCEPTED', 'REJECTED']),
+  statusAfter: payrollDeclarationStatusSchema,
+  occurredAt: instantSchema,
+  actorTwentyUserId: z.string(),
+  externalReference: nullableStringSchema,
+  message: nullableStringSchema,
+  evidenceFilename: nullableStringSchema,
+  evidenceContentType: nullableStringSchema,
+  evidencePayloadSha256: sha256Schema.nullable(),
+  evidenceSizeBytes: z.number().int().positive().nullable(),
+});
+
+export const payrollDeclarationSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  exerciceId: uuidSchema.nullable(),
+  kind: z.string(),
+  periodKey: z.string(),
+  formatVersion: z.string(),
+  filename: z.string(),
+  contentType: z.string(),
+  payloadSha256: sha256Schema,
+  validationStatus: payrollDeclarationStatusSchema,
+  validationReport: z.unknown(),
+  generatedByTwentyUserId: z.string(),
+  generatedAt: instantSchema,
+  attemptNumber: z.number().int().positive(),
+  previousSubmissionId: uuidSchema.nullable(),
+  submittedAt: nullableInstantSchema,
+  submittedByTwentyUserId: nullableStringSchema,
+  submissionChannel: nullableStringSchema,
+  externallyValidatedAt: nullableInstantSchema,
+  externallyValidatedBy: nullableStringSchema,
+  externalReference: nullableStringSchema,
+  rejectionReason: nullableStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  previousSubmission: z
+    .object({ id: uuidSchema, attemptNumber: z.number().int().positive() })
+    .nullable(),
+  events: z.array(payrollDeclarationEventSchema),
+});
+export const payrollDeclarationListSchema = z.array(payrollDeclarationSchema);
+
+export const payrollDeclarationExportSchema = z.object({
+  submissionId: uuidSchema,
+  attemptNumber: z.number().int().positive(),
+  previousSubmissionId: uuidSchema.nullable(),
+  filename: z.string(),
+  contentType: z.string(),
+  content: z.string(),
+  payloadSha256: sha256Schema,
+  validation: z.object({
+    valid: z.boolean(),
+    errors: z.array(z.string()),
+    warnings: z.array(z.string()),
+    validator: z.string(),
+    checkedAt: instantSchema,
+    externalAcceptanceRequired: z.literal(true),
+  }),
+  employees: countSchema,
+});
+
+export const payrollDeclarationEvidenceSchema = z.object({
+  id: uuidSchema,
+  filename: z.string(),
+  contentType: z.string(),
+  contentBase64: z.string(),
+  payloadSha256: sha256Schema.nullable(),
+  sizeBytes: z.number().int().positive().nullable(),
+});
+
 export type PayrollRegulatoryStatus = z.infer<
   typeof payrollRegulatoryStatusSchema
 >;
@@ -224,3 +309,10 @@ export type PayrollControlDefinition = z.infer<
 export type PayrollRegulatorySummary = z.infer<
   typeof payrollRegulatorySummarySchema
 >;
+export type PayrollDeclarationStatus = z.infer<
+  typeof payrollDeclarationStatusSchema
+>;
+export type PayrollDeclarationEvent = z.infer<
+  typeof payrollDeclarationEventSchema
+>;
+export type PayrollDeclaration = z.infer<typeof payrollDeclarationSchema>;

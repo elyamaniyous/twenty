@@ -632,6 +632,9 @@ export type {
   PayrollComponent,
   PayrollControlDefinition,
   PayrollRegulatorySummary,
+  PayrollDeclarationStatus,
+  PayrollDeclarationEvent,
+  PayrollDeclaration,
 } from './payroll-regulatory-contracts';
 export {
   payrollRegulatoryStatusSchema,
@@ -648,4 +651,10 @@ export {
   payrollRegulatorySummarySchema,
   payrollRegulatorySeedResultSchema,
   payrollLegalSourceListSchema,
+  payrollDeclarationStatusSchema,
+  payrollDeclarationEventSchema,
+  payrollDeclarationSchema,
+  payrollDeclarationListSchema,
+  payrollDeclarationExportSchema,
+  payrollDeclarationEvidenceSchema,
 } from './payroll-regulatory-contracts';
