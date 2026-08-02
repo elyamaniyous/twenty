@@ -385,6 +385,8 @@ export const ErpHrPeoplePage = () => {
     if (drawer === null) return;
     const numberOrNull = (value: string | undefined) =>
       value ? Number(value) : null;
+    const isoDateTimeOrNull = (value: string | undefined) =>
+      value ? new Date(value).toISOString() : null;
     const bodyByKind: Record<DrawerKind, unknown> = {
       job: {
         code: form.code,
@@ -414,7 +416,7 @@ export const ErpHrPeoplePage = () => {
         rejectionReason: form.rejectionReason,
       },
       interview: {
-        scheduledAt: new Date(form.scheduledAt).toISOString(),
+        scheduledAt: isoDateTimeOrNull(form.scheduledAt),
         durationMinutes: Number(form.durationMinutes),
         location: form.location || null,
       },
@@ -454,8 +456,8 @@ export const ErpHrPeoplePage = () => {
         skillId: form.skillId || null,
       },
       session: {
-        startsAt: new Date(form.startsAt).toISOString(),
-        endsAt: new Date(form.endsAt).toISOString(),
+        startsAt: isoDateTimeOrNull(form.startsAt),
+        endsAt: isoDateTimeOrNull(form.endsAt),
         location: form.location || null,
         capacity: numberOrNull(form.capacity),
         status: 'OPEN',
