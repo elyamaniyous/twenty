@@ -3255,6 +3255,32 @@ export const erpMarocRouteIds = {
   hrMonthlyPeriodFreeze: 'hr-monthly-closing.period.freeze',
   hrMonthlyPeriodReopen: 'hr-monthly-closing.period.reopen',
   hrMonthlyPeriodTransmit: 'hr-monthly-closing.period.transmit',
+  hrPeopleWorkspace: 'hr-people.workspace',
+  hrPeopleChangeRequestDecision: 'hr-people.change-request.decision',
+  hrPeopleAttestationDecision: 'hr-people.attestation.decision',
+  hrPeopleNotificationRetry: 'hr-people.notification.retry',
+  hrPeopleJobOpenings: 'hr-people.job-openings',
+  hrPeopleJobOpeningDetail: 'hr-people.job-opening.detail',
+  hrPeopleCandidates: 'hr-people.candidates',
+  hrPeopleApplications: 'hr-people.applications',
+  hrPeopleApplicationDetail: 'hr-people.application.detail',
+  hrPeopleApplicationInterviews: 'hr-people.application.interviews',
+  hrPeopleInterviewDetail: 'hr-people.interview.detail',
+  hrPeopleApplicationOffers: 'hr-people.application.offers',
+  hrPeopleOfferDetail: 'hr-people.offer.detail',
+  hrPeopleApplicationHire: 'hr-people.application.hire',
+  hrPeopleSkills: 'hr-people.skills',
+  hrPeopleEmployeeSkills: 'hr-people.employee.skills',
+  hrPeopleTrainingCourses: 'hr-people.training-courses',
+  hrPeopleTrainingCourseSessions: 'hr-people.training-course.sessions',
+  hrPeopleTrainingSessionEnrollments: 'hr-people.training-session.enrollments',
+  hrPeopleTrainingEnrollmentDetail: 'hr-people.training-enrollment.detail',
+  hrPeopleCertifications: 'hr-people.certifications',
+  hrPeopleEmployeeCertifications: 'hr-people.employee.certifications',
+  hrPeopleReviewCampaigns: 'hr-people.review-campaigns',
+  hrPeopleReviews: 'hr-people.reviews',
+  hrPeopleReviewDetail: 'hr-people.review.detail',
+  hrPeopleReviewObjectives: 'hr-people.review.objectives',
   documentsCollection: 'documents.collection',
   documentDetail: 'documents.detail',
   documentContent: 'documents.content',
@@ -3742,6 +3768,46 @@ export const erpMarocUpstreamRoutes = {
     reopen: (id: string) => `/hr-monthly-periods/${encodeRouteId(id)}/reopen`,
     transmit: (id: string) =>
       `/hr-monthly-periods/${encodeRouteId(id)}/transmit`,
+  },
+  hrPeople: {
+    workspace: '/hr-people/workspace',
+    changeRequestDecision: (id: string) =>
+      `/hr-people/change-requests/${encodeRouteId(id)}/decision`,
+    attestationDecision: (id: string) =>
+      `/hr-people/attestations/${encodeRouteId(id)}/decision`,
+    notificationRetry: (id: string) =>
+      `/hr-people/notifications/${encodeRouteId(id)}/retry`,
+    jobOpenings: '/hr-people/job-openings',
+    jobOpening: (id: string) => `/hr-people/job-openings/${encodeRouteId(id)}`,
+    candidates: '/hr-people/candidates',
+    applications: '/hr-people/applications',
+    application: (id: string) => `/hr-people/applications/${encodeRouteId(id)}`,
+    applicationInterviews: (id: string) =>
+      `/hr-people/applications/${encodeRouteId(id)}/interviews`,
+    interview: (id: string) => `/hr-people/interviews/${encodeRouteId(id)}`,
+    applicationOffers: (id: string) =>
+      `/hr-people/applications/${encodeRouteId(id)}/offers`,
+    offer: (id: string) => `/hr-people/offers/${encodeRouteId(id)}`,
+    applicationHire: (id: string) =>
+      `/hr-people/applications/${encodeRouteId(id)}/hire`,
+    skills: '/hr-people/skills',
+    employeeSkills: (id: string) =>
+      `/hr-people/employees/${encodeRouteId(id)}/skills`,
+    trainingCourses: '/hr-people/training-courses',
+    trainingCourseSessions: (id: string) =>
+      `/hr-people/training-courses/${encodeRouteId(id)}/sessions`,
+    trainingSessionEnrollments: (id: string) =>
+      `/hr-people/training-sessions/${encodeRouteId(id)}/enrollments`,
+    trainingEnrollment: (id: string) =>
+      `/hr-people/training-enrollments/${encodeRouteId(id)}`,
+    certifications: '/hr-people/certifications',
+    employeeCertifications: (id: string) =>
+      `/hr-people/employees/${encodeRouteId(id)}/certifications`,
+    reviewCampaigns: '/hr-people/review-campaigns',
+    reviews: '/hr-people/reviews',
+    review: (id: string) => `/hr-people/reviews/${encodeRouteId(id)}`,
+    reviewObjectives: (id: string) =>
+      `/hr-people/reviews/${encodeRouteId(id)}/objectives`,
   },
   documents: {
     collection: '/documents',
