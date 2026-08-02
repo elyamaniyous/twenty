@@ -40,6 +40,11 @@ const StyledHeader = styled.header`
   justify-content: space-between;
   min-height: 56px;
   padding: ${themeCssVariables.spacing[2]} ${themeCssVariables.spacing[4]};
+
+  @media (max-width: 720px) {
+    align-items: stretch;
+    flex-direction: column;
+  }
 `;
 
 const StyledHeadingGroup = styled.div`
@@ -71,7 +76,12 @@ const StyledActions = styled.div`
   align-items: center;
   display: flex;
   flex: 0 0 auto;
+  flex-wrap: wrap;
   gap: ${themeCssVariables.spacing[2]};
+
+  @media (max-width: 720px) {
+    width: 100%;
+  }
 `;
 
 const StyledContent = styled.div`
