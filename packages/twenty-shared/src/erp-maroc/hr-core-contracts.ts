@@ -9,6 +9,11 @@ import {
   nonNegativeIntegerSchema,
   uuidSchema,
 } from './erp-maroc-contracts';
+import {
+  hrAttestationRequestSchema,
+  hrEmployeeChangeRequestSchema,
+  hrNotificationSchema,
+} from './hr-people-contracts';
 
 const civilDateHttpSchema = z
   .union([civilDateSchema, instantSchema])
@@ -1329,6 +1334,9 @@ export const hrEmployeeSelfServiceSchema = z.object({
   payslips: z.array(hrEmployeePayslipSummarySchema),
   timeEntries: z.array(hrEmployeeSelfServiceTimeEntrySchema),
   timeCorrectionRequests: z.array(hrEmployeeSelfServiceTimeCorrectionSchema),
+  changeRequests: z.array(hrEmployeeChangeRequestSchema),
+  attestationRequests: z.array(hrAttestationRequestSchema),
+  notifications: z.array(hrNotificationSchema),
 });
 
 export const hrEmployeeSelfServicePayslipDocumentSchema = z.object({

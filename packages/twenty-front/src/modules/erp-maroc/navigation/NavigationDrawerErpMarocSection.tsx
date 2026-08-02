@@ -133,6 +133,12 @@ export const NavigationDrawerErpMarocSection = () => {
       Icon: IconUser,
     },
     {
+      label: t`Développement RH`,
+      path: erpMarocPaths.hrPeople,
+      activePaths: [erpMarocPaths.hrPeople],
+      Icon: IconUsers,
+    },
+    {
       label: t`Cycle de paie`,
       path: erpMarocPaths.payrollCycle,
       activePaths: [erpMarocPaths.payrollCycle],

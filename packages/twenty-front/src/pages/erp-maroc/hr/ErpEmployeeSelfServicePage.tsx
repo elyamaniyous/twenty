@@ -13,9 +13,13 @@ import { styled } from '@linaria/react';
 import { useCallback, useEffect, useState } from 'react';
 import {
   hrDocumentContentSchema,
+  hrAttestationRequestSchema,
+  hrEmployeeChangeRequestSchema,
   hrEmployeeSelfServicePayslipDocumentSchema,
   hrEmployeeSelfServiceSchema,
   hrLeaveRequestSchema,
+  hrNotificationSchema,
+  hrPeopleDocumentSchema,
   hrTimeEntryCorrectionRequestSchema,
   type HrTimeEntryCorrectionAction,
   type HrTimeEntryType,
@@ -31,12 +35,19 @@ import {
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
-type View = 'overview' | 'documents' | 'payslips' | 'leave' | 'time';
+type View =
+  | 'overview'
+  | 'documents'
+  | 'payslips'
+  | 'leave'
+  | 'time'
+  | 'services';
 type LoadState = 'loading' | 'ready' | 'error';
 type DocumentRow = HrEmployeeSelfService['documents'][number];
 type PayslipRow = HrEmployeeSelfService['payslips'][number];
 type LeaveRow = HrEmployeeSelfService['leaveRequests'][number];
 type TimeRow = HrEmployeeSelfService['timeCorrectionRequests'][number];
+type ServiceDrawer = 'contact' | 'bank' | 'attestation' | 'sign' | null;
 
 type LeaveForm = {
   policyId: string;
@@ -235,6 +246,60 @@ const StyledTextarea = styled.textarea`
   resize: vertical;
 `;
 
+const StyledServiceGrid = styled.div`
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: repeat(3, minmax(280px, 1fr));
+  min-height: 0;
+  overflow: auto;
+
+  @media (max-width: 1000px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const StyledServicePanel = styled.section`
+  border-right: 1px solid ${themeCssVariables.border.color.light};
+  min-width: 0;
+`;
+
+const StyledServiceHeader = styled.header`
+  align-items: center;
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
+  display: flex;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 0 ${themeCssVariables.spacing[3]};
+`;
+
+const StyledServiceTitle = styled.h2`
+  color: ${themeCssVariables.font.color.primary};
+  font-size: ${themeCssVariables.font.size.md};
+  letter-spacing: 0;
+  margin: 0;
+`;
+
+const StyledServiceRow = styled.div`
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
+  display: grid;
+  gap: ${themeCssVariables.spacing[2]};
+  padding: ${themeCssVariables.spacing[3]};
+`;
+
+const StyledServiceMeta = styled.div`
+  align-items: center;
+  color: ${themeCssVariables.font.color.secondary};
+  display: flex;
+  font-size: ${themeCssVariables.font.size.sm};
+  gap: ${themeCssVariables.spacing[2]};
+  justify-content: space-between;
+`;
+
+const StyledServiceActions = styled.div`
+  display: flex;
+  gap: ${themeCssVariables.spacing[1]};
+`;
+
 const formatMad = (cents: number) =>
   new Intl.NumberFormat('fr-MA', {
     style: 'currency',
@@ -336,6 +401,9 @@ export const ErpEmployeeSelfServicePage = () => {
   const [messageDanger, setMessageDanger] = useState(false);
   const [leaveDrawerOpen, setLeaveDrawerOpen] = useState(false);
   const [timeDrawerOpen, setTimeDrawerOpen] = useState(false);
+  const [serviceDrawer, setServiceDrawer] = useState<ServiceDrawer>(null);
+  const [serviceTargetId, setServiceTargetId] = useState<string | null>(null);
+  const [serviceForm, setServiceForm] = useState<Record<string, string>>({});
   const [leaveForm, setLeaveForm] = useState<LeaveForm>(() => emptyLeaveForm());
   const [timeForm, setTimeForm] = useState<TimeCorrectionForm>(() =>
     emptyTimeCorrectionForm(),
@@ -521,6 +589,160 @@ export const ErpEmployeeSelfServicePage = () => {
     } finally {
       setBusy(false);
     }
+  };
+
+  const openServiceDrawer = (
+    kind: Exclude<ServiceDrawer, null>,
+    id?: string,
+  ) => {
+    setMessage(null);
+    setServiceTargetId(id ?? null);
+    setServiceForm(
+      kind === 'contact'
+        ? {
+            email: data?.employee.email ?? '',
+            phone: data?.employee.phone ?? '',
+            address: data?.employee.address ?? '',
+            reason: '',
+          }
+        : kind === 'bank'
+          ? {
+              bankName: data?.bankAccount?.bankName ?? '',
+              accountHolderName:
+                data?.bankAccount?.accountHolderName ??
+                `${data?.employee.firstName ?? ''} ${data?.employee.lastName ?? ''}`.trim(),
+              rib: '',
+              reason: '',
+            }
+          : kind === 'attestation'
+            ? { type: 'WORK', purpose: '' }
+            : {
+                signedName:
+                  `${data?.employee.firstName ?? ''} ${data?.employee.lastName ?? ''}`.trim(),
+              },
+    );
+    setServiceDrawer(kind);
+  };
+
+  const submitServiceRequest = async () => {
+    if (serviceDrawer === null) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      if (serviceDrawer === 'contact' || serviceDrawer === 'bank') {
+        const isBank = serviceDrawer === 'bank';
+        await client
+          .createMutationIntent(
+            {
+              method: 'POST',
+              path: '/hr-self-service/change-requests',
+              schema: hrEmployeeChangeRequestSchema,
+              body: isBank
+                ? {
+                    type: 'BANK_ACCOUNT',
+                    bankName: serviceForm.bankName,
+                    accountHolderName: serviceForm.accountHolderName,
+                    rib: serviceForm.rib,
+                    reason: serviceForm.reason || null,
+                  }
+                : {
+                    type: 'CONTACT_DETAILS',
+                    email: serviceForm.email || null,
+                    phone: serviceForm.phone || null,
+                    address: serviceForm.address || null,
+                    reason: serviceForm.reason || null,
+                  },
+            },
+            { idempotency: 'required' },
+          )
+          .execute();
+      } else if (serviceDrawer === 'attestation') {
+        await client
+          .createMutationIntent(
+            {
+              method: 'POST',
+              path: '/hr-self-service/attestations',
+              schema: hrAttestationRequestSchema,
+              body: {
+                type: serviceForm.type,
+                purpose: serviceForm.purpose || null,
+              },
+            },
+            { idempotency: 'required' },
+          )
+          .execute();
+      } else if (serviceTargetId !== null) {
+        await client
+          .createMutationIntent(
+            {
+              method: 'PATCH',
+              path: `/hr-self-service/attestations/${serviceTargetId}/sign`,
+              schema: hrAttestationRequestSchema,
+              body: { signedName: serviceForm.signedName },
+            },
+            { idempotency: 'forbidden' },
+          )
+          .execute();
+      }
+      setServiceDrawer(null);
+      setMessageDanger(false);
+      setMessage('Demande enregistrée et transmise aux RH.');
+      await load();
+    } catch {
+      setMessageDanger(true);
+      setMessage('Demande impossible. Vérifiez les informations saisies.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const acknowledgeAttestation = async (id: string) => {
+    setBusy(true);
+    try {
+      await client
+        .createMutationIntent(
+          {
+            method: 'PATCH',
+            path: `/hr-self-service/attestations/${id}/acknowledge`,
+            schema: hrAttestationRequestSchema,
+            body: {},
+          },
+          { idempotency: 'forbidden' },
+        )
+        .execute();
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const downloadAttestation = async (id: string) => {
+    setBusy(true);
+    try {
+      const document = await client.request({
+        method: 'GET',
+        path: `/hr-self-service/attestations/${id}/content`,
+        schema: hrPeopleDocumentSchema,
+      });
+      saveBase64(document.contentBase64, document.mimeType, document.filename);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const markNotificationRead = async (id: string) => {
+    await client
+      .createMutationIntent(
+        {
+          method: 'PATCH',
+          path: `/hr-self-service/notifications/${id}/read`,
+          schema: hrNotificationSchema,
+          body: {},
+        },
+        { idempotency: 'forbidden' },
+      )
+      .execute();
+    await load();
   };
 
   const currentYear = new Date().getFullYear();
@@ -774,6 +996,7 @@ export const ErpEmployeeSelfServicePage = () => {
                 ['payslips', 'Bulletins'],
                 ['leave', 'Congés'],
                 ['time', 'Temps de travail'],
+                ['services', 'Demandes et notifications'],
               ] as const
             ).map(([key, label]) => (
               <StyledTab
@@ -898,7 +1121,7 @@ export const ErpEmployeeSelfServicePage = () => {
                 emptyLabel="Aucune demande de congé"
               />
             </>
-          ) : (
+          ) : view === 'time' ? (
             <>
               <StyledViewActions>
                 <Button
@@ -917,6 +1140,140 @@ export const ErpEmployeeSelfServicePage = () => {
                 emptyLabel="Aucune correction de pointage"
               />
             </>
+          ) : (
+            <StyledServiceGrid>
+              <StyledServicePanel>
+                <StyledServiceHeader>
+                  <StyledServiceTitle>Mes modifications</StyledServiceTitle>
+                  <StyledServiceActions>
+                    <Button
+                      title="Coordonnées"
+                      ariaLabel="Modifier mes coordonnées"
+                      Icon={IconPlus}
+                      variant="secondary"
+                      onClick={() => openServiceDrawer('contact')}
+                    />
+                    <Button
+                      title="RIB"
+                      ariaLabel="Modifier mon RIB"
+                      Icon={IconPlus}
+                      variant="secondary"
+                      onClick={() => openServiceDrawer('bank')}
+                    />
+                  </StyledServiceActions>
+                </StyledServiceHeader>
+                {data.changeRequests.map((request) => (
+                  <StyledServiceRow key={request.id}>
+                    <strong>
+                      {request.type === 'BANK_ACCOUNT'
+                        ? 'Coordonnées bancaires'
+                        : 'Coordonnées personnelles'}
+                    </strong>
+                    <StyledServiceMeta>
+                      <span>{formatDateTime(request.requestedAt)}</span>
+                      <ErpStatusBadge
+                        label={statusLabels[request.status] ?? request.status}
+                        tone={statusTone(request.status)}
+                      />
+                    </StyledServiceMeta>
+                    {request.decisionNote ? (
+                      <span>{request.decisionNote}</span>
+                    ) : null}
+                  </StyledServiceRow>
+                ))}
+              </StyledServicePanel>
+              <StyledServicePanel>
+                <StyledServiceHeader>
+                  <StyledServiceTitle>Mes attestations</StyledServiceTitle>
+                  <Button
+                    title="Demander"
+                    ariaLabel="Demander une attestation"
+                    Icon={IconPlus}
+                    accent="blue"
+                    onClick={() => openServiceDrawer('attestation')}
+                  />
+                </StyledServiceHeader>
+                {data.attestationRequests.map((request) => (
+                  <StyledServiceRow key={request.id}>
+                    <strong>
+                      {request.type === 'WORK'
+                        ? 'Attestation de travail'
+                        : 'Attestation de salaire'}
+                    </strong>
+                    <StyledServiceMeta>
+                      <span>{formatDateTime(request.requestedAt)}</span>
+                      <ErpStatusBadge
+                        label={request.status}
+                        tone={statusTone(request.status)}
+                      />
+                    </StyledServiceMeta>
+                    <StyledServiceActions>
+                      {['GENERATED', 'ACKNOWLEDGED', 'SIGNED'].includes(
+                        request.status,
+                      ) ? (
+                        <Button
+                          title="Télécharger"
+                          ariaLabel="Télécharger l’attestation"
+                          Icon={IconDownload}
+                          variant="secondary"
+                          disabled={busy}
+                          onClick={() => void downloadAttestation(request.id)}
+                        />
+                      ) : null}
+                      {request.status === 'GENERATED' ? (
+                        <Button
+                          title="Accuser réception"
+                          ariaLabel="Accuser réception de l’attestation"
+                          Icon={IconCheck}
+                          accent="blue"
+                          disabled={busy}
+                          onClick={() =>
+                            void acknowledgeAttestation(request.id)
+                          }
+                        />
+                      ) : null}
+                      {request.status === 'ACKNOWLEDGED' ? (
+                        <Button
+                          title="Signer"
+                          ariaLabel="Signer l’attestation"
+                          Icon={IconCheck}
+                          accent="blue"
+                          disabled={busy}
+                          onClick={() => openServiceDrawer('sign', request.id)}
+                        />
+                      ) : null}
+                    </StyledServiceActions>
+                  </StyledServiceRow>
+                ))}
+              </StyledServicePanel>
+              <StyledServicePanel>
+                <StyledServiceHeader>
+                  <StyledServiceTitle>Notifications</StyledServiceTitle>
+                </StyledServiceHeader>
+                {data.notifications.map((notification) => (
+                  <StyledServiceRow key={notification.id}>
+                    <strong>{notification.title}</strong>
+                    <span>{notification.body}</span>
+                    <StyledServiceMeta>
+                      <span>{formatDateTime(notification.createdAt)}</span>
+                      {notification.status !== 'READ' ? (
+                        <Button
+                          title="Lu"
+                          ariaLabel="Marquer la notification comme lue"
+                          Icon={IconCheck}
+                          variant="secondary"
+                          onClick={() =>
+                            void markNotificationRead(notification.id)
+                          }
+                        />
+                      ) : (
+                        <ErpStatusBadge label="Lu" tone="success" />
+                      )}
+                    </StyledServiceMeta>
+                  </StyledServiceRow>
+                ))}
+              </StyledServicePanel>
+            </StyledServiceGrid>
           )}
 
           <ErpFormDrawer
@@ -1228,6 +1585,171 @@ export const ErpEmployeeSelfServicePage = () => {
                   }
                 />
               </StyledField>
+            </StyledDrawerForm>
+          </ErpFormDrawer>
+
+          <ErpFormDrawer
+            isOpen={serviceDrawer !== null}
+            title={
+              serviceDrawer === 'contact'
+                ? 'Modifier mes coordonnées'
+                : serviceDrawer === 'bank'
+                  ? 'Modifier mon RIB'
+                  : serviceDrawer === 'attestation'
+                    ? 'Demander une attestation'
+                    : 'Signature interne'
+            }
+            description="La demande et chaque décision sont conservées dans le journal d’audit."
+            isBusy={busy}
+            onClose={() => setServiceDrawer(null)}
+            footer={
+              <>
+                <Button
+                  title="Annuler"
+                  ariaLabel="Annuler la demande"
+                  variant="secondary"
+                  onClick={() => setServiceDrawer(null)}
+                />
+                <Button
+                  title="Envoyer"
+                  ariaLabel="Envoyer la demande"
+                  Icon={IconCheck}
+                  accent="blue"
+                  disabled={busy}
+                  onClick={() => void submitServiceRequest()}
+                />
+              </>
+            }
+          >
+            <StyledDrawerForm
+              onSubmit={(event) => {
+                event.preventDefault();
+                void submitServiceRequest();
+              }}
+            >
+              {serviceDrawer === 'contact' ? (
+                <>
+                  {['email', 'phone', 'address'].map((field) => (
+                    <StyledField key={field}>
+                      {field === 'email'
+                        ? 'Email'
+                        : field === 'phone'
+                          ? 'Téléphone'
+                          : 'Adresse'}
+                      <StyledInput
+                        type={field === 'email' ? 'email' : 'text'}
+                        value={serviceForm[field] ?? ''}
+                        onChange={(event) =>
+                          setServiceForm((current) => ({
+                            ...current,
+                            [field]: event.target.value,
+                          }))
+                        }
+                      />
+                    </StyledField>
+                  ))}
+                  <StyledField>
+                    Motif
+                    <StyledTextarea
+                      value={serviceForm.reason ?? ''}
+                      onChange={(event) =>
+                        setServiceForm((current) => ({
+                          ...current,
+                          reason: event.target.value,
+                        }))
+                      }
+                    />
+                  </StyledField>
+                </>
+              ) : null}
+              {serviceDrawer === 'bank' ? (
+                <>
+                  {[
+                    ['bankName', 'Banque'],
+                    ['accountHolderName', 'Titulaire'],
+                    ['rib', 'RIB marocain (24 chiffres)'],
+                  ].map(([field, label]) => (
+                    <StyledField key={field}>
+                      {label}
+                      <StyledInput
+                        inputMode={field === 'rib' ? 'numeric' : undefined}
+                        autoComplete="off"
+                        value={serviceForm[field] ?? ''}
+                        onChange={(event) =>
+                          setServiceForm((current) => ({
+                            ...current,
+                            [field]: event.target.value,
+                          }))
+                        }
+                      />
+                    </StyledField>
+                  ))}
+                  <StyledField>
+                    Motif
+                    <StyledTextarea
+                      value={serviceForm.reason ?? ''}
+                      onChange={(event) =>
+                        setServiceForm((current) => ({
+                          ...current,
+                          reason: event.target.value,
+                        }))
+                      }
+                    />
+                  </StyledField>
+                </>
+              ) : null}
+              {serviceDrawer === 'attestation' ? (
+                <>
+                  <StyledField>
+                    Type
+                    <StyledSelect
+                      value={serviceForm.type ?? 'WORK'}
+                      onChange={(event) =>
+                        setServiceForm((current) => ({
+                          ...current,
+                          type: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="WORK">Attestation de travail</option>
+                      <option value="SALARY">Attestation de salaire</option>
+                    </StyledSelect>
+                  </StyledField>
+                  <StyledField>
+                    Usage prévu
+                    <StyledTextarea
+                      value={serviceForm.purpose ?? ''}
+                      onChange={(event) =>
+                        setServiceForm((current) => ({
+                          ...current,
+                          purpose: event.target.value,
+                        }))
+                      }
+                    />
+                  </StyledField>
+                </>
+              ) : null}
+              {serviceDrawer === 'sign' ? (
+                <>
+                  <StyledNotice danger={false}>
+                    Cette signature électronique interne prouve l’accord dans
+                    Zowka. Elle ne constitue pas une signature électronique
+                    qualifiée.
+                  </StyledNotice>
+                  <StyledField>
+                    Nom légal complet
+                    <StyledInput
+                      value={serviceForm.signedName ?? ''}
+                      onChange={(event) =>
+                        setServiceForm((current) => ({
+                          ...current,
+                          signedName: event.target.value,
+                        }))
+                      }
+                    />
+                  </StyledField>
+                </>
+              ) : null}
             </StyledDrawerForm>
           </ErpFormDrawer>
         </>
