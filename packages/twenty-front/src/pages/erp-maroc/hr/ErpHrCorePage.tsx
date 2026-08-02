@@ -139,6 +139,10 @@ const StyledMetrics = styled.section`
   flex: 0 0 auto;
   grid-template-columns: repeat(10, minmax(120px, 1fr));
   overflow-x: auto;
+
+  @media (max-width: 720px) {
+    grid-template-columns: repeat(10, minmax(150px, 1fr));
+  }
 `;
 
 const StyledMetric = styled.div`
@@ -148,6 +152,10 @@ const StyledMetric = styled.div`
   gap: ${themeCssVariables.spacing[1]};
   min-width: 120px;
   padding: ${themeCssVariables.spacing[3]};
+
+  @media (max-width: 720px) {
+    min-width: 150px;
+  }
 `;
 
 const StyledMetricLabel = styled.span`
