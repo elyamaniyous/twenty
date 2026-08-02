@@ -107,12 +107,14 @@ const labels = [
   'Relances',
   'Marketing',
   'Ressources humaines',
+  'Mon espace salarié',
   'Cycle de paie',
   'Référentiel paie',
   'Écritures',
   'Grand livre',
   'Balance',
   'Lettrage',
+  'Banque',
 ];
 
 const renderWithNavigation = ({
@@ -170,11 +172,17 @@ describe('NavigationDrawerErpMarocSection', () => {
       creditNoteDetail: '/erp-maroc/credit-notes/:id',
       reminders: '/erp-maroc/reminders',
       marketing: '/erp-maroc/marketing',
+      hrCore: '/erp-maroc/hr',
+      hrSelfService: '/erp-maroc/hr/my-space',
+      hrEmployeeDetail: '/erp-maroc/hr/employees/:id',
+      payrollCycle: '/erp-maroc/hr/payroll-cycle',
+      payrollRegulatory: '/erp-maroc/hr/payroll-regulatory',
       accountingEntries: '/erp-maroc/accounting/entries',
       accountingEntryDetail: '/erp-maroc/accounting/entries/:id',
       accountingGrandLivre: '/erp-maroc/accounting/grand-livre',
       accountingBalance: '/erp-maroc/accounting/balance',
       accountingLettrage: '/erp-maroc/accounting/lettrage',
+      bankStatements: '/erp-maroc/bank-statements',
     });
   });
 
@@ -213,6 +221,7 @@ describe('NavigationDrawerErpMarocSection', () => {
     [erpMarocPaths.reminders, 'Relances'],
     [erpMarocPaths.marketing, 'Marketing'],
     [erpMarocPaths.hrCore, 'Ressources humaines'],
+    [erpMarocPaths.hrSelfService, 'Mon espace salarié'],
     [erpMarocPaths.payrollCycle, 'Cycle de paie'],
     [erpMarocPaths.payrollRegulatory, 'Référentiel paie'],
     [erpMarocPaths.accountingEntries, 'Écritures'],
@@ -220,6 +229,7 @@ describe('NavigationDrawerErpMarocSection', () => {
     [erpMarocPaths.accountingGrandLivre, 'Grand livre'],
     [erpMarocPaths.accountingBalance, 'Balance'],
     [erpMarocPaths.accountingLettrage, 'Lettrage'],
+    [erpMarocPaths.bankStatements, 'Banque'],
   ])('marks only the exact item active at %s', (path, activeLabel) => {
     renderWithNavigation({ path });
 

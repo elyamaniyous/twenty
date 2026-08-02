@@ -280,6 +280,25 @@ export const hrAccessGrantSchema = z.object({
   employeeScopes: z.array(hrAccessGrantEmployeeSchema),
 });
 
+export const hrEmployeeSelfServiceAccessSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  twentyUserId: z.string(),
+  employeeId: uuidSchema,
+  isActive: z.boolean(),
+  createdByTwentyUserId: z.string(),
+  updatedByTwentyUserId: z.string(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  employee: z.object({
+    employeeNumber: z.string(),
+    firstName: z.string(),
+    lastName: z.string(),
+    status: hrEmployeeStatusSchema,
+  }),
+});
+
 export const hrAccessAdministrationSchema = z.object({
   users: z.array(
     z.object({
@@ -287,6 +306,7 @@ export const hrAccessAdministrationSchema = z.object({
       email: nullableStringSchema,
       role: erpRoleSchema,
       hrAccessGrant: hrAccessGrantSchema.nullable(),
+      hrEmployeeSelfServiceAccess: hrEmployeeSelfServiceAccessSchema.nullable(),
     }),
   ),
 });
@@ -1165,6 +1185,146 @@ export const hrEmployeePayslipSummarySchema = z.object({
   createdAt: instantSchema,
 });
 
+const hrEmployeeSelfServiceDocumentSchema = z.object({
+  id: uuidSchema,
+  category: hrDocumentCategorySchema,
+  title: z.string(),
+  isRequired: z.boolean(),
+  status: hrDocumentStatusSchema,
+  daysUntilExpiry: z.number().int().nullable(),
+  latestVersion: z
+    .object({
+      id: uuidSchema,
+      version: z.number().int().positive(),
+      filename: z.string(),
+      mimeType: z.string(),
+      sizeBytes: z.number().int().positive(),
+      issuedAt: nullableCivilDateHttpSchema,
+      expiresAt: nullableCivilDateHttpSchema,
+      createdAt: instantSchema,
+    })
+    .nullable(),
+});
+
+const hrEmployeeSelfServiceLeaveRequestSchema = z.object({
+  id: uuidSchema,
+  type: hrLeaveTypeSchema,
+  status: hrLeaveRequestStatusSchema,
+  startDate: civilDateHttpSchema,
+  endDate: civilDateHttpSchema,
+  workingDays: z.number().finite().nonnegative(),
+  reason: nullableStringSchema,
+  evidenceRequired: z.boolean(),
+  decisionReason: nullableStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+
+const hrEmployeeSelfServiceTimeCorrectionSchema = z.object({
+  id: uuidSchema,
+  action: hrTimeEntryCorrectionActionSchema,
+  targetAttendanceDate: civilDateHttpSchema,
+  proposedType: hrTimeEntryTypeSchema.nullable(),
+  proposedOccurredAt: instantSchema.nullable(),
+  reason: z.string(),
+  status: hrTimeEntryCorrectionStatusSchema,
+  evidenceRequired: z.boolean(),
+  decisionReason: nullableStringSchema,
+  requestedAt: instantSchema,
+  updatedAt: instantSchema,
+});
+
+const hrEmployeeSelfServiceLeaveBalanceSchema = z.object({
+  id: uuidSchema,
+  year: z.number().int().min(2000).max(2200),
+  entitledDays: z.number().finite(),
+  carriedDays: z.number().finite(),
+  adjustmentDays: z.number().finite(),
+  consumedDays: z.number().finite().nonnegative(),
+  pendingDays: z.number().finite().nonnegative(),
+  availableDays: z.number().finite(),
+  updatedAt: instantSchema,
+});
+
+const hrEmployeeSelfServiceOrganisationUnitSchema = z.object({
+  id: uuidSchema,
+  code: z.string(),
+  name: z.string(),
+});
+
+export const hrEmployeeSelfServiceSchema = z.object({
+  access: z.object({ id: uuidSchema, isActive: z.literal(true) }),
+  employee: z.object({
+    id: uuidSchema,
+    employeeNumber: z.string(),
+    firstName: z.string(),
+    lastName: z.string(),
+    cin: nullableStringSchema,
+    cnssNumber: nullableStringSchema,
+    email: nullableStringSchema,
+    phone: nullableStringSchema,
+    address: nullableStringSchema,
+    jobTitle: z.string(),
+    department: nullableStringSchema,
+    contractType: hrContractTypeSchema,
+    status: hrEmployeeStatusSchema,
+    hireDate: civilDateHttpSchema,
+    terminationDate: nullableCivilDateHttpSchema,
+    baseSalaryCents: centsSchema,
+  }),
+  currentContract: z
+    .object({
+      id: uuidSchema,
+      contractNumber: z.string(),
+      contractType: hrContractTypeSchema,
+      status: hrContractStatusSchema,
+      startDate: civilDateHttpSchema,
+      endDate: nullableCivilDateHttpSchema,
+      probationEndDate: nullableCivilDateHttpSchema,
+      jobTitleSnapshot: z.string(),
+      weeklyHoursHundredths: nonNegativeIntegerSchema,
+      establishment: hrEmployeeSelfServiceOrganisationUnitSchema.nullable(),
+      department: hrEmployeeSelfServiceOrganisationUnitSchema.nullable(),
+      jobPosition: z
+        .object({ id: uuidSchema, code: z.string(), title: z.string() })
+        .nullable(),
+    })
+    .nullable(),
+  currentAssignment: z
+    .object({
+      id: uuidSchema,
+      isPrimary: z.boolean(),
+      startDate: civilDateHttpSchema,
+      department: hrEmployeeSelfServiceOrganisationUnitSchema.nullable(),
+      jobPosition: z
+        .object({ id: uuidSchema, code: z.string(), title: z.string() })
+        .nullable(),
+      team: hrEmployeeSelfServiceOrganisationUnitSchema.nullable(),
+      workLocation: z
+        .object({
+          id: uuidSchema,
+          code: z.string(),
+          name: z.string(),
+          type: hrWorkLocationTypeSchema,
+          city: nullableStringSchema,
+        })
+        .nullable(),
+    })
+    .nullable(),
+  bankAccount: hrEmployeeBankAccountSchema.nullable(),
+  documents: z.array(hrEmployeeSelfServiceDocumentSchema),
+  leaveBalances: z.array(hrEmployeeSelfServiceLeaveBalanceSchema),
+  leaveRequests: z.array(hrEmployeeSelfServiceLeaveRequestSchema),
+  payslips: z.array(hrEmployeePayslipSummarySchema),
+  timeCorrectionRequests: z.array(hrEmployeeSelfServiceTimeCorrectionSchema),
+});
+
+export const hrEmployeeSelfServicePayslipDocumentSchema = z.object({
+  filename: z.string(),
+  contentType: z.literal('application/pdf'),
+  contentBase64: z.string(),
+});
+
 export const hrCalendarDaySchema = z.object({
   id: uuidSchema,
   organisationId: uuidSchema,
@@ -1969,6 +2129,9 @@ export type HrPayrollVariableKind = z.infer<typeof hrPayrollVariableKindSchema>;
 export type HrPayrollVariableUnit = z.infer<typeof hrPayrollVariableUnitSchema>;
 export type HrAccessContext = z.infer<typeof hrAccessContextSchema>;
 export type HrAccessGrant = z.infer<typeof hrAccessGrantSchema>;
+export type HrEmployeeSelfServiceAccess = z.infer<
+  typeof hrEmployeeSelfServiceAccessSchema
+>;
 export type HrAccessAdministration = z.infer<
   typeof hrAccessAdministrationSchema
 >;
@@ -2050,6 +2213,7 @@ export type HrLeaveAccrualRunResult = z.infer<
 export type HrEmployeePayslipSummary = z.infer<
   typeof hrEmployeePayslipSummarySchema
 >;
+export type HrEmployeeSelfService = z.infer<typeof hrEmployeeSelfServiceSchema>;
 export type HrCalendarDay = z.infer<typeof hrCalendarDaySchema>;
 export type HrWorkCalendar = z.infer<typeof hrWorkCalendarSchema>;
 export type HrMoroccoHolidaySeedResult = z.infer<

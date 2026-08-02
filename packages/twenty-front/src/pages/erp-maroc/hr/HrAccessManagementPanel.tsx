@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   hrAccessAdministrationSchema,
   hrAccessGrantSchema,
+  hrEmployeeSelfServiceAccessSchema,
   type HrAccessAdministration,
   type HrAccessRole,
   type HrEmployeeListItem,
@@ -13,7 +14,13 @@ import {
   type HrFieldPermission,
   type HrPopulationScope,
 } from 'twenty-shared/erp-maroc';
-import { IconCheck, IconEdit, IconPlus, IconRefresh } from 'twenty-ui/display';
+import {
+  IconCheck,
+  IconEdit,
+  IconPlus,
+  IconRefresh,
+  IconUser,
+} from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
@@ -31,6 +38,12 @@ type GrantForm = {
   fieldPermissions: HrFieldPermission[];
   establishmentIds: string[];
   employeeIds: string[];
+  isActive: boolean;
+};
+
+type SelfServiceForm = {
+  twentyUserId: string;
+  employeeId: string;
   isActive: boolean;
 };
 
@@ -75,8 +88,8 @@ const StyledRow = styled.div`
   gap: ${themeCssVariables.spacing[3]};
   grid-template-columns:
     minmax(240px, 1.4fr) minmax(150px, 0.8fr) minmax(180px, 1fr)
-    minmax(150px, 0.8fr) auto;
-  min-width: 920px;
+    minmax(150px, 0.8fr) minmax(180px, 1fr) auto;
+  min-width: 1120px;
   padding: ${themeCssVariables.spacing[3]} ${themeCssVariables.spacing[4]};
 `;
 
@@ -181,6 +194,12 @@ const StyledScopeList = styled.div`
   padding: ${themeCssVariables.spacing[2]};
 `;
 
+const StyledRowActions = styled.div`
+  align-items: center;
+  display: flex;
+  gap: ${themeCssVariables.spacing[2]};
+`;
+
 const roleLabels: Record<HrAccessRole, string> = {
   HR_ADMIN: 'Administrateur RH',
   HR_MANAGER: 'Responsable RH',
@@ -247,6 +266,16 @@ const emptyForm = (user?: AccessUser): GrantForm => {
   };
 };
 
+const emptySelfServiceForm = (
+  employees: HrEmployeeListItem[],
+  user?: AccessUser,
+): SelfServiceForm => ({
+  twentyUserId: user?.twentyUserId ?? '',
+  employeeId:
+    user?.hrEmployeeSelfServiceAccess?.employeeId ?? employees[0]?.id ?? '',
+  isActive: user?.hrEmployeeSelfServiceAccess?.isActive ?? true,
+});
+
 const toggleValue = <T extends string>(
   values: readonly T[],
   value: T,
@@ -282,6 +311,7 @@ export const HrAccessManagementPanel = ({
     'loading',
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selfServiceDrawerOpen, setSelfServiceDrawerOpen] = useState(false);
   const [form, setForm] = useState<GrantForm>(() => emptyForm());
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -311,6 +341,16 @@ export const HrAccessManagementPanel = ({
     setForm(emptyForm(user));
     setDrawerOpen(true);
   };
+
+  const openSelfServiceUser = (user: AccessUser) => {
+    setMessage(null);
+    setSelfServiceForm(emptySelfServiceForm(employees, user));
+    setSelfServiceDrawerOpen(true);
+  };
+
+  const [selfServiceForm, setSelfServiceForm] = useState<SelfServiceForm>(() =>
+    emptySelfServiceForm(employees),
+  );
 
   const openFirstAvailableUser = () => {
     const user = administration?.users.find(
@@ -370,6 +410,40 @@ export const HrAccessManagementPanel = ({
       setMessage(
         'La configuration a été refusée. Vérifiez les permissions dépendantes.',
       );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitSelfService = async () => {
+    if (
+      selfServiceForm.twentyUserId === '' ||
+      selfServiceForm.employeeId === ''
+    ) {
+      setMessageDanger(true);
+      setMessage('Sélectionnez un utilisateur et un salarié.');
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const intent = client.createMutationIntent(
+        {
+          method: 'POST',
+          path: '/hr-core/access/self-service-links',
+          schema: hrEmployeeSelfServiceAccessSchema,
+          body: selfServiceForm,
+        },
+        { idempotency: 'required' },
+      );
+      await intent.execute();
+      setSelfServiceDrawerOpen(false);
+      setMessageDanger(false);
+      setMessage('Espace salarié mis à jour.');
+      await load();
+    } catch {
+      setMessageDanger(true);
+      setMessage('Ce salarié est peut-être déjà lié à un autre utilisateur.');
     } finally {
       setBusy(false);
     }
@@ -444,17 +518,39 @@ export const HrAccessManagementPanel = ({
                   <StyledSecondary>Périmètre</StyledSecondary>
                   <span>{accessScopeSummary(user)}</span>
                 </StyledCell>
-                {systemAdministrator ? (
-                  <ErpStatusBadge label="Système" tone="success" />
-                ) : (
-                  <Button
-                    title="Modifier l’accès RH"
-                    ariaLabel={`Modifier l’accès RH de ${user.email ?? user.twentyUserId}`}
-                    Icon={grant === null ? IconPlus : IconEdit}
-                    variant="secondary"
-                    onClick={() => openUser(user)}
-                  />
-                )}
+                <StyledCell>
+                  <StyledSecondary>Espace salarié</StyledSecondary>
+                  <span>
+                    {user.hrEmployeeSelfServiceAccess === null
+                      ? 'Non configuré'
+                      : `${user.hrEmployeeSelfServiceAccess.employee.firstName} ${user.hrEmployeeSelfServiceAccess.employee.lastName}`}
+                  </span>
+                  {user.hrEmployeeSelfServiceAccess?.isActive === false ? (
+                    <StyledSecondary>Désactivé</StyledSecondary>
+                  ) : null}
+                </StyledCell>
+                <StyledRowActions>
+                  {systemAdministrator ? (
+                    <ErpStatusBadge label="Système" tone="success" />
+                  ) : (
+                    <Button
+                      title="Modifier l’accès RH"
+                      ariaLabel={`Modifier l’accès RH de ${user.email ?? user.twentyUserId}`}
+                      Icon={grant === null ? IconPlus : IconEdit}
+                      variant="secondary"
+                      onClick={() => openUser(user)}
+                    />
+                  )}
+                  {employees.length > 0 ? (
+                    <Button
+                      title="Configurer l’espace salarié"
+                      ariaLabel={`Configurer l’espace salarié de ${user.email ?? user.twentyUserId}`}
+                      Icon={IconUser}
+                      variant="secondary"
+                      onClick={() => openSelfServiceUser(user)}
+                    />
+                  ) : null}
+                </StyledRowActions>
               </StyledRow>
             );
           })}
@@ -634,6 +730,93 @@ export const HrAccessManagementPanel = ({
               }
             />
             Accès actif
+          </StyledCheckbox>
+        </StyledDrawerForm>
+      </ErpFormDrawer>
+
+      <ErpFormDrawer
+        isOpen={selfServiceDrawerOpen}
+        title="Espace salarié"
+        description="Le compte accède uniquement à son propre dossier, sans aucun droit d’administration RH."
+        isBusy={busy}
+        onClose={() => setSelfServiceDrawerOpen(false)}
+        footer={
+          <>
+            <Button
+              title="Annuler"
+              ariaLabel="Annuler"
+              variant="secondary"
+              disabled={busy}
+              onClick={() => setSelfServiceDrawerOpen(false)}
+            />
+            <Button
+              title="Enregistrer"
+              ariaLabel="Enregistrer l’espace salarié"
+              Icon={IconCheck}
+              accent="blue"
+              disabled={busy}
+              onClick={() => void submitSelfService()}
+            />
+          </>
+        }
+      >
+        <StyledDrawerForm
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submitSelfService();
+          }}
+        >
+          <StyledField>
+            Utilisateur
+            <StyledSelect
+              value={selfServiceForm.twentyUserId}
+              onChange={(event) => {
+                const user = administration?.users.find(
+                  ({ twentyUserId }) => twentyUserId === event.target.value,
+                );
+                if (user) {
+                  setSelfServiceForm(emptySelfServiceForm(employees, user));
+                }
+              }}
+            >
+              {administration?.users.map((user) => (
+                <option key={user.twentyUserId} value={user.twentyUserId}>
+                  {user.email ?? user.twentyUserId}
+                </option>
+              ))}
+            </StyledSelect>
+          </StyledField>
+          <StyledField>
+            Salarié associé
+            <StyledSelect
+              value={selfServiceForm.employeeId}
+              onChange={(event) =>
+                setSelfServiceForm((current) => ({
+                  ...current,
+                  employeeId: event.target.value,
+                }))
+              }
+            >
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.employeeNumber} · {employee.firstName}{' '}
+                  {employee.lastName}
+                </option>
+              ))}
+            </StyledSelect>
+          </StyledField>
+          <StyledCheckbox>
+            <input
+              type="checkbox"
+              checked={selfServiceForm.isActive}
+              onChange={(event) =>
+                setSelfServiceForm((current) => ({
+                  ...current,
+                  isActive: event.target.checked,
+                }))
+              }
+            />
+            Espace salarié actif
           </StyledCheckbox>
         </StyledDrawerForm>
       </ErpFormDrawer>

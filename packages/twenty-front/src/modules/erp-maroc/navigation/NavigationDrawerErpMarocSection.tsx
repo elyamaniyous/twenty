@@ -18,6 +18,7 @@ import {
   IconMail,
   IconNotes,
   IconSettings,
+  IconUser,
   IconUsers,
   type IconComponent,
 } from 'twenty-ui/display';
@@ -124,6 +125,12 @@ export const NavigationDrawerErpMarocSection = () => {
       path: erpMarocPaths.hrCore,
       activePaths: [erpMarocPaths.hrCore, erpMarocPaths.hrEmployeeDetail],
       Icon: IconUsers,
+    },
+    {
+      label: t`Mon espace salarié`,
+      path: erpMarocPaths.hrSelfService,
+      activePaths: [erpMarocPaths.hrSelfService],
+      Icon: IconUser,
     },
     {
       label: t`Cycle de paie`,

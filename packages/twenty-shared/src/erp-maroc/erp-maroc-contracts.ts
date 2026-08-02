@@ -3158,6 +3158,10 @@ export const erpMarocRouteIds = {
   hrAccessMe: 'hr-core.access.me',
   hrAccessAdministration: 'hr-core.access.administration',
   hrAccessGrants: 'hr-core.access.grants',
+  hrEmployeeSelfServiceLinks: 'hr-core.access.self-service-links',
+  hrEmployeeSelfServiceMe: 'hr-self-service.me',
+  hrEmployeeSelfServiceDocument: 'hr-self-service.document.content',
+  hrEmployeeSelfServicePayslip: 'hr-self-service.payslip.pdf',
   hrEstablishments: 'hr-core.establishments',
   hrEstablishmentDetail: 'hr-core.establishment.detail',
   hrGrades: 'hr-core.grades',
@@ -3589,6 +3593,7 @@ export const erpMarocUpstreamRoutes = {
     accessMe: '/hr-core/access/me',
     accessAdministration: '/hr-core/access/administration',
     accessGrants: '/hr-core/access/grants',
+    selfServiceLinks: '/hr-core/access/self-service-links',
     establishments: '/hr-core/establishments',
     establishment: (id: string) =>
       `/hr-core/establishments/${encodeRouteId(id)}`,
@@ -3650,6 +3655,13 @@ export const erpMarocUpstreamRoutes = {
       `/hr-core/contracts/${encodeRouteId(id)}/amendments`,
     amendmentStatus: (id: string) =>
       `/hr-core/amendments/${encodeRouteId(id)}/status`,
+  },
+  hrSelfService: {
+    me: '/hr-self-service/me',
+    documentContent: (id: string) =>
+      `/hr-self-service/documents/${encodeRouteId(id)}/content`,
+    payslipPdf: (id: string) =>
+      `/hr-self-service/payslips/${encodeRouteId(id)}/pdf`,
   },
   hrAttendance: {
     workCalendars: '/hr-attendance/work-calendars',

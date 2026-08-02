@@ -23,6 +23,7 @@ export const erpMarocPaths = {
   reminders: '/erp-maroc/reminders',
   marketing: '/erp-maroc/marketing',
   hrCore: '/erp-maroc/hr',
+  hrSelfService: '/erp-maroc/hr/my-space',
   hrEmployeeDetail: '/erp-maroc/hr/employees/:id',
   payrollCycle: '/erp-maroc/hr/payroll-cycle',
   payrollRegulatory: '/erp-maroc/hr/payroll-regulatory',

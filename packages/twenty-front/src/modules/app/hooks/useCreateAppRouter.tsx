@@ -166,6 +166,12 @@ const ErpHrCorePage = lazy(() =>
   })),
 );
 
+const ErpEmployeeSelfServicePage = lazy(() =>
+  import('~/pages/erp-maroc/hr/ErpEmployeeSelfServicePage').then((module) => ({
+    default: module.ErpEmployeeSelfServicePage,
+  })),
+);
+
 const ErpEmployeeHrDetailPage = lazy(() =>
   import('~/pages/erp-maroc/hr/ErpEmployeeHrDetailPage').then((module) => ({
     default: module.ErpEmployeeHrDetailPage,
@@ -625,6 +631,14 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpHrCorePage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.hrSelfService}
+                element={
+                  <LazyRoute>
+                    <ErpEmployeeSelfServicePage />
                   </LazyRoute>
                 }
               />
