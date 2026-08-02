@@ -86,6 +86,24 @@ const rate = (basisPoints: number) =>
         maximumFractionDigits: 2,
       }).format(basisPoints / 100)} %`;
 
+const evolution = (
+  deltaCents: number | null | undefined,
+  deltaRateBasisPoints: number | null | undefined,
+  emptyLabel = 'Nouveau',
+) => {
+  if (deltaCents === null || deltaCents === undefined) return emptyLabel;
+  const amount = `${deltaCents > 0 ? '+' : ''}${money(deltaCents)}`;
+  if (deltaRateBasisPoints === null || deltaRateBasisPoints === undefined) {
+    return amount;
+  }
+  const percentage = new Intl.NumberFormat('fr-MA', {
+    maximumFractionDigits: 2,
+  }).format(Math.abs(deltaRateBasisPoints) / 100);
+  const sign =
+    deltaRateBasisPoints > 0 ? '+' : deltaRateBasisPoints < 0 ? '−' : '';
+  return `${amount} · ${sign}${percentage} %`;
+};
+
 const statusLabels: Record<HrMonthlyPeriodStatus, string> = {
   OPEN: 'Population',
   IN_REVIEW: 'En revue',
@@ -158,7 +176,7 @@ const StyledMetrics = styled.section`
   border-bottom: 1px solid ${themeCssVariables.border.color.light};
   display: grid;
   flex: 0 0 auto;
-  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  grid-template-columns: repeat(6, minmax(140px, 1fr));
   overflow-x: auto;
 `;
 
@@ -311,6 +329,21 @@ const StyledRubricTitle = styled.strong`
   color: ${themeCssVariables.font.color.primary};
   font-size: ${themeCssVariables.font.size.md};
   letter-spacing: 0;
+`;
+
+const StyledRubricComparison = styled.section`
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  overflow-x: auto;
+`;
+
+const StyledRubricComparisonItem = styled.div`
+  border-right: 1px solid ${themeCssVariables.border.color.light};
+  display: grid;
+  gap: 2px;
+  min-width: 180px;
+  padding: ${themeCssVariables.spacing[2]} ${themeCssVariables.spacing[3]};
 `;
 
 const centsFromMad = (value: unknown): number => {
@@ -1458,6 +1491,23 @@ export const ErpPayrollCyclePage = () => {
         },
       },
       {
+        key: 'net-evolution',
+        header: 'Évolution M/M-1',
+        width: '210px',
+        align: 'right',
+        render: (row) => {
+          const comparison = payslipByEmployee.get(row.employeeId)?.comparison;
+          return comparison === undefined
+            ? '—'
+            : evolution(
+                comparison.previousPayslipId === null
+                  ? null
+                  : comparison.net.deltaCents,
+                comparison.net.deltaRateBasisPoints,
+              );
+        },
+      },
+      {
         key: 'details',
         header: '',
         width: '110px',
@@ -1562,6 +1612,29 @@ export const ErpPayrollCyclePage = () => {
       width: '170px',
       align: 'right',
       render: ({ amountCents }) => money(amountCents),
+    },
+    {
+      key: 'evolution',
+      header: 'Évolution M-1',
+      width: '210px',
+      align: 'right',
+      render: ({ deltaAmountCents, deltaRateBasisPoints }) =>
+        evolution(deltaAmountCents, deltaRateBasisPoints),
+    },
+    {
+      key: 'explanation',
+      header: 'Explication et source',
+      width: '380px',
+      render: ({ formula, sourceCodes }) => (
+        <StyledEmployee>
+          <span>{formula ?? 'Montant repris du bulletin historique'}</span>
+          <StyledMuted>
+            {sourceCodes?.length
+              ? sourceCodes.join(' · ')
+              : 'Source non structurée'}
+          </StyledMuted>
+        </StyledEmployee>
+      ),
     },
   ];
 
@@ -1785,6 +1858,17 @@ export const ErpPayrollCyclePage = () => {
                 `${draftPayslipCount} / ${validatedOnlyPayslipCount} / ${paidPayslipCount}`,
               ],
               ['Net à payer', money(preview?.totalNetCents ?? 0)],
+              [
+                'Évolution nette M/M-1',
+                preview === null
+                  ? '—'
+                  : preview.comparison.hasPreviousPeriodData
+                    ? evolution(
+                        preview.comparison.net.deltaCents,
+                        preview.comparison.net.deltaRateBasisPoints,
+                      )
+                    : 'Pas de M-1',
+              ],
               ['Coût employeur', money(preview?.totalEmployerCostCents ?? 0)],
             ].map(([label, value]) => (
               <StyledMetric key={label}>
@@ -2176,6 +2260,38 @@ export const ErpPayrollCyclePage = () => {
                 tone={selectedPayslip.status === 'DRAFT' ? 'info' : 'success'}
               />
             </StyledRubricHeader>
+            <StyledRubricComparison>
+              <StyledRubricComparisonItem>
+                <StyledMetricLabel>Net courant</StyledMetricLabel>
+                <StyledMetricValue>
+                  {money(selectedPayslip.netSalaryCents)}
+                </StyledMetricValue>
+              </StyledRubricComparisonItem>
+              <StyledRubricComparisonItem>
+                <StyledMetricLabel>
+                  Net {selectedPayslip.comparison?.previousPeriodKey ?? 'M-1'}
+                </StyledMetricLabel>
+                <StyledMetricValue>
+                  {selectedPayslip.comparison?.previousPayslipId === null ||
+                  selectedPayslip.comparison === undefined
+                    ? 'Nouveau salarié'
+                    : money(selectedPayslip.comparison.net.previousCents)}
+                </StyledMetricValue>
+              </StyledRubricComparisonItem>
+              <StyledRubricComparisonItem>
+                <StyledMetricLabel>Évolution du net</StyledMetricLabel>
+                <StyledMetricValue>
+                  {selectedPayslip.comparison === undefined
+                    ? '—'
+                    : evolution(
+                        selectedPayslip.comparison.previousPayslipId === null
+                          ? null
+                          : selectedPayslip.comparison.net.deltaCents,
+                        selectedPayslip.comparison.net.deltaRateBasisPoints,
+                      )}
+                </StyledMetricValue>
+              </StyledRubricComparisonItem>
+            </StyledRubricComparison>
             <ErpOperationalTable
               ariaLabel="Rubriques du bulletin sélectionné"
               columns={rubricColumns}

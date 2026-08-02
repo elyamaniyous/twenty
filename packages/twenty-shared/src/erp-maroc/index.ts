@@ -295,6 +295,8 @@ export {
   erpEmployeeSchema,
   erpEmployeeListSchema,
   erpPayslipLineSchema,
+  erpPayrollMetricComparisonSchema,
+  erpPayrollPayslipComparisonSchema,
   erpPayslipSchema,
   erpPayslipListSchema,
   erpPayrollPreviewWarningSchema,

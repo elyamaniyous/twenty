@@ -2322,8 +2322,30 @@ export const erpPayslipLineSchema = z
     rateBasisPoints: signedCentsSchema,
     amountCents: signedCentsSchema,
     position: nonNegativeIntegerSchema,
+    quantityHundredths: nonNegativeIntegerSchema.optional(),
+    formula: nonBlankStringSchema.optional(),
+    sourceCodes: z.array(nonBlankStringSchema).optional(),
+    previousAmountCents: signedCentsSchema.nullable().optional(),
+    deltaAmountCents: signedCentsSchema.nullable().optional(),
+    deltaRateBasisPoints: safeIntegerSchema.nullable().optional(),
   })
   .passthrough();
+
+export const erpPayrollMetricComparisonSchema = z.object({
+  currentCents: signedCentsSchema,
+  previousCents: signedCentsSchema,
+  deltaCents: signedCentsSchema,
+  deltaRateBasisPoints: safeIntegerSchema.nullable(),
+});
+
+export const erpPayrollPayslipComparisonSchema = z.object({
+  previousPeriodKey: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  previousPayslipId: nullableUuidSchema,
+  gross: erpPayrollMetricComparisonSchema,
+  net: erpPayrollMetricComparisonSchema,
+  employerCost: erpPayrollMetricComparisonSchema,
+});
+
 export const erpPayslipSchema = z
   .object({
     id: uuidSchema,
@@ -2342,6 +2364,7 @@ export const erpPayslipSchema = z
     paidAt: nullableInstantSchema,
     employee: erpEmployeeSchema.optional(),
     lines: z.array(erpPayslipLineSchema).optional(),
+    comparison: erpPayrollPayslipComparisonSchema.optional(),
     createdAt: instantSchema,
     updatedAt: instantSchema,
   })
@@ -2364,6 +2387,15 @@ export const erpPayrollPeriodPreviewSchema = z.object({
   totalEmployerCostCents: centsSchema,
   warnings: z.array(erpPayrollPreviewWarningSchema),
   payslips: erpPayslipListSchema,
+  comparison: z.object({
+    previousPeriodKey: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+    hasPreviousPeriodData: z.boolean(),
+    currentEmployeeCount: nonNegativeIntegerSchema,
+    previousEmployeeCount: nonNegativeIntegerSchema,
+    gross: erpPayrollMetricComparisonSchema,
+    net: erpPayrollMetricComparisonSchema,
+    employerCost: erpPayrollMetricComparisonSchema,
+  }),
 });
 
 export const erpPayrollPaymentBatchSchema = z.object({
