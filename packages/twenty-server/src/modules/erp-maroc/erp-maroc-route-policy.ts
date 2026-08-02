@@ -113,6 +113,9 @@ import {
   payrollDeclarationExportSchema,
   payrollDeclarationListSchema,
   payrollDeclarationSchema,
+  payrollDeadlineListSchema,
+  payrollClosingDossierSchema,
+  payrollClosingPreviewSchema,
   erpPayrollPaymentBatchNullableSchema,
   erpPayrollPaymentBatchSchema,
   erpPayrollPaymentReconciliationSchema,
@@ -228,6 +231,8 @@ const leaveRequestQuery = Object.freeze(['year', 'status']);
 const leaveBalanceQuery = Object.freeze(['year']);
 const monthlyClosingQuery = Object.freeze(['year']);
 const payrollDeclarationExportQuery = Object.freeze(['periodKey', 'format']);
+const payrollDeadlineQuery = Object.freeze(['year']);
+const payrollPeriodSource = '(\\d{4}-(?:0[1-9]|1[0-2]))';
 const pdfSchema = z.instanceof(Uint8Array);
 
 const exact = (path: string) => new RegExp(`^${path}$`);
@@ -1531,6 +1536,50 @@ const routes: ErpMarocRoute[] = [
     responseSchema: payrollDeclarationEvidenceSchema,
     kind: 'json',
     idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollDeadlines,
+    method: 'GET',
+    pattern: exact('/payroll/deadlines'),
+    build: staticBuilder(erpMarocUpstreamRoutes.payroll.deadlines),
+    queryKeys: payrollDeadlineQuery,
+    responseSchema: payrollDeadlineListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollClosingPreview,
+    method: 'GET',
+    pattern: new RegExp(
+      `^/payroll/closing-dossiers/${payrollPeriodSource}/preview$`,
+    ),
+    build: (match) => erpMarocUpstreamRoutes.payroll.closingPreview(match[1]),
+    queryKeys: noQuery,
+    responseSchema: payrollClosingPreviewSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollClosingClose,
+    method: 'POST',
+    pattern: new RegExp(
+      `^/payroll/closing-dossiers/${payrollPeriodSource}/close$`,
+    ),
+    build: (match) => erpMarocUpstreamRoutes.payroll.closePeriod(match[1]),
+    queryKeys: noQuery,
+    responseSchema: payrollClosingDossierSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollClosingReopen,
+    method: 'POST',
+    pattern: new RegExp(`^/payroll/closing-dossiers/${uuidSource}/reopen$`),
+    build: idBuilder(erpMarocUpstreamRoutes.payroll.reopenPeriod),
+    queryKeys: noQuery,
+    responseSchema: payrollClosingDossierSchema,
+    kind: 'json',
+    idempotency: 'required',
   }),
   defineRoute({
     routeId: erpMarocRouteIds.payrollRegulatorySummary,
@@ -2895,6 +2944,13 @@ const assertNormalizedQueryValue = (
     return;
   }
   if (
+    routeId === erpMarocRouteIds.payrollDeadlines &&
+    key === 'year' &&
+    /^(?:20\d{2}|2100)$/.test(value)
+  ) {
+    return;
+  }
+  if (
     routeId === erpMarocRouteIds.hrLeaveRequests &&
     key === 'status' &&
     new Set([
@@ -2954,6 +3010,12 @@ const buildQueryString = (
   if (
     (route.queryKeys === leaveRequestQuery ||
       route.queryKeys === leaveBalanceQuery) &&
+    !values.has('year')
+  ) {
+    rejectRoute();
+  }
+  if (
+    route.routeId === erpMarocRouteIds.payrollDeadlines &&
     !values.has('year')
   ) {
     rejectRoute();

@@ -113,6 +113,9 @@ import {
   payrollDeclarationExportSchema,
   payrollDeclarationListSchema,
   payrollDeclarationSchema,
+  payrollDeadlineListSchema,
+  payrollClosingDossierSchema,
+  payrollClosingPreviewSchema,
   erpPayrollPaymentBatchNullableSchema,
   erpPayrollPaymentBatchSchema,
   erpPayrollPaymentFailureSchema,
@@ -205,6 +208,8 @@ const requiredIdempotencyRoutes = new Set([
   'POST /payroll/regulatory/seed/morocco-2026',
   `POST /payroll/declarations/${id}/submit`,
   `POST /payroll/declarations/${id}/receipts`,
+  'POST /payroll/closing-dossiers/2026-07/close',
+  `POST /payroll/closing-dossiers/${id}/reopen`,
   'POST /hr-core/access/grants',
   'POST /hr-core/establishments',
   `PATCH /hr-core/establishments/${id}`,
@@ -827,6 +832,25 @@ const approvedRoutes = [
     'payroll.declaration.evidence',
     payrollDeclarationEvidenceSchema,
   ],
+  ['GET', '/payroll/deadlines', 'payroll.deadlines', payrollDeadlineListSchema],
+  [
+    'GET',
+    '/payroll/closing-dossiers/2026-07/preview',
+    'payroll.closing.preview',
+    payrollClosingPreviewSchema,
+  ],
+  [
+    'POST',
+    '/payroll/closing-dossiers/2026-07/close',
+    'payroll.closing.close',
+    payrollClosingDossierSchema,
+  ],
+  [
+    'POST',
+    `/payroll/closing-dossiers/${id}/reopen`,
+    'payroll.closing.reopen',
+    payrollClosingDossierSchema,
+  ],
   [
     'GET',
     '/payroll/regulatory/summary',
@@ -1425,7 +1449,9 @@ describe('ERP Maroc route policy', () => {
                 ? { year: '2026' }
                 : routeId === 'hr-leave.balances'
                   ? { year: '2026' }
-                  : routeId === 'hr-monthly-closing.periods' && method === 'GET'
+                  : (routeId === 'hr-monthly-closing.periods' ||
+                        routeId === 'payroll.deadlines') &&
+                      method === 'GET'
                     ? { year: '2026' }
                     : requiresAccountCode
                       ? { accountCode: '3421' }
@@ -1445,7 +1471,9 @@ describe('ERP Maroc route policy', () => {
               : (routeId === 'hr-leave.requests' && method === 'GET') ||
                   routeId === 'hr-leave.balances'
                 ? `${path}?year=2026`
-                : routeId === 'hr-monthly-closing.periods' && method === 'GET'
+                : (routeId === 'hr-monthly-closing.periods' ||
+                      routeId === 'payroll.deadlines') &&
+                    method === 'GET'
                   ? `${path}?year=2026`
                   : requiresAccountCode
                     ? `${path}?accountCode=3421`
@@ -1648,6 +1676,11 @@ describe('ERP Maroc route policy', () => {
         year: '2026',
       }).upstreamPath,
     ).toBe('/hr-monthly-periods?year=2026');
+    expect(
+      resolveErpRoute('GET', '/payroll/deadlines', {
+        year: '2026',
+      }).upstreamPath,
+    ).toBe('/payroll/deadlines?year=2026');
   });
 
   it.each([
@@ -1702,6 +1735,10 @@ describe('ERP Maroc route policy', () => {
     ['/hr-monthly-periods', { year: '1999' }],
     ['/hr-monthly-periods', { year: '2101' }],
     ['/hr-monthly-periods', { year: '02026' }],
+    ['/payroll/deadlines', {}],
+    ['/payroll/deadlines', { year: '1999' }],
+    ['/payroll/deadlines', { year: '2101' }],
+    ['/payroll/deadlines', { year: '02026' }],
   ])('rejects non-normalized or unauthorized query for %s', (path, query) => {
     expect(() => resolveErpRoute('GET', path, query)).toThrow(
       'ERP route is not allowed',

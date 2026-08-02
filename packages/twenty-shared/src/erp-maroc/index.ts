@@ -635,6 +635,11 @@ export type {
   PayrollDeclarationStatus,
   PayrollDeclarationEvent,
   PayrollDeclaration,
+  PayrollDeadlineStatus,
+  PayrollDeadline,
+  PayrollClosingCheck,
+  PayrollClosingDossier,
+  PayrollClosingPreview,
 } from './payroll-regulatory-contracts';
 export {
   payrollRegulatoryStatusSchema,
@@ -657,4 +662,12 @@ export {
   payrollDeclarationListSchema,
   payrollDeclarationExportSchema,
   payrollDeclarationEvidenceSchema,
+  payrollDeadlineStatusSchema,
+  payrollDeadlineSchema,
+  payrollDeadlineListSchema,
+  payrollClosingCheckSchema,
+  payrollClosingTotalsSchema,
+  payrollClosingProofsSchema,
+  payrollClosingDossierSchema,
+  payrollClosingPreviewSchema,
 } from './payroll-regulatory-contracts';

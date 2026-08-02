@@ -3140,6 +3140,10 @@ export const erpMarocRouteIds = {
   payrollDeclarationSubmit: 'payroll.declaration.submit',
   payrollDeclarationReceipt: 'payroll.declaration.receipt',
   payrollDeclarationEvidence: 'payroll.declaration.evidence',
+  payrollDeadlines: 'payroll.deadlines',
+  payrollClosingPreview: 'payroll.closing.preview',
+  payrollClosingClose: 'payroll.closing.close',
+  payrollClosingReopen: 'payroll.closing.reopen',
   payrollPayslipPdf: 'payroll.payslip.pdf',
   payrollEmployeeAttestation: 'payroll.employee.attestation',
   payrollFinalSettlementPdf: 'payroll.employee.final-settlement.pdf',
@@ -3559,6 +3563,13 @@ export const erpMarocUpstreamRoutes = {
       `/payroll/declarations/${encodeRouteId(id)}/receipts`,
     declarationEvidence: (id: string) =>
       `/payroll/declaration-events/${encodeRouteId(id)}/evidence`,
+    deadlines: '/payroll/deadlines',
+    closingPreview: (periodKey: string) =>
+      `/payroll/closing-dossiers/${encodeURIComponent(periodKey)}/preview`,
+    closePeriod: (periodKey: string) =>
+      `/payroll/closing-dossiers/${encodeURIComponent(periodKey)}/close`,
+    reopenPeriod: (id: string) =>
+      `/payroll/closing-dossiers/${encodeRouteId(id)}/reopen`,
     payslipPdf: (id: string) => `/payroll/payslips/${encodeRouteId(id)}/pdf`,
     employeeAttestation: (id: string) =>
       `/payroll/employees/${encodeRouteId(id)}/attestation`,

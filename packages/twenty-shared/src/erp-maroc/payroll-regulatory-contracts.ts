@@ -297,6 +297,101 @@ export const payrollDeclarationEvidenceSchema = z.object({
   sizeBytes: z.number().int().positive().nullable(),
 });
 
+export const payrollDeadlineStatusSchema = z.enum([
+  'UPCOMING',
+  'DUE_SOON',
+  'OVERDUE',
+  'IN_PROGRESS',
+  'REJECTED',
+  'COMPLETED',
+]);
+
+export const payrollDeadlineSchema = z.object({
+  code: z.enum([
+    'CNSS_MONTHLY',
+    'IR_WITHHOLDING_MONTHLY',
+    'IR_SALARIES_ANNUAL',
+  ]),
+  label: z.string(),
+  periodKey: z.string(),
+  dueDate: civilDateHttpSchema,
+  portal: z.enum(['DAMANCOM', 'SIMPL_IR']),
+  ruleVersion: z.string(),
+  sourceLabel: z.string(),
+  sourceUrl: z.string(),
+  sourceArticle: nullableStringSchema,
+  requiresExpertReview: z.boolean(),
+  status: payrollDeadlineStatusSchema,
+  declarationId: uuidSchema.nullable(),
+  declarationStatus: payrollDeclarationStatusSchema.nullable(),
+  attemptNumber: z.number().int().positive().nullable(),
+  externalReference: nullableStringSchema,
+});
+export const payrollDeadlineListSchema = z.array(payrollDeadlineSchema);
+
+export const payrollClosingCheckSchema = z.object({
+  code: z.string(),
+  label: z.string(),
+  passed: z.boolean(),
+  blocking: z.literal(true),
+  detail: z.string(),
+});
+
+export const payrollClosingTotalsSchema = z.object({
+  employeeCount: countSchema,
+  totalGrossCents: countSchema,
+  totalNetCents: countSchema,
+  totalEmployerCostCents: countSchema,
+  totalCnssCents: countSchema,
+  totalAmoCents: countSchema,
+  totalIrCents: countSchema,
+});
+
+export const payrollClosingProofsSchema = z.object({
+  hrMonthlyPeriodId: uuidSchema.nullable(),
+  payslipIds: z.array(uuidSchema),
+  payrollAccountingEntryIds: z.array(uuidSchema),
+  paymentBatchId: uuidSchema.nullable(),
+  paymentBatchAttemptNumber: z.number().int().positive().nullable(),
+  settlementAccountingEntryId: uuidSchema.nullable(),
+  cnssDeclarationId: uuidSchema.nullable(),
+  cnssEvidenceEventId: uuidSchema.nullable(),
+  irDeclarationId: uuidSchema.nullable(),
+  irEvidenceEventId: uuidSchema.nullable(),
+});
+
+export const payrollClosingDossierSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  periodKey: z.string(),
+  version: z.number().int().positive(),
+  status: z.enum(['CLOSED', 'REOPENED']),
+  previousDossierId: uuidSchema.nullable(),
+  snapshot: z.unknown(),
+  snapshotSha256: sha256Schema,
+  closedAt: instantSchema,
+  closedByTwentyUserId: z.string(),
+  closeIdempotencyKey: z.string(),
+  reopenedAt: nullableInstantSchema,
+  reopenedByTwentyUserId: nullableStringSchema,
+  reopenReason: nullableStringSchema,
+  reopenIdempotencyKey: nullableStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+
+export const payrollClosingPreviewSchema = z.object({
+  periodKey: z.string(),
+  generatedAt: instantSchema,
+  ready: z.boolean(),
+  checks: z.array(payrollClosingCheckSchema),
+  totals: payrollClosingTotalsSchema,
+  proofs: payrollClosingProofsSchema,
+  deadlines: payrollDeadlineListSchema,
+  latestDossier: payrollClosingDossierSchema.nullable(),
+});
+
 export type PayrollRegulatoryStatus = z.infer<
   typeof payrollRegulatoryStatusSchema
 >;
@@ -316,3 +411,8 @@ export type PayrollDeclarationEvent = z.infer<
   typeof payrollDeclarationEventSchema
 >;
 export type PayrollDeclaration = z.infer<typeof payrollDeclarationSchema>;
+export type PayrollDeadlineStatus = z.infer<typeof payrollDeadlineStatusSchema>;
+export type PayrollDeadline = z.infer<typeof payrollDeadlineSchema>;
+export type PayrollClosingCheck = z.infer<typeof payrollClosingCheckSchema>;
+export type PayrollClosingDossier = z.infer<typeof payrollClosingDossierSchema>;
+export type PayrollClosingPreview = z.infer<typeof payrollClosingPreviewSchema>;

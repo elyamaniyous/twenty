@@ -28,13 +28,17 @@ import { IconRefresh, IconSearch, IconUpload } from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { PayrollDeclarationsPanel } from './PayrollDeclarationsPanel';
+import { PayrollDeadlinesPanel } from './PayrollDeadlinesPanel';
+import { PayrollClosingPanel } from './PayrollClosingPanel';
 
 type View =
   | 'parameters'
   | 'components'
   | 'controls'
   | 'sources'
-  | 'declarations';
+  | 'declarations'
+  | 'deadlines'
+  | 'closing';
 type LoadState = 'loading' | 'ready' | 'error';
 
 const EMPTY_SUMMARY: PayrollRegulatorySummary = {
@@ -633,6 +637,8 @@ export const ErpPayrollRegulatoryPage = () => {
               ['controls', 'Contrôles'],
               ['sources', 'Sources'],
               ['declarations', 'Déclarations'],
+              ['deadlines', 'Échéancier'],
+              ['closing', 'Clôture'],
             ] as const
           ).map(([key, label]) => (
             <StyledTab
@@ -692,8 +698,12 @@ export const ErpPayrollRegulatoryPage = () => {
           getRowKey={(source) => source.id}
           emptyLabel="Aucune source réglementaire"
         />
-      ) : (
+      ) : view === 'declarations' ? (
         <PayrollDeclarationsPanel query={query} />
+      ) : view === 'deadlines' ? (
+        <PayrollDeadlinesPanel query={query} />
+      ) : (
+        <PayrollClosingPanel />
       )}
     </ErpPageShell>
   );
