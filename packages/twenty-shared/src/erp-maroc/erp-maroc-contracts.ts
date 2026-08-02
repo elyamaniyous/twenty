@@ -3162,6 +3162,13 @@ export const erpMarocRouteIds = {
   hrEmployeeSelfServiceMe: 'hr-self-service.me',
   hrEmployeeSelfServiceDocument: 'hr-self-service.document.content',
   hrEmployeeSelfServicePayslip: 'hr-self-service.payslip.pdf',
+  hrEmployeeSelfServiceLeaveRequests: 'hr-self-service.leave-requests',
+  hrEmployeeSelfServiceLeaveEvidence: 'hr-self-service.leave-request.evidence',
+  hrEmployeeSelfServiceLeaveCancel: 'hr-self-service.leave-request.cancel',
+  hrEmployeeSelfServiceTimeCorrections:
+    'hr-self-service.time-correction-requests',
+  hrEmployeeSelfServiceTimeCorrectionEvidence:
+    'hr-self-service.time-correction-request.evidence',
   hrEstablishments: 'hr-core.establishments',
   hrEstablishmentDetail: 'hr-core.establishment.detail',
   hrGrades: 'hr-core.grades',
@@ -3662,6 +3669,14 @@ export const erpMarocUpstreamRoutes = {
       `/hr-self-service/documents/${encodeRouteId(id)}/content`,
     payslipPdf: (id: string) =>
       `/hr-self-service/payslips/${encodeRouteId(id)}/pdf`,
+    leaveRequests: '/hr-self-service/leave-requests',
+    leaveEvidence: (id: string) =>
+      `/hr-self-service/leave-requests/${encodeRouteId(id)}/evidence`,
+    leaveCancel: (id: string) =>
+      `/hr-self-service/leave-requests/${encodeRouteId(id)}/cancel`,
+    timeCorrectionRequests: '/hr-self-service/time-correction-requests',
+    timeCorrectionEvidence: (id: string) =>
+      `/hr-self-service/time-correction-requests/${encodeRouteId(id)}/evidence`,
   },
   hrAttendance: {
     workCalendars: '/hr-attendance/work-calendars',

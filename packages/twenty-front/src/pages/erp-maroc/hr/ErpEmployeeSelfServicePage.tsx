@@ -2,6 +2,7 @@ import {
   ErpOperationalTable,
   type ErpOperationalTableColumn,
 } from '@/erp-maroc/components/ErpOperationalTable';
+import { ErpFormDrawer } from '@/erp-maroc/components/ErpFormDrawer';
 import { ErpPageShell } from '@/erp-maroc/components/ErpPageShell';
 import {
   ErpStatusBadge,
@@ -14,9 +15,19 @@ import {
   hrDocumentContentSchema,
   hrEmployeeSelfServicePayslipDocumentSchema,
   hrEmployeeSelfServiceSchema,
+  hrLeaveRequestSchema,
+  hrTimeEntryCorrectionRequestSchema,
+  type HrTimeEntryCorrectionAction,
+  type HrTimeEntryType,
+  type HrTimeWorkMode,
   type HrEmployeeSelfService,
 } from 'twenty-shared/erp-maroc';
-import { IconDownload, IconRefresh } from 'twenty-ui/display';
+import {
+  IconCheck,
+  IconDownload,
+  IconPlus,
+  IconRefresh,
+} from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
@@ -26,6 +37,27 @@ type DocumentRow = HrEmployeeSelfService['documents'][number];
 type PayslipRow = HrEmployeeSelfService['payslips'][number];
 type LeaveRow = HrEmployeeSelfService['leaveRequests'][number];
 type TimeRow = HrEmployeeSelfService['timeCorrectionRequests'][number];
+
+type LeaveForm = {
+  policyId: string;
+  startDate: string;
+  endDate: string;
+  eventDate: string;
+  eventReference: string;
+  reason: string;
+  supportingDocumentId: string;
+};
+
+type TimeCorrectionForm = {
+  action: HrTimeEntryCorrectionAction;
+  originalTimeEntryId: string;
+  proposedType: HrTimeEntryType;
+  proposedOccurredAt: string;
+  proposedWorkMode: HrTimeWorkMode;
+  proposedNotes: string;
+  reason: string;
+  supportingDocumentId: string;
+};
 
 const StyledMetrics = styled.section`
   border-bottom: 1px solid ${themeCssVariables.border.color.light};
@@ -66,6 +98,15 @@ const StyledToolbar = styled.div`
   gap: ${themeCssVariables.spacing[1]};
   min-height: 44px;
   overflow-x: auto;
+  padding: 0 ${themeCssVariables.spacing[3]};
+`;
+
+const StyledViewActions = styled.div`
+  align-items: center;
+  border-bottom: 1px solid ${themeCssVariables.border.color.light};
+  display: flex;
+  justify-content: flex-end;
+  min-height: 44px;
   padding: 0 ${themeCssVariables.spacing[3]};
 `;
 
@@ -152,6 +193,48 @@ const StyledNotice = styled.div<{ danger: boolean }>`
   padding: ${themeCssVariables.spacing[2]} ${themeCssVariables.spacing[4]};
 `;
 
+const StyledDrawerForm = styled.form`
+  display: grid;
+  gap: ${themeCssVariables.spacing[3]};
+  overflow-y: auto;
+  padding: ${themeCssVariables.spacing[4]};
+`;
+
+const StyledField = styled.label`
+  color: ${themeCssVariables.font.color.secondary};
+  display: grid;
+  font-size: ${themeCssVariables.font.size.sm};
+  gap: ${themeCssVariables.spacing[1]};
+`;
+
+const fieldStyles = `
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: ${themeCssVariables.border.radius.sm};
+  box-sizing: border-box;
+  color: ${themeCssVariables.font.color.primary};
+  font: inherit;
+  min-height: 34px;
+  padding: 0 ${themeCssVariables.spacing[2]};
+  width: 100%;
+`;
+
+const StyledInput = styled.input`
+  ${fieldStyles}
+`;
+
+const StyledSelect = styled.select`
+  ${fieldStyles}
+`;
+
+const StyledTextarea = styled.textarea`
+  ${fieldStyles}
+  min-height: 88px;
+  padding-bottom: ${themeCssVariables.spacing[2]};
+  padding-top: ${themeCssVariables.spacing[2]};
+  resize: vertical;
+`;
+
 const formatMad = (cents: number) =>
   new Intl.NumberFormat('fr-MA', {
     style: 'currency',
@@ -164,6 +247,43 @@ const formatDate = (value: string | null) =>
     : new Intl.DateTimeFormat('fr-MA', { dateStyle: 'medium' }).format(
         new Date(`${value.slice(0, 10)}T12:00:00Z`),
       );
+
+const formatDateTime = (value: string) =>
+  new Intl.DateTimeFormat('fr-MA', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
+
+const localDateInput = (date = new Date()) => {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 10);
+};
+
+const localDateTimeInput = (date = new Date()) => {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+};
+
+const emptyLeaveForm = (policyId = ''): LeaveForm => ({
+  policyId,
+  startDate: localDateInput(),
+  endDate: localDateInput(),
+  eventDate: '',
+  eventReference: '',
+  reason: '',
+  supportingDocumentId: '',
+});
+
+const emptyTimeCorrectionForm = (): TimeCorrectionForm => ({
+  action: 'ADD',
+  originalTimeEntryId: '',
+  proposedType: 'CLOCK_IN',
+  proposedOccurredAt: localDateTimeInput(),
+  proposedWorkMode: 'ONSITE',
+  proposedNotes: '',
+  reason: '',
+  supportingDocumentId: '',
+});
 
 const saveBase64 = (
   contentBase64: string,
@@ -213,6 +333,13 @@ export const ErpEmployeeSelfServicePage = () => {
   const [view, setView] = useState<View>('overview');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [messageDanger, setMessageDanger] = useState(false);
+  const [leaveDrawerOpen, setLeaveDrawerOpen] = useState(false);
+  const [timeDrawerOpen, setTimeDrawerOpen] = useState(false);
+  const [leaveForm, setLeaveForm] = useState<LeaveForm>(() => emptyLeaveForm());
+  const [timeForm, setTimeForm] = useState<TimeCorrectionForm>(() =>
+    emptyTimeCorrectionForm(),
+  );
 
   const load = useCallback(async () => {
     setLoadState('loading');
@@ -269,6 +396,133 @@ export const ErpEmployeeSelfServicePage = () => {
     }
   };
 
+  const openLeaveRequest = () => {
+    setMessage(null);
+    setLeaveForm(emptyLeaveForm(data?.leavePolicies[0]?.id));
+    setLeaveDrawerOpen(true);
+  };
+
+  const submitLeaveRequest = async () => {
+    const policy = data?.leavePolicies.find(
+      ({ id }) => id === leaveForm.policyId,
+    );
+    if (
+      policy === undefined ||
+      leaveForm.startDate === '' ||
+      leaveForm.endDate === '' ||
+      (policy.eventDateRequired && leaveForm.eventDate === '')
+    ) {
+      setMessageDanger(true);
+      setMessage('Complétez les champs obligatoires de la demande.');
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const intent = client.createMutationIntent(
+        {
+          method: 'POST',
+          path: '/hr-self-service/leave-requests',
+          schema: hrLeaveRequestSchema,
+          body: {
+            policyId: leaveForm.policyId,
+            startDate: leaveForm.startDate,
+            endDate: leaveForm.endDate,
+            eventDate: leaveForm.eventDate || null,
+            eventReference: leaveForm.eventReference || null,
+            reason: leaveForm.reason || null,
+            supportingDocumentId: leaveForm.supportingDocumentId || null,
+          },
+        },
+        { idempotency: 'required' },
+      );
+      await intent.execute();
+      setLeaveDrawerOpen(false);
+      setMessageDanger(false);
+      setMessage('Demande de congé enregistrée.');
+      await load();
+    } catch {
+      setMessageDanger(true);
+      setMessage(
+        'Demande refusée. Vérifiez les dates, le délai et votre solde.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openTimeCorrection = () => {
+    setMessage(null);
+    setTimeForm(emptyTimeCorrectionForm());
+    setTimeDrawerOpen(true);
+  };
+
+  const submitTimeCorrection = async () => {
+    const needsOriginal = timeForm.action !== 'ADD';
+    const needsProposal = timeForm.action !== 'CANCEL';
+    if (
+      timeForm.reason.trim().length < 3 ||
+      (needsOriginal && timeForm.originalTimeEntryId === '') ||
+      (needsProposal && timeForm.proposedOccurredAt === '')
+    ) {
+      setMessageDanger(true);
+      setMessage('Complétez le pointage concerné, l’heure et le motif.');
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const body = {
+        action: timeForm.action,
+        reason: timeForm.reason,
+        ...(needsOriginal
+          ? { originalTimeEntryId: timeForm.originalTimeEntryId }
+          : {}),
+        ...(needsProposal
+          ? {
+              proposedType: timeForm.proposedType,
+              proposedOccurredAt: new Date(
+                timeForm.proposedOccurredAt,
+              ).toISOString(),
+              proposedWorkMode: timeForm.proposedWorkMode,
+              proposedNotes: timeForm.proposedNotes || null,
+            }
+          : {}),
+      };
+      const intent = client.createMutationIntent(
+        {
+          method: 'POST',
+          path: '/hr-self-service/time-correction-requests',
+          schema: hrTimeEntryCorrectionRequestSchema,
+          body,
+        },
+        { idempotency: 'required' },
+      );
+      const request = await intent.execute();
+      if (timeForm.supportingDocumentId !== '') {
+        const evidenceIntent = client.createMutationIntent(
+          {
+            method: 'PATCH',
+            path: `/hr-self-service/time-correction-requests/${request.id}/evidence`,
+            schema: hrTimeEntryCorrectionRequestSchema,
+            body: { documentId: timeForm.supportingDocumentId },
+          },
+          { idempotency: 'required' },
+        );
+        await evidenceIntent.execute();
+      }
+      setTimeDrawerOpen(false);
+      setMessageDanger(false);
+      setMessage('Demande de correction enregistrée.');
+      await load();
+    } catch {
+      setMessageDanger(true);
+      setMessage('Correction refusée. Vérifiez le pointage et la période.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const currentYear = new Date().getFullYear();
   const currentBalance = data?.leaveBalances.find(
     ({ year }) => year === currentYear,
@@ -281,6 +535,9 @@ export const ErpEmployeeSelfServicePage = () => {
     data?.documents.filter(({ status }) =>
       ['MISSING', 'EXPIRING', 'EXPIRED'].includes(status),
     ).length ?? 0;
+  const selectedLeavePolicy = data?.leavePolicies.find(
+    ({ id }) => id === leaveForm.policyId,
+  );
 
   const documentColumns: ErpOperationalTableColumn<DocumentRow>[] = [
     {
@@ -532,7 +789,7 @@ export const ErpEmployeeSelfServicePage = () => {
             ))}
           </StyledToolbar>
           {message === null ? null : (
-            <StyledNotice danger>{message}</StyledNotice>
+            <StyledNotice danger={messageDanger}>{message}</StyledNotice>
           )}
           {view === 'overview' ? (
             <StyledOverview>
@@ -622,22 +879,357 @@ export const ErpEmployeeSelfServicePage = () => {
               emptyLabel="Aucun bulletin validé"
             />
           ) : view === 'leave' ? (
-            <ErpOperationalTable
-              ariaLabel="Mes demandes de congé"
-              columns={leaveColumns}
-              rows={data.leaveRequests}
-              getRowKey={(row) => row.id}
-              emptyLabel="Aucune demande de congé"
-            />
+            <>
+              <StyledViewActions>
+                <Button
+                  title="Nouvelle demande"
+                  ariaLabel="Créer une demande de congé"
+                  Icon={IconPlus}
+                  accent="blue"
+                  disabled={data.leavePolicies.length === 0}
+                  onClick={openLeaveRequest}
+                />
+              </StyledViewActions>
+              <ErpOperationalTable
+                ariaLabel="Mes demandes de congé"
+                columns={leaveColumns}
+                rows={data.leaveRequests}
+                getRowKey={(row) => row.id}
+                emptyLabel="Aucune demande de congé"
+              />
+            </>
           ) : (
-            <ErpOperationalTable
-              ariaLabel="Mes corrections de pointage"
-              columns={timeColumns}
-              rows={data.timeCorrectionRequests}
-              getRowKey={(row) => row.id}
-              emptyLabel="Aucune correction de pointage"
-            />
+            <>
+              <StyledViewActions>
+                <Button
+                  title="Nouvelle correction"
+                  ariaLabel="Créer une demande de correction de pointage"
+                  Icon={IconPlus}
+                  accent="blue"
+                  onClick={openTimeCorrection}
+                />
+              </StyledViewActions>
+              <ErpOperationalTable
+                ariaLabel="Mes corrections de pointage"
+                columns={timeColumns}
+                rows={data.timeCorrectionRequests}
+                getRowKey={(row) => row.id}
+                emptyLabel="Aucune correction de pointage"
+              />
+            </>
           )}
+
+          <ErpFormDrawer
+            isOpen={leaveDrawerOpen}
+            title="Demande de congé"
+            description="La demande suivra le circuit d’approbation RH configuré."
+            isBusy={busy}
+            onClose={() => setLeaveDrawerOpen(false)}
+            footer={
+              <>
+                <Button
+                  title="Annuler"
+                  ariaLabel="Fermer la demande de congé"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => setLeaveDrawerOpen(false)}
+                />
+                <Button
+                  title="Envoyer"
+                  ariaLabel="Envoyer la demande de congé"
+                  Icon={IconCheck}
+                  accent="blue"
+                  disabled={busy}
+                  onClick={() => void submitLeaveRequest()}
+                />
+              </>
+            }
+          >
+            <StyledDrawerForm
+              onSubmit={(event) => {
+                event.preventDefault();
+                void submitLeaveRequest();
+              }}
+            >
+              <StyledField>
+                Type de congé
+                <StyledSelect
+                  value={leaveForm.policyId}
+                  onChange={(event) =>
+                    setLeaveForm((current) => ({
+                      ...current,
+                      policyId: event.target.value,
+                    }))
+                  }
+                >
+                  {data.leavePolicies.map((policy) => (
+                    <option key={policy.id} value={policy.id}>
+                      {policy.name}
+                    </option>
+                  ))}
+                </StyledSelect>
+              </StyledField>
+              <StyledField>
+                Date de début
+                <StyledInput
+                  type="date"
+                  value={leaveForm.startDate}
+                  onChange={(event) =>
+                    setLeaveForm((current) => ({
+                      ...current,
+                      startDate: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                Date de fin
+                <StyledInput
+                  type="date"
+                  min={leaveForm.startDate}
+                  value={leaveForm.endDate}
+                  onChange={(event) =>
+                    setLeaveForm((current) => ({
+                      ...current,
+                      endDate: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              {selectedLeavePolicy?.eventDateRequired ? (
+                <>
+                  <StyledField>
+                    Date de l’événement
+                    <StyledInput
+                      type="date"
+                      value={leaveForm.eventDate}
+                      onChange={(event) =>
+                        setLeaveForm((current) => ({
+                          ...current,
+                          eventDate: event.target.value,
+                        }))
+                      }
+                    />
+                  </StyledField>
+                  <StyledField>
+                    Référence de l’événement
+                    <StyledInput
+                      value={leaveForm.eventReference}
+                      onChange={(event) =>
+                        setLeaveForm((current) => ({
+                          ...current,
+                          eventReference: event.target.value,
+                        }))
+                      }
+                    />
+                  </StyledField>
+                </>
+              ) : null}
+              <StyledField>
+                Justificatif
+                <StyledSelect
+                  value={leaveForm.supportingDocumentId}
+                  onChange={(event) =>
+                    setLeaveForm((current) => ({
+                      ...current,
+                      supportingDocumentId: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Aucun document</option>
+                  {data.documents
+                    .filter(({ latestVersion }) => latestVersion !== null)
+                    .map((document) => (
+                      <option key={document.id} value={document.id}>
+                        {document.title}
+                      </option>
+                    ))}
+                </StyledSelect>
+              </StyledField>
+              <StyledField>
+                Motif
+                <StyledTextarea
+                  value={leaveForm.reason}
+                  onChange={(event) =>
+                    setLeaveForm((current) => ({
+                      ...current,
+                      reason: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+            </StyledDrawerForm>
+          </ErpFormDrawer>
+
+          <ErpFormDrawer
+            isOpen={timeDrawerOpen}
+            title="Correction de pointage"
+            description="La correction sera appliquée uniquement après les validations requises."
+            isBusy={busy}
+            onClose={() => setTimeDrawerOpen(false)}
+            footer={
+              <>
+                <Button
+                  title="Annuler"
+                  ariaLabel="Fermer la correction de pointage"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => setTimeDrawerOpen(false)}
+                />
+                <Button
+                  title="Envoyer"
+                  ariaLabel="Envoyer la correction de pointage"
+                  Icon={IconCheck}
+                  accent="blue"
+                  disabled={busy}
+                  onClick={() => void submitTimeCorrection()}
+                />
+              </>
+            }
+          >
+            <StyledDrawerForm
+              onSubmit={(event) => {
+                event.preventDefault();
+                void submitTimeCorrection();
+              }}
+            >
+              <StyledField>
+                Type de correction
+                <StyledSelect
+                  value={timeForm.action}
+                  onChange={(event) =>
+                    setTimeForm((current) => ({
+                      ...current,
+                      action: event.target.value as HrTimeEntryCorrectionAction,
+                    }))
+                  }
+                >
+                  <option value="ADD">Ajouter un pointage manquant</option>
+                  <option value="REPLACE">Modifier un pointage</option>
+                  <option value="CANCEL">Annuler un pointage</option>
+                </StyledSelect>
+              </StyledField>
+              {timeForm.action === 'ADD' ? null : (
+                <StyledField>
+                  Pointage concerné
+                  <StyledSelect
+                    value={timeForm.originalTimeEntryId}
+                    onChange={(event) =>
+                      setTimeForm((current) => ({
+                        ...current,
+                        originalTimeEntryId: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">Sélectionner</option>
+                    {data.timeEntries.map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {formatDateTime(entry.occurredAt)} · {entry.type}
+                      </option>
+                    ))}
+                  </StyledSelect>
+                </StyledField>
+              )}
+              {timeForm.action === 'CANCEL' ? null : (
+                <>
+                  <StyledField>
+                    Nouveau type
+                    <StyledSelect
+                      value={timeForm.proposedType}
+                      onChange={(event) =>
+                        setTimeForm((current) => ({
+                          ...current,
+                          proposedType: event.target.value as HrTimeEntryType,
+                        }))
+                      }
+                    >
+                      <option value="CLOCK_IN">Entrée</option>
+                      <option value="CLOCK_OUT">Sortie</option>
+                      <option value="BREAK_START">Début de pause</option>
+                      <option value="BREAK_END">Fin de pause</option>
+                    </StyledSelect>
+                  </StyledField>
+                  <StyledField>
+                    Date et heure
+                    <StyledInput
+                      type="datetime-local"
+                      value={timeForm.proposedOccurredAt}
+                      onChange={(event) =>
+                        setTimeForm((current) => ({
+                          ...current,
+                          proposedOccurredAt: event.target.value,
+                        }))
+                      }
+                    />
+                  </StyledField>
+                  <StyledField>
+                    Mode de travail
+                    <StyledSelect
+                      value={timeForm.proposedWorkMode}
+                      onChange={(event) =>
+                        setTimeForm((current) => ({
+                          ...current,
+                          proposedWorkMode: event.target
+                            .value as HrTimeWorkMode,
+                        }))
+                      }
+                    >
+                      <option value="ONSITE">Sur site</option>
+                      <option value="REMOTE">Télétravail</option>
+                      <option value="CLIENT_SITE">Chez un client</option>
+                    </StyledSelect>
+                  </StyledField>
+                  <StyledField>
+                    Note sur le pointage
+                    <StyledInput
+                      value={timeForm.proposedNotes}
+                      onChange={(event) =>
+                        setTimeForm((current) => ({
+                          ...current,
+                          proposedNotes: event.target.value,
+                        }))
+                      }
+                    />
+                  </StyledField>
+                </>
+              )}
+              <StyledField>
+                Justificatif
+                <StyledSelect
+                  value={timeForm.supportingDocumentId}
+                  onChange={(event) =>
+                    setTimeForm((current) => ({
+                      ...current,
+                      supportingDocumentId: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Aucun document</option>
+                  {data.documents
+                    .filter(({ latestVersion }) => latestVersion !== null)
+                    .map((document) => (
+                      <option key={document.id} value={document.id}>
+                        {document.title}
+                      </option>
+                    ))}
+                </StyledSelect>
+              </StyledField>
+              <StyledField>
+                Motif
+                <StyledTextarea
+                  required
+                  minLength={3}
+                  value={timeForm.reason}
+                  onChange={(event) =>
+                    setTimeForm((current) => ({
+                      ...current,
+                      reason: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+            </StyledDrawerForm>
+          </ErpFormDrawer>
         </>
       )}
     </ErpPageShell>

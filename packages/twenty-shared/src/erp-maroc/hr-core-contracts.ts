@@ -1234,6 +1234,16 @@ const hrEmployeeSelfServiceTimeCorrectionSchema = z.object({
   updatedAt: instantSchema,
 });
 
+const hrEmployeeSelfServiceTimeEntrySchema = z.object({
+  id: uuidSchema,
+  type: hrTimeEntryTypeSchema,
+  workMode: hrTimeWorkModeSchema,
+  occurredAt: instantSchema,
+  localDate: civilDateHttpSchema,
+  attendanceDate: civilDateHttpSchema,
+  notes: nullableStringSchema,
+});
+
 const hrEmployeeSelfServiceLeaveBalanceSchema = z.object({
   id: uuidSchema,
   year: z.number().int().min(2000).max(2200),
@@ -1313,9 +1323,11 @@ export const hrEmployeeSelfServiceSchema = z.object({
     .nullable(),
   bankAccount: hrEmployeeBankAccountSchema.nullable(),
   documents: z.array(hrEmployeeSelfServiceDocumentSchema),
+  leavePolicies: z.array(hrLeavePolicySchema),
   leaveBalances: z.array(hrEmployeeSelfServiceLeaveBalanceSchema),
   leaveRequests: z.array(hrEmployeeSelfServiceLeaveRequestSchema),
   payslips: z.array(hrEmployeePayslipSummarySchema),
+  timeEntries: z.array(hrEmployeeSelfServiceTimeEntrySchema),
   timeCorrectionRequests: z.array(hrEmployeeSelfServiceTimeCorrectionSchema),
 });
 
