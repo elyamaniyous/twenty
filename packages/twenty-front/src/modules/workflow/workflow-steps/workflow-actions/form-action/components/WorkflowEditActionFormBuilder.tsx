@@ -2,6 +2,7 @@ import { FormFieldInputContainer } from '@/object-record/record-field/ui/form-ty
 import { FormFieldInputInnerContainer } from '@/object-record/record-field/ui/form-types/components/FormFieldInputInnerContainer';
 import { FormFieldInputRowContainer } from '@/object-record/record-field/ui/form-types/components/FormFieldInputRowContainer';
 import { FormFieldPlaceholder } from '@/object-record/record-field/ui/form-types/components/FormFieldPlaceholder';
+import { getDocumentationUrl } from '@/support/utils/getDocumentationUrl';
 import { InputLabel } from '@/ui/input/components/InputLabel';
 import { DraggableItem } from '@/ui/layout/draggable-list/components/DraggableItem';
 import { DraggableList } from '@/ui/layout/draggable-list/components/DraggableList';
@@ -251,7 +252,7 @@ export const WorkflowEditActionFormBuilder = ({
                 label: t`Learn more`,
                 onClick: () =>
                   window.open(
-                    'https://docs.twenty.com/user-guide/workflows/capabilities/workflow-actions#form',
+                    getDocumentationUrl({}),
                     '_blank',
                     'noopener,noreferrer',
                   ),
