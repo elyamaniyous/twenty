@@ -6,6 +6,8 @@ import {
   hrEmployeeCrmLinkResultSchema,
   hrEmployeeDocumentSchema,
   hrEmployeeImportPreviewSchema,
+  hrEmployeeSelfServiceEquipmentAssignmentSchema,
+  hrEquipmentAssignmentSchema,
   hrGradeSchema,
   hrJobPositionSchema,
   hrLeaveBalanceSchema,
@@ -417,6 +419,8 @@ describe('hrEmployeeDetailSchema', () => {
           calculation: { mustRemainServerSide: true },
         },
       ],
+      expenseNotes: [],
+      equipmentAssignments: [],
       history: [
         {
           id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
@@ -473,6 +477,78 @@ describe('hrEmployeeDetailSchema', () => {
     expect(result.leaveRequests[0]).not.toHaveProperty('reason');
     expect(result.payslips[0]).not.toHaveProperty('calculation');
     expect(result.history[0]).not.toHaveProperty('metadata');
+  });
+
+  it('parses a material assignment without leaking unrelated employee data', () => {
+    const createdAt = '2026-08-03T08:00:00.000Z';
+    const assignment = hrEquipmentAssignmentSchema.parse({
+      id: '11111111-1111-4111-8111-111111111111',
+      organisationId: '22222222-2222-4222-8222-222222222222',
+      societeId: '33333333-3333-4333-8333-333333333333',
+      assetId: '44444444-4444-4444-8444-444444444444',
+      employeeId: '55555555-5555-4555-8555-555555555555',
+      assignedAt: '2026-08-01',
+      expectedReturnAt: null,
+      returnedAt: null,
+      conditionAtIssue: 'Bon état',
+      conditionAtReturn: null,
+      assignmentNote: 'Remis lors de l’intégration',
+      assignedByTwentyUserId: 'hr-user',
+      returnedByTwentyUserId: null,
+      createdAt,
+      updatedAt: createdAt,
+      asset: {
+        id: '44444444-4444-4444-8444-444444444444',
+        organisationId: '22222222-2222-4222-8222-222222222222',
+        societeId: '33333333-3333-4333-8333-333333333333',
+        assetTag: 'IT-PORT-0042',
+        category: 'COMPUTER',
+        label: 'Ordinateur portable',
+        brand: 'Lenovo',
+        model: 'ThinkPad',
+        serialNumber: 'SN-42',
+        purchaseReference: 'BC-2026-0042',
+        purchaseDate: '2026-07-20',
+        purchaseCostCents: 1250000,
+        status: 'ASSIGNED',
+        notes: null,
+        createdByTwentyUserId: 'hr-user',
+        createdAt,
+        updatedAt: createdAt,
+      },
+      employee: { cin: 'must-not-be-accepted' },
+    });
+
+    expect(assignment.asset.assetTag).toBe('IT-PORT-0042');
+    expect(assignment).not.toHaveProperty('employee');
+  });
+
+  it('removes equipment purchase details from employee self-service', () => {
+    const assignment = hrEmployeeSelfServiceEquipmentAssignmentSchema.parse({
+      id: '11111111-1111-4111-8111-111111111111',
+      assignedAt: '2026-08-01',
+      expectedReturnAt: null,
+      returnedAt: null,
+      conditionAtIssue: 'Bon état',
+      conditionAtReturn: null,
+      asset: {
+        id: '22222222-2222-4222-8222-222222222222',
+        assetTag: 'IT-PORT-0042',
+        category: 'COMPUTER',
+        label: 'Ordinateur portable',
+        brand: 'Lenovo',
+        model: 'ThinkPad',
+        serialNumber: 'SN-42',
+        status: 'ASSIGNED',
+        purchaseCostCents: 1250000,
+        purchaseReference: 'BC-2026-0042',
+        notes: 'Note interne',
+      },
+    });
+
+    expect(assignment.asset).not.toHaveProperty('purchaseCostCents');
+    expect(assignment.asset).not.toHaveProperty('purchaseReference');
+    expect(assignment.asset).not.toHaveProperty('notes');
   });
 
   it('parses only public CRM links and organisation chart fields', () => {

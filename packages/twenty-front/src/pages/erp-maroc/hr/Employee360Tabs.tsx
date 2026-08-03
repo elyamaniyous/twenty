@@ -12,7 +12,7 @@ import {
 } from 'twenty-shared/erp-maroc';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
-type Props = {
+type Employee360TabsProps = {
   employee: HrEmployeeDetail;
 };
 
@@ -73,6 +73,8 @@ const historyLabels: Record<string, string> = {
   HR_EMPLOYEE_DOCUMENT_VERSION_ADDED: 'Version de document ajoutée',
   HR_LIFECYCLE_JOURNEY_CREATED: 'Parcours RH démarré',
   HR_LIFECYCLE_JOURNEY_CANCELLED: 'Parcours RH annulé',
+  HR_EQUIPMENT_ASSIGNED: 'Matériel remis',
+  HR_EQUIPMENT_RETURNED: 'Matériel restitué',
   HR_EMPLOYEE_CRM_LINKED: 'Profil CRM lié',
   HR_EMPLOYEE_CRM_SYNCED: 'Profil CRM synchronisé',
   HR_EMPLOYEE_CRM_UNLINKED: 'Profil CRM délié',
@@ -190,8 +192,8 @@ const StyledRow = styled.div`
   grid-template-columns:
     minmax(180px, 1.2fr) minmax(160px, 1fr) minmax(140px, 0.8fr)
     minmax(140px, 0.8fr);
-  min-width: 720px;
   min-height: 48px;
+  min-width: 720px;
   padding: 0 ${themeCssVariables.spacing[4]};
 `;
 
@@ -232,7 +234,7 @@ const formatClock = (value: string | null) =>
 const formatDuration = (minutes: number) =>
   `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')}`;
 
-export const Employee360Tabs = ({ employee }: Props) => {
+export const Employee360Tabs = ({ employee }: Employee360TabsProps) => {
   const { client } = useErpMarocContext();
   const [view, setView] = useState<View>('time');
   const [attendance, setAttendance] =

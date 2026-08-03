@@ -942,6 +942,97 @@ export const hrLifecycleJourneySchema = hrLifecycleJourneyBaseSchema.extend({
 });
 export const hrLifecycleJourneyListSchema = z.array(hrLifecycleJourneySchema);
 
+export const hrEquipmentCategorySchema = z.enum([
+  'COMPUTER',
+  'PHONE',
+  'BADGE',
+  'VEHICLE',
+  'TOOL',
+  'PPE',
+  'OTHER',
+]);
+export const hrEquipmentAssetStatusSchema = z.enum([
+  'AVAILABLE',
+  'ASSIGNED',
+  'MAINTENANCE',
+  'LOST',
+  'RETIRED',
+]);
+export const hrEquipmentAssetSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  assetTag: z.string(),
+  category: hrEquipmentCategorySchema,
+  label: z.string(),
+  brand: nullableStringSchema,
+  model: nullableStringSchema,
+  serialNumber: nullableStringSchema,
+  purchaseReference: nullableStringSchema,
+  purchaseDate: nullableCivilDateHttpSchema,
+  purchaseCostCents: centsSchema.nullable(),
+  status: hrEquipmentAssetStatusSchema,
+  notes: nullableStringSchema,
+  createdByTwentyUserId: z.string(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+export const hrEquipmentAssignmentSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  assetId: uuidSchema,
+  employeeId: uuidSchema,
+  assignedAt: civilDateHttpSchema,
+  expectedReturnAt: nullableCivilDateHttpSchema,
+  returnedAt: nullableCivilDateHttpSchema,
+  conditionAtIssue: z.string(),
+  conditionAtReturn: nullableStringSchema,
+  assignmentNote: nullableStringSchema,
+  assignedByTwentyUserId: z.string(),
+  returnedByTwentyUserId: nullableStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  asset: hrEquipmentAssetSchema,
+});
+export const hrEmployeeSelfServiceEquipmentAssignmentSchema = z.object({
+  id: uuidSchema,
+  assignedAt: civilDateHttpSchema,
+  expectedReturnAt: nullableCivilDateHttpSchema,
+  returnedAt: nullableCivilDateHttpSchema,
+  conditionAtIssue: z.string(),
+  conditionAtReturn: nullableStringSchema,
+  asset: z.object({
+    id: uuidSchema,
+    assetTag: z.string(),
+    category: hrEquipmentCategorySchema,
+    label: z.string(),
+    brand: nullableStringSchema,
+    model: nullableStringSchema,
+    serialNumber: nullableStringSchema,
+    status: hrEquipmentAssetStatusSchema,
+  }),
+});
+
+export const hrEmployeeExpenseNoteSummarySchema = z.object({
+  id: uuidSchema,
+  number: z.string(),
+  title: z.string(),
+  expenseDate: civilDateHttpSchema,
+  status: z.enum([
+    'DRAFT',
+    'SUBMITTED',
+    'APPROVED',
+    'REJECTED',
+    'PAID',
+    'CANCELLED',
+  ]),
+  totalTtcCents: centsSchema,
+  currency: z.string(),
+  submittedAt: instantSchema.nullable(),
+  approvedAt: instantSchema.nullable(),
+});
+
 export const hrEmployeeLeaveRequestSchema = z.object({
   id: uuidSchema,
   type: hrLeaveTypeSchema,
@@ -1332,6 +1423,7 @@ export const hrEmployeeSelfServiceSchema = z.object({
   leaveBalances: z.array(hrEmployeeSelfServiceLeaveBalanceSchema),
   leaveRequests: z.array(hrEmployeeSelfServiceLeaveRequestSchema),
   payslips: z.array(hrEmployeePayslipSummarySchema),
+  equipmentAssignments: z.array(hrEmployeeSelfServiceEquipmentAssignmentSchema),
   timeEntries: z.array(hrEmployeeSelfServiceTimeEntrySchema),
   timeCorrectionRequests: z.array(hrEmployeeSelfServiceTimeCorrectionSchema),
   changeRequests: z.array(hrEmployeeChangeRequestSchema),
@@ -2084,6 +2176,8 @@ export const hrEmployeeDetailSchema = z.object({
   leaveRequests: z.array(hrEmployeeLeaveRequestSchema),
   leaveBalances: z.array(hrEmployeeLeaveBalanceSchema),
   payslips: z.array(hrEmployeePayslipSummarySchema),
+  expenseNotes: z.array(hrEmployeeExpenseNoteSummarySchema),
+  equipmentAssignments: z.array(hrEquipmentAssignmentSchema),
   history: z.array(hrEmployeeHistoryEventSchema),
   employmentContracts: z.array(hrEmploymentContractDetailSchema),
   access: hrAccessContextSchema,
@@ -2206,6 +2300,18 @@ export type HrLifecycleJourneyBase = z.infer<
   typeof hrLifecycleJourneyBaseSchema
 >;
 export type HrLifecycleJourney = z.infer<typeof hrLifecycleJourneySchema>;
+export type HrEquipmentCategory = z.infer<typeof hrEquipmentCategorySchema>;
+export type HrEquipmentAssetStatus = z.infer<
+  typeof hrEquipmentAssetStatusSchema
+>;
+export type HrEquipmentAsset = z.infer<typeof hrEquipmentAssetSchema>;
+export type HrEquipmentAssignment = z.infer<typeof hrEquipmentAssignmentSchema>;
+export type HrEmployeeSelfServiceEquipmentAssignment = z.infer<
+  typeof hrEmployeeSelfServiceEquipmentAssignmentSchema
+>;
+export type HrEmployeeExpenseNoteSummary = z.infer<
+  typeof hrEmployeeExpenseNoteSummarySchema
+>;
 export type HrEmployeeLeaveRequest = z.infer<
   typeof hrEmployeeLeaveRequestSchema
 >;

@@ -16,6 +16,7 @@ import {
   hrDocumentContentSchema,
   hrEmployeeDocumentSchema,
   hrEmployeeDetailSchema,
+  hrEquipmentAssignmentSchema,
   hrEmployeeAssignmentSchema,
   hrEmploymentContractSchema,
   hrEstablishmentListSchema,
@@ -26,6 +27,7 @@ import {
   type HrDepartment,
   type HrEmployeeDocument,
   type HrEmployeeDetail,
+  type HrEquipmentAssignment,
   type HrEmploymentContract,
   type HrEstablishment,
   type HrJobPosition,
@@ -72,6 +74,8 @@ type Drawer =
   | { kind: 'contract' }
   | { kind: 'amendment'; contract: HrEmploymentContract }
   | { kind: 'assignment' }
+  | { kind: 'equipment' }
+  | { kind: 'equipmentReturn'; assignment: HrEquipmentAssignment }
   | { kind: 'document' }
   | { kind: 'documentVersion'; document: HrEmployeeDocument }
   | null;
@@ -120,6 +124,34 @@ const lifecycleStatusLabels: Record<string, string> = {
   ACTIVE: 'En cours',
   COMPLETED: 'Terminé',
   CANCELLED: 'Annulé',
+};
+
+const equipmentCategoryLabels: Record<string, string> = {
+  COMPUTER: 'Ordinateur',
+  PHONE: 'Téléphone',
+  BADGE: 'Badge',
+  VEHICLE: 'Véhicule',
+  TOOL: 'Outillage',
+  PPE: 'Équipement de protection',
+  OTHER: 'Autre matériel',
+};
+
+const expenseStatusLabels: Record<string, string> = {
+  DRAFT: 'Brouillon',
+  SUBMITTED: 'Soumise',
+  APPROVED: 'Approuvée',
+  REJECTED: 'Rejetée',
+  PAID: 'Payée',
+  CANCELLED: 'Annulée',
+};
+
+const expenseStatusTones: Record<string, ErpStatusTone> = {
+  DRAFT: 'neutral',
+  SUBMITTED: 'warning',
+  APPROVED: 'success',
+  REJECTED: 'danger',
+  PAID: 'success',
+  CANCELLED: 'neutral',
 };
 
 const StyledScroll = styled.div`
@@ -379,6 +411,26 @@ export const ErpEmployeeHrDetailPage = () => {
     notes: '',
     file: null as File | null,
   });
+  const [equipmentForm, setEquipmentForm] = useState({
+    assetTag: '',
+    category: 'COMPUTER',
+    label: '',
+    brand: '',
+    model: '',
+    serialNumber: '',
+    purchaseReference: '',
+    purchaseDate: '',
+    purchaseCostMad: '',
+    assignedAt: '',
+    expectedReturnAt: '',
+    conditionAtIssue: 'Bon état',
+    assignmentNote: '',
+  });
+  const [equipmentReturnForm, setEquipmentReturnForm] = useState({
+    returnedAt: '',
+    conditionAtReturn: 'Bon état',
+    retireAsset: false,
+  });
 
   const canWriteContracts = employee?.access.canWriteContracts ?? false;
   const canReadDocuments = employee?.access.canReadDocuments ?? false;
@@ -542,6 +594,36 @@ export const ErpEmployeeHrDetailPage = () => {
     setDrawer({ kind: 'documentVersion', document });
   };
 
+  const openEquipmentDrawer = () => {
+    setMessage(null);
+    setEquipmentForm({
+      assetTag: '',
+      category: 'COMPUTER',
+      label: '',
+      brand: '',
+      model: '',
+      serialNumber: '',
+      purchaseReference: '',
+      purchaseDate: '',
+      purchaseCostMad: '',
+      assignedAt: new Date().toISOString().slice(0, 10),
+      expectedReturnAt: '',
+      conditionAtIssue: 'Bon état',
+      assignmentNote: '',
+    });
+    setDrawer({ kind: 'equipment' });
+  };
+
+  const openEquipmentReturnDrawer = (assignment: HrEquipmentAssignment) => {
+    setMessage(null);
+    setEquipmentReturnForm({
+      returnedAt: new Date().toISOString().slice(0, 10),
+      conditionAtReturn: 'Bon état',
+      retireAsset: false,
+    });
+    setDrawer({ kind: 'equipmentReturn', assignment });
+  };
+
   const executeMutation = async (
     input: Parameters<typeof client.createMutationIntent>[0],
     successMessage: string,
@@ -599,6 +681,73 @@ export const ErpEmployeeHrDetailPage = () => {
         },
       },
       'Affectation ajoutée.',
+    );
+  };
+
+  const submitEquipment = async () => {
+    const purchaseCostCents =
+      equipmentForm.purchaseCostMad.trim() === ''
+        ? null
+        : toCents(equipmentForm.purchaseCostMad);
+    if (
+      equipmentForm.assetTag.trim() === '' ||
+      equipmentForm.label.trim() === '' ||
+      equipmentForm.assignedAt === '' ||
+      equipmentForm.conditionAtIssue.trim() === '' ||
+      (purchaseCostCents === null &&
+        equipmentForm.purchaseCostMad.trim() !== '')
+    ) {
+      setMessageDanger(true);
+      setMessage('Renseignez la référence, le matériel, la date et son état.');
+      return;
+    }
+    await executeMutation(
+      {
+        method: 'POST',
+        path: `/hr-core/employees/${id}/equipment-assignments`,
+        schema: hrEquipmentAssignmentSchema,
+        body: {
+          assetTag: equipmentForm.assetTag.trim().toUpperCase(),
+          category: equipmentForm.category,
+          label: equipmentForm.label.trim(),
+          brand: equipmentForm.brand || null,
+          model: equipmentForm.model || null,
+          serialNumber: equipmentForm.serialNumber || null,
+          purchaseReference: equipmentForm.purchaseReference || null,
+          purchaseDate: equipmentForm.purchaseDate || null,
+          purchaseCostCents,
+          assignedAt: equipmentForm.assignedAt,
+          expectedReturnAt: equipmentForm.expectedReturnAt || null,
+          conditionAtIssue: equipmentForm.conditionAtIssue.trim(),
+          assignmentNote: equipmentForm.assignmentNote || null,
+        },
+      },
+      'Matériel remis et enregistré dans le dossier salarié.',
+    );
+  };
+
+  const submitEquipmentReturn = async () => {
+    if (drawer?.kind !== 'equipmentReturn') return;
+    if (
+      equipmentReturnForm.returnedAt === '' ||
+      equipmentReturnForm.conditionAtReturn.trim() === ''
+    ) {
+      setMessageDanger(true);
+      setMessage('Renseignez la date et l’état du matériel restitué.');
+      return;
+    }
+    await executeMutation(
+      {
+        method: 'PATCH',
+        path: `/hr-core/equipment-assignments/${drawer.assignment.id}/return`,
+        schema: hrEquipmentAssignmentSchema,
+        body: {
+          returnedAt: equipmentReturnForm.returnedAt,
+          conditionAtReturn: equipmentReturnForm.conditionAtReturn.trim(),
+          retireAsset: equipmentReturnForm.retireAsset,
+        },
+      },
+      'Retour du matériel enregistré.',
     );
   };
 
@@ -933,6 +1082,126 @@ export const ErpEmployeeHrDetailPage = () => {
             }}
           />
           <Employee360Tabs employee={employee} />
+          {canReadDocuments ? (
+            <>
+              <StyledSectionHeader>
+                <StyledSectionTitle>Matériel confié</StyledSectionTitle>
+                {canWriteDocuments ? (
+                  <Button
+                    title="Remettre du matériel"
+                    ariaLabel="Remettre du matériel au salarié"
+                    Icon={IconPlus}
+                    variant="secondary"
+                    onClick={openEquipmentDrawer}
+                  />
+                ) : (
+                  <StyledLabel>
+                    {employee.equipmentAssignments.length} affectation(s)
+                  </StyledLabel>
+                )}
+              </StyledSectionHeader>
+              {employee.equipmentAssignments.length === 0 ? (
+                <StyledEmpty>Aucun matériel confié à ce salarié.</StyledEmpty>
+              ) : (
+                employee.equipmentAssignments.map((assignment) => (
+                  <StyledContract key={assignment.id}>
+                    <StyledContractMain>
+                      <StyledContractField>
+                        <StyledValue>{assignment.asset.label}</StyledValue>
+                        <StyledLabel>
+                          {equipmentCategoryLabels[assignment.asset.category]} ·{' '}
+                          {assignment.asset.assetTag}
+                        </StyledLabel>
+                      </StyledContractField>
+                      <StyledContractField>
+                        <StyledLabel>Identification</StyledLabel>
+                        <span>
+                          {[assignment.asset.brand, assignment.asset.model]
+                            .filter(Boolean)
+                            .join(' ') || '—'}
+                        </span>
+                        <StyledLabel>
+                          Série: {assignment.asset.serialNumber ?? '—'}
+                        </StyledLabel>
+                      </StyledContractField>
+                      <StyledContractField>
+                        <StyledLabel>Période</StyledLabel>
+                        <span>
+                          {assignment.assignedAt} →{' '}
+                          {assignment.returnedAt ?? 'en cours'}
+                        </span>
+                      </StyledContractField>
+                      <ErpStatusBadge
+                        label={
+                          assignment.returnedAt === null
+                            ? 'Confié'
+                            : assignment.asset.status === 'RETIRED'
+                              ? 'Restitué et réformé'
+                              : 'Restitué'
+                        }
+                        tone={
+                          assignment.returnedAt === null ? 'warning' : 'success'
+                        }
+                      />
+                      <StyledActions>
+                        {canWriteDocuments && assignment.returnedAt === null ? (
+                          <Button
+                            title="Enregistrer le retour"
+                            ariaLabel={`Enregistrer le retour de ${assignment.asset.label}`}
+                            Icon={IconCheck}
+                            variant="secondary"
+                            disabled={busy}
+                            onClick={() =>
+                              openEquipmentReturnDrawer(assignment)
+                            }
+                          />
+                        ) : null}
+                      </StyledActions>
+                    </StyledContractMain>
+                  </StyledContract>
+                ))
+              )}
+            </>
+          ) : null}
+          {employee.access.canReadCompensation ? (
+            <>
+              <StyledSectionHeader>
+                <StyledSectionTitle>Notes de frais</StyledSectionTitle>
+                <StyledLabel>
+                  {employee.expenseNotes.length} note(s) liée(s)
+                </StyledLabel>
+              </StyledSectionHeader>
+              {employee.expenseNotes.length === 0 ? (
+                <StyledEmpty>
+                  Aucune note de frais liée à ce salarié.
+                </StyledEmpty>
+              ) : (
+                employee.expenseNotes.map((expense) => (
+                  <StyledContract key={expense.id}>
+                    <StyledContractMain>
+                      <StyledContractField>
+                        <StyledValue>{expense.title}</StyledValue>
+                        <StyledLabel>{expense.number}</StyledLabel>
+                      </StyledContractField>
+                      <StyledContractField>
+                        <StyledLabel>Date de dépense</StyledLabel>
+                        <span>{expense.expenseDate}</span>
+                      </StyledContractField>
+                      <StyledContractField>
+                        <StyledLabel>Montant TTC</StyledLabel>
+                        <span>{formatMad(expense.totalTtcCents)}</span>
+                      </StyledContractField>
+                      <ErpStatusBadge
+                        label={expenseStatusLabels[expense.status]}
+                        tone={expenseStatusTones[expense.status] ?? 'neutral'}
+                      />
+                      <span />
+                    </StyledContractMain>
+                  </StyledContract>
+                ))
+              )}
+            </>
+          ) : null}
           <StyledSectionHeader>
             <StyledSectionTitle>Parcours RH</StyledSectionTitle>
             <StyledLabel>
@@ -1304,20 +1573,28 @@ export const ErpEmployeeHrDetailPage = () => {
             ? 'Nouveau document RH'
             : drawer?.kind === 'documentVersion'
               ? `Nouvelle version · ${drawer.document.title}`
-              : drawer?.kind === 'assignment'
-                ? 'Nouvelle affectation'
-                : drawer?.kind === 'amendment'
-                  ? 'Nouvel avenant'
-                  : 'Nouveau contrat'
+              : drawer?.kind === 'equipment'
+                ? 'Remettre du matériel'
+                : drawer?.kind === 'equipmentReturn'
+                  ? `Retour · ${drawer.assignment.asset.label}`
+                  : drawer?.kind === 'assignment'
+                    ? 'Nouvelle affectation'
+                    : drawer?.kind === 'amendment'
+                      ? 'Nouvel avenant'
+                      : 'Nouveau contrat'
         }
         description={
           drawer?.kind === 'document' || drawer?.kind === 'documentVersion'
             ? 'PDF, PNG ou JPEG, 20 Mo maximum. Chaque remplacement conserve la version précédente.'
-            : drawer?.kind === 'assignment'
-              ? 'La quotité cumulée ne peut pas dépasser 100 % sur une même période.'
-              : drawer?.kind === 'amendment'
-                ? 'La modification sera appliquée après validation par un second administrateur.'
-                : 'Le contrat sera créé en brouillon avant activation.'
+            : drawer?.kind === 'equipment'
+              ? 'Le matériel et son origine d’achat seront liés au dossier du salarié avec une trace de remise.'
+              : drawer?.kind === 'equipmentReturn'
+                ? 'Le retour clôture l’affectation sans effacer son historique.'
+                : drawer?.kind === 'assignment'
+                  ? 'La quotité cumulée ne peut pas dépasser 100 % sur une même période.'
+                  : drawer?.kind === 'amendment'
+                    ? 'La modification sera appliquée après validation par un second administrateur.'
+                    : 'Le contrat sera créé en brouillon avant activation.'
         }
         isBusy={busy}
         onClose={() => setDrawer(null)}
@@ -1340,11 +1617,15 @@ export const ErpEmployeeHrDetailPage = () => {
                 void (drawer?.kind === 'document' ||
                 drawer?.kind === 'documentVersion'
                   ? submitDocument()
-                  : drawer?.kind === 'assignment'
-                    ? submitAssignment()
-                    : drawer?.kind === 'amendment'
-                      ? submitAmendment()
-                      : submitContract())
+                  : drawer?.kind === 'equipment'
+                    ? submitEquipment()
+                    : drawer?.kind === 'equipmentReturn'
+                      ? submitEquipmentReturn()
+                      : drawer?.kind === 'assignment'
+                        ? submitAssignment()
+                        : drawer?.kind === 'amendment'
+                          ? submitAmendment()
+                          : submitContract())
               }
             />
           </>
@@ -1356,11 +1637,15 @@ export const ErpEmployeeHrDetailPage = () => {
             void (drawer?.kind === 'document' ||
             drawer?.kind === 'documentVersion'
               ? submitDocument()
-              : drawer?.kind === 'assignment'
-                ? submitAssignment()
-                : drawer?.kind === 'amendment'
-                  ? submitAmendment()
-                  : submitContract());
+              : drawer?.kind === 'equipment'
+                ? submitEquipment()
+                : drawer?.kind === 'equipmentReturn'
+                  ? submitEquipmentReturn()
+                  : drawer?.kind === 'assignment'
+                    ? submitAssignment()
+                    : drawer?.kind === 'amendment'
+                      ? submitAmendment()
+                      : submitContract());
           }}
         >
           {drawer?.kind === 'document' || drawer?.kind === 'documentVersion' ? (
@@ -1483,6 +1768,230 @@ export const ErpEmployeeHrDetailPage = () => {
                   }
                 />
               </StyledField>
+            </>
+          ) : drawer?.kind === 'equipment' ? (
+            <>
+              <StyledField>
+                Référence interne
+                <StyledInput
+                  value={equipmentForm.assetTag}
+                  maxLength={80}
+                  placeholder="Ex. IT-PORT-0042"
+                  onChange={(event) =>
+                    setEquipmentForm((current) => ({
+                      ...current,
+                      assetTag: event.target.value.toUpperCase(),
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                Catégorie
+                <StyledSelect
+                  value={equipmentForm.category}
+                  onChange={(event) =>
+                    setEquipmentForm((current) => ({
+                      ...current,
+                      category: event.target.value,
+                    }))
+                  }
+                >
+                  {Object.entries(equipmentCategoryLabels).map(
+                    ([category, label]) => (
+                      <option key={category} value={category}>
+                        {label}
+                      </option>
+                    ),
+                  )}
+                </StyledSelect>
+              </StyledField>
+              <StyledField>
+                Désignation
+                <StyledInput
+                  value={equipmentForm.label}
+                  maxLength={180}
+                  placeholder="Ex. MacBook Pro 14 pouces"
+                  onChange={(event) =>
+                    setEquipmentForm((current) => ({
+                      ...current,
+                      label: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                Marque
+                <StyledInput
+                  value={equipmentForm.brand}
+                  maxLength={120}
+                  onChange={(event) =>
+                    setEquipmentForm((current) => ({
+                      ...current,
+                      brand: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                Modèle
+                <StyledInput
+                  value={equipmentForm.model}
+                  maxLength={120}
+                  onChange={(event) =>
+                    setEquipmentForm((current) => ({
+                      ...current,
+                      model: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                Numéro de série
+                <StyledInput
+                  value={equipmentForm.serialNumber}
+                  maxLength={160}
+                  onChange={(event) =>
+                    setEquipmentForm((current) => ({
+                      ...current,
+                      serialNumber: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                Référence d’achat
+                <StyledInput
+                  value={equipmentForm.purchaseReference}
+                  maxLength={160}
+                  placeholder="Bon de commande ou facture"
+                  onChange={(event) =>
+                    setEquipmentForm((current) => ({
+                      ...current,
+                      purchaseReference: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                Date d’achat
+                <StyledInput
+                  type="date"
+                  value={equipmentForm.purchaseDate}
+                  onChange={(event) =>
+                    setEquipmentForm((current) => ({
+                      ...current,
+                      purchaseDate: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                Coût d’achat (MAD)
+                <StyledInput
+                  inputMode="decimal"
+                  value={equipmentForm.purchaseCostMad}
+                  onChange={(event) =>
+                    setEquipmentForm((current) => ({
+                      ...current,
+                      purchaseCostMad: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                Date de remise
+                <StyledInput
+                  type="date"
+                  value={equipmentForm.assignedAt}
+                  onChange={(event) =>
+                    setEquipmentForm((current) => ({
+                      ...current,
+                      assignedAt: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                Retour prévu
+                <StyledInput
+                  type="date"
+                  value={equipmentForm.expectedReturnAt}
+                  onChange={(event) =>
+                    setEquipmentForm((current) => ({
+                      ...current,
+                      expectedReturnAt: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                État à la remise
+                <StyledInput
+                  value={equipmentForm.conditionAtIssue}
+                  maxLength={500}
+                  onChange={(event) =>
+                    setEquipmentForm((current) => ({
+                      ...current,
+                      conditionAtIssue: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                Note d’affectation
+                <StyledInput
+                  value={equipmentForm.assignmentNote}
+                  maxLength={2000}
+                  onChange={(event) =>
+                    setEquipmentForm((current) => ({
+                      ...current,
+                      assignmentNote: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+            </>
+          ) : drawer?.kind === 'equipmentReturn' ? (
+            <>
+              <StyledField>
+                Date de retour
+                <StyledInput
+                  type="date"
+                  value={equipmentReturnForm.returnedAt}
+                  onChange={(event) =>
+                    setEquipmentReturnForm((current) => ({
+                      ...current,
+                      returnedAt: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledField>
+                État au retour
+                <StyledInput
+                  value={equipmentReturnForm.conditionAtReturn}
+                  maxLength={500}
+                  onChange={(event) =>
+                    setEquipmentReturnForm((current) => ({
+                      ...current,
+                      conditionAtReturn: event.target.value,
+                    }))
+                  }
+                />
+              </StyledField>
+              <StyledCheckbox>
+                <input
+                  type="checkbox"
+                  checked={equipmentReturnForm.retireAsset}
+                  onChange={(event) =>
+                    setEquipmentReturnForm((current) => ({
+                      ...current,
+                      retireAsset: event.target.checked,
+                    }))
+                  }
+                />
+                Réformer définitivement ce matériel
+              </StyledCheckbox>
             </>
           ) : drawer?.kind === 'assignment' ? (
             <>

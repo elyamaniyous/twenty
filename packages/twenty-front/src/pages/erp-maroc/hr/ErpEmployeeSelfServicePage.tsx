@@ -1084,6 +1084,30 @@ export const ErpEmployeeSelfServicePage = () => {
                   </StyledDetail>
                 </StyledDetails>
               </StyledSection>
+              <StyledSection>
+                <StyledSectionTitle>Mon matériel</StyledSectionTitle>
+                {data.equipmentAssignments.filter(
+                  ({ returnedAt }) => returnedAt === null,
+                ).length === 0 ? (
+                  <span>Aucun matériel actuellement confié.</span>
+                ) : (
+                  <StyledDetails>
+                    {data.equipmentAssignments
+                      .filter(({ returnedAt }) => returnedAt === null)
+                      .map((assignment) => (
+                        <StyledDetail key={assignment.id}>
+                          <dt>{assignment.asset.label}</dt>
+                          <dd>
+                            {assignment.asset.assetTag}
+                            {assignment.asset.serialNumber === null
+                              ? ''
+                              : ` · ${assignment.asset.serialNumber}`}
+                          </dd>
+                        </StyledDetail>
+                      ))}
+                  </StyledDetails>
+                )}
+              </StyledSection>
             </StyledOverview>
           ) : view === 'documents' ? (
             <ErpOperationalTable
