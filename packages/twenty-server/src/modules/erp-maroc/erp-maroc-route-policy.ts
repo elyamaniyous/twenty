@@ -855,6 +855,16 @@ const routes: ErpMarocRoute[] = [
     idempotency: 'required',
   }),
   defineRoute({
+    routeId: erpMarocRouteIds.chequeUnreconcile,
+    method: 'POST',
+    pattern: action('cheques', 'unreconcile'),
+    build: idBuilder(erpMarocUpstreamRoutes.cheques.unreconcile),
+    queryKeys: noQuery,
+    responseSchema: erpChequeSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
     routeId: erpMarocRouteIds.chequeTransition,
     method: 'POST',
     pattern: action('cheques', 'transition'),

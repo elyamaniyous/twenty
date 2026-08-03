@@ -1141,6 +1141,21 @@ export const erpChequeBankStatementLineSchema = z.object({
   debitCents: centsSchema,
   creditCents: centsSchema,
   reconciledAt: nullableInstantSchema.optional(),
+  score: nonNegativeIntegerSchema.max(100).optional(),
+  dateDistanceDays: nonNegativeIntegerSchema.optional(),
+  reasons: z
+    .array(
+      z.enum([
+        'AMOUNT_EXACT',
+        'DIRECTION_MATCH',
+        'BANK_ACCOUNT_MATCH',
+        'DATE_EXACT',
+        'DATE_NEAR',
+        'CHEQUE_NUMBER_MATCH',
+        'COUNTERPARTY_MATCH',
+      ]),
+    )
+    .optional(),
 });
 
 export const erpChequeSchema = z.object({
@@ -2057,7 +2072,26 @@ export const erpOpeningItemBankReconciliationSchema = z.object({
   reconciledByTwentyUserId: nonBlankStringSchema,
 });
 
+export const erpChequeBankReconciliationSchema = z.object({
+  kind: z.literal('CHEQUE'),
+  chequeId: uuidSchema,
+  direction: erpChequeDirectionSchema,
+  instrumentType: erpChequeInstrumentTypeSchema,
+  number: nonBlankStringSchema,
+  counterpartyName: nonBlankStringSchema,
+  tierId: nullableUuidSchema,
+  tierName: nullableStringSchema,
+  bankAccountId: uuidSchema,
+  bankAccountName: nonBlankStringSchema,
+  bankName: nonBlankStringSchema,
+  amountCents: positiveIntegerSchema,
+  status: erpChequeStatusSchema,
+  reconciledAt: instantSchema,
+  reconciledByTwentyUserId: nonBlankStringSchema,
+});
+
 export const erpBankReconciliationSchema = z.discriminatedUnion('kind', [
+  erpChequeBankReconciliationSchema,
   erpSupplierBankReconciliationSchema,
   erpCustomerBankReconciliationSchema,
   erpOpeningItemBankReconciliationSchema,
@@ -2065,10 +2099,34 @@ export const erpBankReconciliationSchema = z.discriminatedUnion('kind', [
 
 export const erpBankReconciliationReasonSchema = z.enum([
   'AMOUNT_EXACT',
+  'DIRECTION_MATCH',
+  'BANK_ACCOUNT_MATCH',
   'DATE_EXACT',
   'DATE_NEAR',
   'REFERENCE_MATCH',
+  'CHEQUE_NUMBER_MATCH',
+  'COUNTERPARTY_MATCH',
 ]);
+
+export const erpChequeBankReconciliationCandidateSchema = z.object({
+  kind: z.literal('CHEQUE'),
+  chequeId: uuidSchema,
+  direction: erpChequeDirectionSchema,
+  instrumentType: erpChequeInstrumentTypeSchema,
+  number: nonBlankStringSchema,
+  counterpartyName: nonBlankStringSchema,
+  tierId: nullableUuidSchema,
+  tierName: nullableStringSchema,
+  bankAccountId: uuidSchema,
+  bankAccountName: nonBlankStringSchema,
+  bankName: nonBlankStringSchema,
+  amountCents: positiveIntegerSchema,
+  status: erpChequeStatusSchema,
+  effectiveDate: civilDateSchema,
+  score: nonNegativeIntegerSchema.max(100),
+  dateDistanceDays: nonNegativeIntegerSchema,
+  reasons: z.array(erpBankReconciliationReasonSchema).min(1),
+});
 
 export const erpSupplierBankReconciliationCandidateSchema = z.object({
   kind: z.literal('SUPPLIER'),
@@ -2104,6 +2162,7 @@ export const erpCustomerBankReconciliationCandidateSchema = z.object({
 export const erpBankReconciliationCandidateSchema = z.discriminatedUnion(
   'kind',
   [
+    erpChequeBankReconciliationCandidateSchema,
     erpSupplierBankReconciliationCandidateSchema,
     erpCustomerBankReconciliationCandidateSchema,
   ],
@@ -3032,6 +3091,7 @@ export const erpMarocRouteIds = {
   chequeTransition: 'cheques.transition',
   chequeReconciliationCandidates: 'cheques.reconciliationCandidates',
   chequeReconcile: 'cheques.reconcile',
+  chequeUnreconcile: 'cheques.unreconcile',
   creditNotesCollection: 'credit-notes.collection',
   creditNoteDetail: 'credit-notes.detail',
   creditNoteValidate: 'credit-notes.validate',
@@ -3346,6 +3406,7 @@ export const erpMarocUpstreamRoutes = {
     reconciliationCandidates: (id: string) =>
       `/cheques/${encodeRouteId(id)}/reconciliation-candidates`,
     reconcile: (id: string) => `/cheques/${encodeRouteId(id)}/reconcile`,
+    unreconcile: (id: string) => `/cheques/${encodeRouteId(id)}/unreconcile`,
   },
   creditNotes: {
     collection: '/credit-notes',

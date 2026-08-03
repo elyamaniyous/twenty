@@ -36,6 +36,16 @@ const statusLabels: Record<ErpChequeStatus, string> = {
   CANCELLED: 'Annulé',
 };
 
+const reconciliationReasonLabels: Record<string, string> = {
+  AMOUNT_EXACT: 'Montant exact',
+  DIRECTION_MATCH: 'Sens bancaire cohérent',
+  BANK_ACCOUNT_MATCH: 'Même compte bancaire',
+  DATE_EXACT: 'Date exacte',
+  DATE_NEAR: 'Date proche',
+  CHEQUE_NUMBER_MATCH: 'Numéro retrouvé',
+  COUNTERPARTY_MATCH: 'Tiers retrouvé',
+};
+
 const transitions: Record<
   'RECEIVED' | 'ISSUED',
   Record<ErpChequeStatus, ErpChequeStatus[]>
@@ -168,6 +178,22 @@ const candidateColumns: ErpOperationalTableColumn<ErpChequeBankStatementLine>[] 
       render: (row) => row.reference ?? '—',
     },
     {
+      key: 'score',
+      header: 'Score',
+      width: '90px',
+      align: 'right',
+      render: (row) => (row.score === undefined ? '—' : `${row.score}/100`),
+    },
+    {
+      key: 'evidence',
+      header: 'Preuves',
+      width: '260px',
+      render: (row) =>
+        row.reasons
+          ?.map((item) => reconciliationReasonLabels[item] ?? item)
+          .join(', ') ?? '—',
+    },
+    {
       key: 'amount',
       header: 'Montant',
       width: '150px',
@@ -189,6 +215,7 @@ export const ErpChequeDetailPage = () => {
   >('idle');
   const [targetStatus, setTargetStatus] = useState<ErpChequeStatus | ''>('');
   const [reason, setReason] = useState('');
+  const [unreconciliationReason, setUnreconciliationReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const canManage = context?.capabilities.manageSupplierAccounting === true;
@@ -290,6 +317,35 @@ export const ErpChequeDetailPage = () => {
       setMessage('Le chèque est rapproché et dénoué.');
     } catch {
       setMessage('Le rapprochement bancaire a échoué.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const unreconcile = async () => {
+    if (isSubmitting || unreconciliationReason.trim().length < 10) return;
+    try {
+      setIsSubmitting(true);
+      setMessage(null);
+      const intent = client.createMutationIntent(
+        {
+          method: 'POST',
+          path: `/cheques/${id}/unreconcile`,
+          schema: erpChequeSchema,
+          body: { reason: unreconciliationReason.trim() },
+        },
+        { idempotency: 'required' },
+      );
+      const result = await intent.execute();
+      setCheque(result);
+      setUnreconciliationReason('');
+      setMessage(
+        'Le lettrage bancaire a été annulé et le statut antérieur restauré.',
+      );
+    } catch {
+      setMessage(
+        'Le délettrage a échoué. Vérifiez que le relevé est encore ouvert.',
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -441,6 +497,39 @@ export const ErpChequeDetailPage = () => {
               retryLabel="Réessayer"
               onRetry={() => void loadCandidates()}
             />
+          </StyledSection>
+        ) : null}
+
+        {canManage &&
+        cheque.status === 'CLEARED' &&
+        cheque.bankStatementLine !== null ? (
+          <StyledSection>
+            <h2>Délettrage bancaire</h2>
+            <StyledTransition>
+              <label>
+                Motif de correction
+                <input
+                  value={unreconciliationReason}
+                  maxLength={500}
+                  onChange={(event) =>
+                    setUnreconciliationReason(event.target.value)
+                  }
+                />
+              </label>
+              <Button
+                title="Annuler le rapprochement"
+                ariaLabel="Annuler le rapprochement bancaire"
+                variant="secondary"
+                disabled={
+                  isSubmitting || unreconciliationReason.trim().length < 10
+                }
+                onClick={() => void unreconcile()}
+              />
+            </StyledTransition>
+            <StyledMessage>
+              Le relevé doit être ouvert. L’action restaure l’état précédant le
+              dénouement et reste inscrite dans l’historique.
+            </StyledMessage>
           </StyledSection>
         ) : null}
 
