@@ -1076,6 +1076,253 @@ export const erpPaymentSchema = erpPaymentBaseSchema.extend({
 
 export const erpPaymentPageSchema = listPageSchema(erpPaymentSchema);
 
+export const erpChequeDirectionSchema = z.enum(['RECEIVED', 'ISSUED']);
+export const erpChequeInstrumentTypeSchema = z.enum(['CHEQUE', 'LCN']);
+export const erpChequeStatusSchema = z.enum([
+  'DRAFT',
+  'PRINTED',
+  'SIGNED',
+  'DELIVERED',
+  'IN_PORTFOLIO',
+  'DEPOSITED',
+  'CLEARED',
+  'REJECTED',
+  'STOPPED',
+  'CANCELLED',
+]);
+export const erpChequeBookStatusSchema = z.enum(['ACTIVE', 'CLOSED']);
+
+export const erpChequeBookSchema = z.object({
+  id: uuidSchema,
+  societeId: uuidSchema,
+  bankAccountId: uuidSchema,
+  name: nonBlankStringSchema,
+  prefix: z.string(),
+  startNumber: nonNegativeIntegerSchema,
+  endNumber: nonNegativeIntegerSchema,
+  nextNumber: nonNegativeIntegerSchema,
+  numberPadding: positiveIntegerSchema,
+  status: erpChequeBookStatusSchema,
+  custodian: nullableStringSchema,
+  createdByTwentyUserId: nonBlankStringSchema,
+  closedAt: nullableInstantSchema,
+  closedByTwentyUserId: nullableStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  bankAccount: z.object({
+    id: uuidSchema,
+    name: nonBlankStringSchema,
+    bankName: nonBlankStringSchema,
+    rib: nonBlankStringSchema,
+  }),
+  _count: z.object({ cheques: nonNegativeIntegerSchema }),
+});
+
+export const erpChequeBookListSchema = z.array(erpChequeBookSchema);
+
+export const erpChequeEventSchema = z.object({
+  id: uuidSchema,
+  chequeId: uuidSchema,
+  fromStatus: erpChequeStatusSchema.nullable(),
+  toStatus: erpChequeStatusSchema,
+  reason: nullableStringSchema,
+  actorTwentyUserId: nonBlankStringSchema,
+  commandId: nonBlankStringSchema,
+  occurredAt: instantSchema,
+  metadata: z.record(z.string(), z.unknown()),
+});
+
+export const erpChequeBankStatementLineSchema = z.object({
+  id: uuidSchema,
+  transactionDate: civilDateHttpSchema,
+  valueDate: nullableCivilDateHttpSchema,
+  description: nonBlankStringSchema,
+  reference: nullableStringSchema,
+  debitCents: centsSchema,
+  creditCents: centsSchema,
+  reconciledAt: nullableInstantSchema.optional(),
+});
+
+export const erpChequeSchema = z.object({
+  id: uuidSchema,
+  societeId: uuidSchema,
+  bankAccountId: uuidSchema,
+  chequeBookId: nullableUuidSchema,
+  tierId: nullableUuidSchema,
+  customerPaymentId: nullableUuidSchema,
+  supplierPaymentPreparationId: nullableUuidSchema,
+  direction: erpChequeDirectionSchema,
+  instrumentType: erpChequeInstrumentTypeSchema,
+  number: nonBlankStringSchema,
+  amountCents: positiveIntegerSchema,
+  currency: z.literal('MAD'),
+  issueDate: civilDateHttpSchema,
+  dueDate: nullableCivilDateHttpSchema,
+  place: nullableStringSchema,
+  counterpartyName: nonBlankStringSchema,
+  drawerName: nullableStringSchema,
+  memo: nullableStringSchema,
+  status: erpChequeStatusSchema,
+  statusChangedAt: instantSchema,
+  createdByTwentyUserId: nonBlankStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  bankAccount: z.object({
+    id: uuidSchema,
+    name: nonBlankStringSchema,
+    bankName: nonBlankStringSchema,
+    rib: nonBlankStringSchema,
+    currency: nonBlankStringSchema,
+  }),
+  chequeBook: erpChequeBookSchema
+    .pick({
+      id: true,
+      name: true,
+      prefix: true,
+      startNumber: true,
+      endNumber: true,
+      nextNumber: true,
+      numberPadding: true,
+      status: true,
+    })
+    .nullable(),
+  tier: z
+    .object({
+      id: uuidSchema,
+      name: nonBlankStringSchema,
+      type: erpTierTypeSchema,
+    })
+    .nullable(),
+  customerPayment: z
+    .object({
+      id: uuidSchema,
+      reference: nullableStringSchema,
+      status: erpPaymentStatusSchema,
+      amountCents: positiveIntegerSchema,
+    })
+    .nullable(),
+  supplierPaymentPreparation: z
+    .object({
+      id: uuidSchema,
+      reference: nullableStringSchema,
+      status: erpSupplierPaymentPreparationStatusSchema,
+      amountCents: positiveIntegerSchema,
+      supplierInvoiceId: uuidSchema,
+    })
+    .nullable(),
+  bankStatementLine: erpChequeBankStatementLineSchema.nullable(),
+  events: z.array(erpChequeEventSchema),
+});
+
+export const erpChequePageSchema = listPageSchema(erpChequeSchema);
+export const erpChequeReconciliationCandidatesSchema = z.array(
+  erpChequeBankStatementLineSchema.omit({ reconciledAt: true }),
+);
+export const erpChequeSummarySchema = z.object({
+  rows: z.array(
+    z.object({
+      direction: erpChequeDirectionSchema,
+      status: erpChequeStatusSchema,
+      count: nonNegativeIntegerSchema,
+      amountCents: centsSchema,
+    }),
+  ),
+});
+
+export const erpChequeAlertTypeSchema = z.enum([
+  'RECEIVED_TO_DEPOSIT',
+  'ISSUED_TO_FUND',
+  'STALE_DEPOSIT',
+]);
+export const erpChequeAlertUrgencySchema = z.enum([
+  'DUE_SOON',
+  'DUE_TODAY',
+  'OVERDUE',
+]);
+export const erpChequeAlertsSchema = z.object({
+  asOf: civilDateHttpSchema,
+  horizonDays: positiveIntegerSchema,
+  alerts: z.array(
+    z.object({
+      type: erpChequeAlertTypeSchema,
+      urgency: erpChequeAlertUrgencySchema,
+      effectiveDueDate: civilDateHttpSchema,
+      daysUntilDue: safeIntegerSchema,
+      cheque: erpChequeSchema,
+    }),
+  ),
+  lowBooks: z.array(
+    z.object({
+      book: erpChequeBookSchema,
+      remainingLeaves: nonNegativeIntegerSchema,
+    }),
+  ),
+});
+
+const erpChequeDepositSlipBaseSchema = z.object({
+  id: uuidSchema,
+  societeId: uuidSchema,
+  bankAccountId: uuidSchema,
+  number: nonBlankStringSchema,
+  year: positiveIntegerSchema,
+  depositDate: civilDateHttpSchema,
+  totalAmountCents: positiveIntegerSchema,
+  notes: nullableStringSchema,
+  submittedAt: instantSchema,
+  submittedByTwentyUserId: nonBlankStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  bankAccount: z.object({
+    id: uuidSchema,
+    name: nonBlankStringSchema,
+    bankName: nonBlankStringSchema,
+    rib: nonBlankStringSchema,
+  }),
+});
+
+export const erpChequeDepositSlipListItemSchema =
+  erpChequeDepositSlipBaseSchema.extend({
+    _count: z.object({ lines: positiveIntegerSchema }),
+  });
+export const erpChequeDepositSlipListSchema = z.array(
+  erpChequeDepositSlipListItemSchema,
+);
+
+export const erpChequeDepositSlipSchema = erpChequeDepositSlipBaseSchema.extend(
+  {
+    societe: z.object({
+      id: uuidSchema,
+      raisonSociale: nonBlankStringSchema,
+      ice: nullableStringSchema,
+      identifiantFiscal: nullableStringSchema,
+      rc: nullableStringSchema,
+      address: nullableStringSchema,
+      city: nullableStringSchema,
+    }),
+    lines: z.array(
+      z.object({
+        id: uuidSchema,
+        depositSlipId: uuidSchema,
+        chequeId: uuidSchema,
+        position: positiveIntegerSchema,
+        createdAt: instantSchema,
+        cheque: z.object({
+          id: uuidSchema,
+          number: nonBlankStringSchema,
+          instrumentType: erpChequeInstrumentTypeSchema,
+          issueDate: civilDateHttpSchema,
+          dueDate: nullableCivilDateHttpSchema,
+          counterpartyName: nonBlankStringSchema,
+          drawerName: nullableStringSchema,
+          amountCents: positiveIntegerSchema,
+          status: erpChequeStatusSchema,
+        }),
+      }),
+    ),
+  },
+);
+export const erpChequeDepositEligibleListSchema = z.array(erpChequeSchema);
+
 export const erpEligibleInvoiceSchema = z.object({
   id: uuidSchema,
   number: z.string().nullable(),
@@ -2773,6 +3020,18 @@ export const erpMarocRouteIds = {
   paymentEligibleInvoices: 'payments.eligibleInvoices',
   paymentAllocate: 'payments.allocate',
   paymentTerminate: 'payments.terminate',
+  chequesCollection: 'cheques.collection',
+  chequeDetail: 'cheques.detail',
+  chequeBooks: 'cheques.books',
+  chequeSummary: 'cheques.summary',
+  chequeAlerts: 'cheques.alerts',
+  chequeDepositSlips: 'cheques.depositSlips',
+  chequeDepositSlipEligible: 'cheques.depositSlips.eligible',
+  chequeDepositSlipDetail: 'cheques.depositSlips.detail',
+  chequeDepositSlipPdf: 'cheques.depositSlips.pdf',
+  chequeTransition: 'cheques.transition',
+  chequeReconciliationCandidates: 'cheques.reconciliationCandidates',
+  chequeReconcile: 'cheques.reconcile',
   creditNotesCollection: 'credit-notes.collection',
   creditNoteDetail: 'credit-notes.detail',
   creditNoteValidate: 'credit-notes.validate',
@@ -3070,6 +3329,23 @@ export const erpMarocUpstreamRoutes = {
       `/payments/${encodeRouteId(id)}/eligible-invoices`,
     allocate: (id: string) => `/payments/${encodeRouteId(id)}/allocate`,
     terminate: (id: string) => `/payments/${encodeRouteId(id)}/terminate`,
+  },
+  cheques: {
+    collection: '/cheques',
+    detail: (id: string) => `/cheques/${encodeRouteId(id)}`,
+    books: '/cheques/books',
+    summary: '/cheques/summary',
+    alerts: '/cheques/alerts',
+    depositSlips: '/cheques/deposit-slips',
+    depositSlipEligible: '/cheques/deposit-slips/eligible',
+    depositSlipDetail: (id: string) =>
+      `/cheques/deposit-slips/${encodeRouteId(id)}`,
+    depositSlipPdf: (id: string) =>
+      `/cheques/deposit-slips/${encodeRouteId(id)}/pdf`,
+    transition: (id: string) => `/cheques/${encodeRouteId(id)}/transition`,
+    reconciliationCandidates: (id: string) =>
+      `/cheques/${encodeRouteId(id)}/reconciliation-candidates`,
+    reconcile: (id: string) => `/cheques/${encodeRouteId(id)}/reconcile`,
   },
   creditNotes: {
     collection: '/credit-notes',
@@ -3445,6 +3721,24 @@ export type ErpInvoicePage = z.infer<typeof erpInvoicePageSchema>;
 export type ErpPaymentAllocation = z.infer<typeof erpPaymentAllocationSchema>;
 export type ErpPayment = z.infer<typeof erpPaymentSchema>;
 export type ErpPaymentPage = z.infer<typeof erpPaymentPageSchema>;
+export type ErpChequeDirection = z.infer<typeof erpChequeDirectionSchema>;
+export type ErpChequeInstrumentType = z.infer<
+  typeof erpChequeInstrumentTypeSchema
+>;
+export type ErpChequeStatus = z.infer<typeof erpChequeStatusSchema>;
+export type ErpChequeBook = z.infer<typeof erpChequeBookSchema>;
+export type ErpCheque = z.infer<typeof erpChequeSchema>;
+export type ErpChequePage = z.infer<typeof erpChequePageSchema>;
+export type ErpChequeSummary = z.infer<typeof erpChequeSummarySchema>;
+export type ErpChequeAlerts = z.infer<typeof erpChequeAlertsSchema>;
+export type ErpChequeAlert = ErpChequeAlerts['alerts'][number];
+export type ErpChequeDepositSlipListItem = z.infer<
+  typeof erpChequeDepositSlipListItemSchema
+>;
+export type ErpChequeDepositSlip = z.infer<typeof erpChequeDepositSlipSchema>;
+export type ErpChequeBankStatementLine = z.infer<
+  typeof erpChequeBankStatementLineSchema
+>;
 export type ErpEligibleInvoice = z.infer<typeof erpEligibleInvoiceSchema>;
 export type ErpEligibleInvoicePage = z.infer<
   typeof erpEligibleInvoicePageSchema

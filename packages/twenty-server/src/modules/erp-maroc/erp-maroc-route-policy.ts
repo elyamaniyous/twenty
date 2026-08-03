@@ -9,6 +9,16 @@ import {
   erpBankStatementLineSchema,
   erpBankStatementListSchema,
   erpBankStatementSchema,
+  erpChequeAlertsSchema,
+  erpChequeBookListSchema,
+  erpChequeBookSchema,
+  erpChequeDepositEligibleListSchema,
+  erpChequeDepositSlipListSchema,
+  erpChequeDepositSlipSchema,
+  erpChequePageSchema,
+  erpChequeReconciliationCandidatesSchema,
+  erpChequeSchema,
+  erpChequeSummarySchema,
   erpCreditNotePageSchema,
   erpCreditNoteSchema,
   erpContextSchema,
@@ -143,6 +153,23 @@ const paymentQuery = Object.freeze([
   'cursor',
   'limit',
 ]);
+const chequeQuery = Object.freeze([
+  'direction',
+  'instrumentType',
+  'status',
+  'bankAccountId',
+  'tierId',
+  'dueBefore',
+  'search',
+  'cursor',
+  'limit',
+]);
+const chequeAlertQuery = Object.freeze([
+  'horizonDays',
+  'staleDepositDays',
+  'lowBookThreshold',
+]);
+const chequeEligibleQuery = Object.freeze(['bankAccountId']);
 const creditNoteQuery = Object.freeze([
   'status',
   'tierId',
@@ -696,6 +723,156 @@ const routes: ErpMarocRoute[] = [
     responseSchema: erpPaymentSchema,
     kind: 'json',
     idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.chequeBooks,
+    method: 'GET',
+    pattern: exact('/cheques/books'),
+    build: staticBuilder(erpMarocUpstreamRoutes.cheques.books),
+    queryKeys: noQuery,
+    responseSchema: erpChequeBookListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.chequeBooks,
+    method: 'POST',
+    pattern: exact('/cheques/books'),
+    build: staticBuilder(erpMarocUpstreamRoutes.cheques.books),
+    queryKeys: noQuery,
+    responseSchema: erpChequeBookSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.chequeSummary,
+    method: 'GET',
+    pattern: exact('/cheques/summary'),
+    build: staticBuilder(erpMarocUpstreamRoutes.cheques.summary),
+    queryKeys: noQuery,
+    responseSchema: erpChequeSummarySchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.chequeAlerts,
+    method: 'GET',
+    pattern: exact('/cheques/alerts'),
+    build: staticBuilder(erpMarocUpstreamRoutes.cheques.alerts),
+    queryKeys: chequeAlertQuery,
+    responseSchema: erpChequeAlertsSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.chequeDepositSlipEligible,
+    method: 'GET',
+    pattern: exact('/cheques/deposit-slips/eligible'),
+    build: staticBuilder(erpMarocUpstreamRoutes.cheques.depositSlipEligible),
+    queryKeys: chequeEligibleQuery,
+    responseSchema: erpChequeDepositEligibleListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.chequeDepositSlips,
+    method: 'GET',
+    pattern: exact('/cheques/deposit-slips'),
+    build: staticBuilder(erpMarocUpstreamRoutes.cheques.depositSlips),
+    queryKeys: noQuery,
+    responseSchema: erpChequeDepositSlipListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.chequeDepositSlips,
+    method: 'POST',
+    pattern: exact('/cheques/deposit-slips'),
+    build: staticBuilder(erpMarocUpstreamRoutes.cheques.depositSlips),
+    queryKeys: noQuery,
+    responseSchema: erpChequeDepositSlipSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.chequeDepositSlipPdf,
+    method: 'GET',
+    pattern: new RegExp(`^/cheques/deposit-slips/${uuidSource}/pdf$`),
+    build: idBuilder(erpMarocUpstreamRoutes.cheques.depositSlipPdf),
+    queryKeys: noQuery,
+    responseSchema: pdfSchema,
+    kind: 'pdf',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.chequeDepositSlipDetail,
+    method: 'GET',
+    pattern: new RegExp(`^/cheques/deposit-slips/${uuidSource}$`),
+    build: idBuilder(erpMarocUpstreamRoutes.cheques.depositSlipDetail),
+    queryKeys: noQuery,
+    responseSchema: erpChequeDepositSlipSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.chequesCollection,
+    method: 'GET',
+    pattern: exact('/cheques'),
+    build: staticBuilder(erpMarocUpstreamRoutes.cheques.collection),
+    queryKeys: chequeQuery,
+    responseSchema: erpChequePageSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.chequesCollection,
+    method: 'POST',
+    pattern: exact('/cheques'),
+    build: staticBuilder(erpMarocUpstreamRoutes.cheques.collection),
+    queryKeys: noQuery,
+    responseSchema: erpChequeSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.chequeReconciliationCandidates,
+    method: 'GET',
+    pattern: action('cheques', 'reconciliation-candidates'),
+    build: idBuilder(erpMarocUpstreamRoutes.cheques.reconciliationCandidates),
+    queryKeys: noQuery,
+    responseSchema: erpChequeReconciliationCandidatesSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.chequeReconcile,
+    method: 'POST',
+    pattern: action('cheques', 'reconcile'),
+    build: idBuilder(erpMarocUpstreamRoutes.cheques.reconcile),
+    queryKeys: noQuery,
+    responseSchema: erpChequeSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.chequeTransition,
+    method: 'POST',
+    pattern: action('cheques', 'transition'),
+    build: idBuilder(erpMarocUpstreamRoutes.cheques.transition),
+    queryKeys: noQuery,
+    responseSchema: erpChequeSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.chequeDetail,
+    method: 'GET',
+    pattern: detail('cheques'),
+    build: idBuilder(erpMarocUpstreamRoutes.cheques.detail),
+    queryKeys: noQuery,
+    responseSchema: erpChequeSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
   }),
   defineRoute({
     routeId: erpMarocRouteIds.creditNotesCollection,
@@ -1926,6 +2103,20 @@ const paymentMethods = new Set([
   'DIRECT_DEBIT',
   'OTHER',
 ]);
+const chequeDirections = new Set(['RECEIVED', 'ISSUED']);
+const chequeInstrumentTypes = new Set(['CHEQUE', 'LCN']);
+const chequeStatuses = new Set([
+  'DRAFT',
+  'PRINTED',
+  'SIGNED',
+  'DELIVERED',
+  'IN_PORTFOLIO',
+  'DEPOSITED',
+  'CLEARED',
+  'REJECTED',
+  'STOPPED',
+  'CANCELLED',
+]);
 const creditNoteStatuses = new Set(['DRAFT', 'VALIDATED', 'CANCELLED']);
 const reminderStatuses = new Set([
   'PROPOSED',
@@ -1956,7 +2147,12 @@ const assertNormalizedQueryValue = (
   value: string,
 ): void => {
   if (value.length === 0 || value.trim() !== value) rejectRoute();
-  if (key === 'cursor' || key === 'tierId' || key === 'invoiceId') {
+  if (
+    key === 'cursor' ||
+    key === 'tierId' ||
+    key === 'invoiceId' ||
+    key === 'bankAccountId'
+  ) {
     if (!uuidSchema.safeParse(value).success) rejectRoute();
     return;
   }
@@ -1964,7 +2160,7 @@ const assertNormalizedQueryValue = (
     if (!/^(?:[1-9]|[1-9]\d|100)$/.test(value)) rejectRoute();
     return;
   }
-  if (key === 'from' || key === 'to') {
+  if (key === 'from' || key === 'to' || key === 'dueBefore') {
     if (!isValidCivilDate(value)) rejectRoute();
     return;
   }
@@ -1993,6 +2189,25 @@ const assertNormalizedQueryValue = (
     if (key === 'status' && paymentStatuses.has(value)) return;
     if (key === 'kind' && paymentKinds.has(value)) return;
     if (key === 'method' && paymentMethods.has(value)) return;
+  }
+  if (routeId === erpMarocRouteIds.chequesCollection) {
+    if (key === 'direction' && chequeDirections.has(value)) return;
+    if (key === 'instrumentType' && chequeInstrumentTypes.has(value)) return;
+    if (key === 'status' && chequeStatuses.has(value)) return;
+    if (
+      key === 'search' &&
+      value.length <= 120 &&
+      !/[\u0000-\u001f\u007f-\u009f]/.test(value)
+    ) {
+      return;
+    }
+  }
+  if (routeId === erpMarocRouteIds.chequeAlerts) {
+    if (!/^\d+$/.test(value)) rejectRoute();
+    const parsed = Number(value);
+    if (key === 'horizonDays' && parsed >= 1 && parsed <= 90) return;
+    if (key === 'staleDepositDays' && parsed >= 1 && parsed <= 30) return;
+    if (key === 'lowBookThreshold' && parsed >= 1 && parsed <= 100) return;
   }
   if (routeId === erpMarocRouteIds.creditNotesCollection) {
     if (key === 'status' && creditNoteStatuses.has(value)) return;

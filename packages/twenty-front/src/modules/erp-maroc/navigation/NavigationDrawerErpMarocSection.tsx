@@ -96,6 +96,16 @@ export const NavigationDrawerErpMarocSection = () => {
       Icon: IconCreditCard,
     },
     {
+      label: t`Chèques`,
+      path: erpMarocPaths.cheques,
+      activePaths: [
+        erpMarocPaths.cheques,
+        erpMarocPaths.chequeDetail,
+        erpMarocPaths.chequeDepositSlipDetail,
+      ],
+      Icon: IconNotes,
+    },
+    {
       label: t`Avoirs`,
       path: erpMarocPaths.creditNotes,
       activePaths: [

@@ -118,6 +118,26 @@ const ErpPaymentDetailPage = lazy(() =>
   })),
 );
 
+const ErpChequesPage = lazy(() =>
+  import('~/pages/erp-maroc/cheques/ErpChequesPage').then((module) => ({
+    default: module.ErpChequesPage,
+  })),
+);
+
+const ErpChequeDetailPage = lazy(() =>
+  import('~/pages/erp-maroc/cheques/ErpChequeDetailPage').then((module) => ({
+    default: module.ErpChequeDetailPage,
+  })),
+);
+
+const ErpChequeDepositSlipPage = lazy(() =>
+  import('~/pages/erp-maroc/cheques/ErpChequeDepositSlipPage').then(
+    (module) => ({
+      default: module.ErpChequeDepositSlipPage,
+    }),
+  ),
+);
+
 const ErpCreditNotesPage = lazy(() =>
   import('~/pages/erp-maroc/credit-notes/ErpCreditNotesPage').then(
     (module) => ({ default: module.ErpCreditNotesPage }),
@@ -563,6 +583,30 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpPaymentDetailPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.cheques}
+                element={
+                  <LazyRoute>
+                    <ErpChequesPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.chequeDetail}
+                element={
+                  <LazyRoute>
+                    <ErpChequeDetailPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.chequeDepositSlipDetail}
+                element={
+                  <LazyRoute>
+                    <ErpChequeDepositSlipPage />
                   </LazyRoute>
                 }
               />
