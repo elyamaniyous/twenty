@@ -25,6 +25,7 @@ export const erpMarocPaths = {
   creditNoteDetail: '/erp-maroc/credit-notes/:id',
   reminders: '/erp-maroc/reminders',
   marketing: '/erp-maroc/marketing',
+  documents: '/erp-maroc/documents',
   hrCore: '/erp-maroc/hr',
   hrEmployeeDetail: '/erp-maroc/hr/employees/:id',
   payrollRegulatory: '/erp-maroc/hr/payroll-regulatory',

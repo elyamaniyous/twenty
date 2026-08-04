@@ -23,6 +23,9 @@ import {
   erpCreditNotePageSchema,
   erpCreditNoteSchema,
   erpContextSchema,
+  erpDocumentContentSchema,
+  erpDocumentListSchema,
+  erpDocumentSchema,
   erpEligibleInvoicePageSchema,
   erpInvoicePageSchema,
   erpInvoiceReadSchema,
@@ -222,6 +225,7 @@ const grandLivreQuery = Object.freeze([
   ...accountingReportQuery,
 ]);
 const lettrageQuery = Object.freeze(['accountCode']);
+const documentQuery = Object.freeze(['search', 'type', 'tag']);
 const fiscalExerciseQuery = Object.freeze(['exerciceId']);
 const fiscalAdc080fQuery = Object.freeze(['regime']);
 const fiscalDeadlineSeedQuery = Object.freeze(['year']);
@@ -1233,6 +1237,76 @@ const routes: ErpMarocRoute[] = [
     responseSchema: erpTaxDeclarationListSchema,
     kind: 'json',
     idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.documentsCollection,
+    method: 'GET',
+    pattern: exact('/documents'),
+    build: staticBuilder(erpMarocUpstreamRoutes.documents.collection),
+    queryKeys: documentQuery,
+    responseSchema: erpDocumentListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.documentsCollection,
+    method: 'POST',
+    pattern: exact('/documents'),
+    build: staticBuilder(erpMarocUpstreamRoutes.documents.collection),
+    queryKeys: noQuery,
+    responseSchema: erpDocumentSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.documentDetail,
+    method: 'GET',
+    pattern: detail('documents'),
+    build: idBuilder(erpMarocUpstreamRoutes.documents.detail),
+    queryKeys: noQuery,
+    responseSchema: erpDocumentSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.documentContent,
+    method: 'GET',
+    pattern: action('documents', 'content'),
+    build: idBuilder(erpMarocUpstreamRoutes.documents.content),
+    queryKeys: noQuery,
+    responseSchema: erpDocumentContentSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.documentOcrRetry,
+    method: 'POST',
+    pattern: new RegExp(`^/documents/${uuidSource}/ocr/retry$`),
+    build: idBuilder(erpMarocUpstreamRoutes.documents.retryOcr),
+    queryKeys: noQuery,
+    responseSchema: erpDocumentSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.documentOcrValidate,
+    method: 'POST',
+    pattern: new RegExp(`^/documents/${uuidSource}/ocr/validate$`),
+    build: idBuilder(erpMarocUpstreamRoutes.documents.validateOcr),
+    queryKeys: noQuery,
+    responseSchema: erpDocumentSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.documentCreateSupplierInvoice,
+    method: 'POST',
+    pattern: action('documents', 'create-supplier-invoice'),
+    build: idBuilder(erpMarocUpstreamRoutes.documents.createSupplierInvoice),
+    queryKeys: noQuery,
+    responseSchema: erpSupplierInvoiceSchema,
+    kind: 'json',
+    idempotency: 'required',
   }),
   defineRoute({
     routeId: erpMarocRouteIds.fiscalTvaCalculate,
@@ -2547,6 +2621,16 @@ const accountingProvisionStatuses = new Set([
   'REVERSED',
   'CANCELLED',
 ]);
+const documentTypes = new Set([
+  'SUPPLIER_INVOICE',
+  'CUSTOMER_INVOICE',
+  'BANK_STATEMENT',
+  'RECEIPT',
+  'CONTRACT',
+  'FISCAL',
+  'PAYROLL',
+  'OTHER',
+]);
 
 const isValidCivilDate = (value: string): boolean => {
   if (!civilDate.test(value)) return false;
@@ -2639,6 +2723,16 @@ const assertNormalizedQueryValue = (
   }
   if (routeId === erpMarocRouteIds.accountingProvisionsCollection) {
     if (key === 'status' && accountingProvisionStatuses.has(value)) return;
+  }
+  if (routeId === erpMarocRouteIds.documentsCollection) {
+    if (key === 'type' && documentTypes.has(value)) return;
+    if (
+      (key === 'search' || key === 'tag') &&
+      value.length <= 120 &&
+      !/[\u0000-\u001f\u007f-\u009f]/.test(value)
+    ) {
+      return;
+    }
   }
   if (
     routeId === erpMarocRouteIds.liasseExport &&

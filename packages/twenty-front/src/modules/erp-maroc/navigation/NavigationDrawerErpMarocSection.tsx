@@ -130,6 +130,12 @@ export const NavigationDrawerErpMarocSection = () => {
       Icon: IconMail,
     },
     {
+      label: t`GED / OCR`,
+      path: erpMarocPaths.documents,
+      activePaths: [erpMarocPaths.documents],
+      Icon: IconFileText,
+    },
+    {
       label: t`Ressources humaines`,
       path: erpMarocPaths.hrCore,
       activePaths: [erpMarocPaths.hrCore, erpMarocPaths.hrEmployeeDetail],

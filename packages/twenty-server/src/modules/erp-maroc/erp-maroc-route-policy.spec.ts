@@ -23,6 +23,9 @@ import {
   erpCreditNotePageSchema,
   erpCreditNoteSchema,
   erpContextSchema,
+  erpDocumentContentSchema,
+  erpDocumentListSchema,
+  erpDocumentSchema,
   erpEligibleInvoicePageSchema,
   erpInvoicePageSchema,
   erpInvoiceReadSchema,
@@ -173,6 +176,10 @@ const requiredIdempotencyRoutes = new Set([
   `POST /accounting/entries/${id}/validate`,
   `POST /accounting/entries/${id}/reject`,
   `POST /accounting/entries/${id}/reverse`,
+  'POST /documents',
+  `POST /documents/${id}/ocr/retry`,
+  `POST /documents/${id}/ocr/validate`,
+  `POST /documents/${id}/create-supplier-invoice`,
   'POST /fiscal/tva/calculate',
   'POST /fiscal/tva/prorata/calculate',
   'POST /fiscal/tva/prorata/annual/post',
@@ -612,6 +619,33 @@ const approvedRoutes = [
     erpGrandLivreReportSchema,
   ],
   ['GET', '/accounting/balance', 'accounting.balance', erpBalanceReportSchema],
+  ['GET', '/documents', 'documents.collection', erpDocumentListSchema],
+  ['POST', '/documents', 'documents.collection', erpDocumentSchema],
+  ['GET', `/documents/${id}`, 'documents.detail', erpDocumentSchema],
+  [
+    'GET',
+    `/documents/${id}/content`,
+    'documents.content',
+    erpDocumentContentSchema,
+  ],
+  [
+    'POST',
+    `/documents/${id}/ocr/retry`,
+    'documents.ocr.retry',
+    erpDocumentSchema,
+  ],
+  [
+    'POST',
+    `/documents/${id}/ocr/validate`,
+    'documents.ocr.validate',
+    erpDocumentSchema,
+  ],
+  [
+    'POST',
+    `/documents/${id}/create-supplier-invoice`,
+    'documents.create-supplier-invoice',
+    erpSupplierInvoiceSchema,
+  ],
   [
     'GET',
     '/fiscal/declarations',
@@ -1458,6 +1492,13 @@ describe('ERP Maroc route policy', () => {
         year: '2026',
       }).upstreamPath,
     ).toBe('/fiscal/deadlines/seed?year=2026');
+    expect(
+      resolveErpRoute('GET', '/documents', {
+        search: 'facture atlas',
+        type: 'SUPPLIER_INVOICE',
+        tag: 'juillet',
+      }).upstreamPath,
+    ).toBe('/documents?search=facture+atlas&type=SUPPLIER_INVOICE&tag=juillet');
   });
 
   it.each([
@@ -1498,6 +1539,9 @@ describe('ERP Maroc route policy', () => {
     [`/fiscal/declarations/${id}/adc080f`, { regime: 'CASH' }],
     ['/fiscal/deadlines/seed', { year: '026' }],
     ['/fiscal/deadlines/seed', { year: '1999' }],
+    ['/documents', { type: 'INVOICE' }],
+    ['/documents', { search: 'facture\nadmin' }],
+    ['/documents', { tag: 'x'.repeat(121) }],
   ])('rejects non-normalized or unauthorized query for %s', (path, query) => {
     expect(() => resolveErpRoute('GET', path, query)).toThrow(
       'ERP route is not allowed',
