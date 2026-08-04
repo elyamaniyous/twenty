@@ -9,6 +9,9 @@ import {
   erpAccountingReferencesSchema,
   erpAccountingReviewTaskListSchema,
   erpAccountingReviewTaskSchema,
+  erpAccountingReviewAccountSchema,
+  erpAccountingReviewDossierSchema,
+  erpAccountingReviewExportSchema,
   erpBalanceReportSchema,
   erpChequeAlertsSchema,
   erpChequeBookListSchema,
@@ -230,6 +233,7 @@ const fiscalExerciseQuery = Object.freeze(['exerciceId']);
 const fiscalAdc080fQuery = Object.freeze(['regime']);
 const fiscalDeadlineSeedQuery = Object.freeze(['year']);
 const liasseExportQuery = Object.freeze(['format']);
+const accountingReviewExportQuery = Object.freeze(['format']);
 const pdfSchema = z.instanceof(Uint8Array);
 
 const exact = (path: string) => new RegExp(`^${path}$`);
@@ -1501,12 +1505,62 @@ const routes: ErpMarocRoute[] = [
     idempotency: 'required',
   }),
   defineRoute({
+    routeId: erpMarocRouteIds.complianceExerciseReviewDossier,
+    method: 'GET',
+    pattern: action('accounting-compliance/exercises', 'review-dossier'),
+    build: idBuilder(erpMarocUpstreamRoutes.compliance.reviewDossier),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingReviewDossierSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.complianceExerciseReviewRefresh,
+    method: 'POST',
+    pattern: action('accounting-compliance/exercises', 'review-refresh'),
+    build: idBuilder(erpMarocUpstreamRoutes.compliance.refreshReview),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingReviewDossierSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.complianceExerciseReviewExport,
+    method: 'GET',
+    pattern: action('accounting-compliance/exercises', 'review-export'),
+    build: idBuilder(erpMarocUpstreamRoutes.compliance.exportReview),
+    queryKeys: accountingReviewExportQuery,
+    responseSchema: erpAccountingReviewExportSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
     routeId: erpMarocRouteIds.complianceReviewTask,
     method: 'PATCH',
     pattern: detail('accounting-compliance/review-tasks'),
     build: idBuilder(erpMarocUpstreamRoutes.compliance.reviewTask),
     queryKeys: noQuery,
     responseSchema: erpAccountingReviewTaskSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.complianceReviewTaskDecision,
+    method: 'POST',
+    pattern: action('accounting-compliance/review-tasks', 'decision'),
+    build: idBuilder(erpMarocUpstreamRoutes.compliance.reviewTaskDecision),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingReviewTaskSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.complianceReviewAccount,
+    method: 'PATCH',
+    pattern: detail('accounting-compliance/review-accounts'),
+    build: idBuilder(erpMarocUpstreamRoutes.compliance.reviewAccount),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingReviewAccountSchema,
     kind: 'json',
     idempotency: 'required',
   }),

@@ -252,6 +252,12 @@ const ErpAccountingClosingPage = lazy(() =>
   ),
 );
 
+const ErpAccountingReviewPage = lazy(() =>
+  import('~/pages/erp-maroc/accounting/ErpAccountingReviewPage').then(
+    (module) => ({ default: module.ErpAccountingReviewPage }),
+  ),
+);
+
 const RecordIndexPage = lazy(() =>
   import('~/pages/object-record/RecordIndexPage').then((module) => ({
     default: module.RecordIndexPage,
@@ -797,6 +803,14 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpAccountingReferencesPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.accountingReview}
+                element={
+                  <LazyRoute>
+                    <ErpAccountingReviewPage />
                   </LazyRoute>
                 }
               />

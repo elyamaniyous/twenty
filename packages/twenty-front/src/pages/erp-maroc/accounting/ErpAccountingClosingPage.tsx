@@ -92,7 +92,9 @@ const taskAppearance: Record<
 > = {
   TODO: { label: 'À faire', tone: 'neutral' },
   IN_PROGRESS: { label: 'En cours', tone: 'info' },
+  READY_FOR_REVIEW: { label: 'À valider', tone: 'warning' },
   DONE: { label: 'Terminé', tone: 'success' },
+  REJECTED: { label: 'Rejeté', tone: 'danger' },
   NOT_APPLICABLE: { label: 'Non applicable', tone: 'warning' },
 };
 

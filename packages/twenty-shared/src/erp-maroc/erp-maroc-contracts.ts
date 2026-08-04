@@ -2650,6 +2650,38 @@ export const erpAccountingPeriodSchema = z
   })
   .passthrough();
 
+export const erpAccountingReviewStatusSchema = z.enum([
+  'TODO',
+  'IN_PROGRESS',
+  'READY_FOR_REVIEW',
+  'DONE',
+  'REJECTED',
+  'NOT_APPLICABLE',
+]);
+
+export const erpAccountingReviewAccountSchema = z
+  .object({
+    id: uuidSchema,
+    exerciceId: uuidSchema,
+    reviewTaskId: uuidSchema,
+    accountId: uuidSchema,
+    accountCode: nonBlankStringSchema,
+    accountLabel: nonBlankStringSchema,
+    debitCents: signedCentsSchema,
+    creditCents: signedCentsSchema,
+    balanceCents: signedCentsSchema,
+    status: erpAccountingReviewStatusSchema,
+    assignedToTwentyUserId: nullableStringSchema,
+    dueDate: nullableCivilDateHttpSchema,
+    notes: nullableStringSchema,
+    evidence: z.unknown().nullable(),
+    completedAt: nullableInstantSchema,
+    reviewedAt: nullableInstantSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+
 export const erpAccountingReviewTaskSchema = z
   .object({
     id: uuidSchema,
@@ -2657,10 +2689,15 @@ export const erpAccountingReviewTaskSchema = z
     code: nonBlankStringSchema,
     label: nonBlankStringSchema,
     category: nonBlankStringSchema,
-    status: z.enum(['TODO', 'IN_PROGRESS', 'DONE', 'NOT_APPLICABLE']),
+    status: erpAccountingReviewStatusSchema,
+    isCritical: z.boolean(),
+    assignedToTwentyUserId: nullableStringSchema,
+    dueDate: nullableCivilDateHttpSchema,
     evidence: z.unknown().nullable(),
     notes: nullableStringSchema,
     completedAt: nullableInstantSchema,
+    reviewedAt: nullableInstantSchema,
+    accounts: z.array(erpAccountingReviewAccountSchema).optional(),
     createdAt: instantSchema,
     updatedAt: instantSchema,
   })
@@ -2668,6 +2705,47 @@ export const erpAccountingReviewTaskSchema = z
 export const erpAccountingReviewTaskListSchema = z.array(
   erpAccountingReviewTaskSchema,
 );
+
+export const erpAccountingReviewDossierSchema = z.object({
+  exercise: z.object({
+    id: uuidSchema,
+    year: nonNegativeIntegerSchema,
+    startDate: civilDateHttpSchema,
+    endDate: civilDateHttpSchema,
+    status: z.enum(['OPEN', 'CLOSING', 'CLOSED']),
+  }),
+  assignees: z.array(
+    z.object({
+      twentyUserId: nonBlankStringSchema,
+      email: nullableStringSchema,
+      role: erpRoleSchema,
+    }),
+  ),
+  tasks: z.array(erpAccountingReviewTaskSchema),
+  summary: z.object({
+    tasksTotal: nonNegativeIntegerSchema,
+    tasksApproved: nonNegativeIntegerSchema,
+    accountsTotal: nonNegativeIntegerSchema,
+    accountsApproved: nonNegativeIntegerSchema,
+    blockers: nonNegativeIntegerSchema,
+    progressBasisPoints: nonNegativeIntegerSchema.max(10_000),
+    canClose: z.boolean(),
+  }),
+  blockers: z.array(
+    z.object({
+      type: z.enum(['TASK', 'ACCOUNT']),
+      id: uuidSchema,
+      label: nonBlankStringSchema,
+    }),
+  ),
+});
+
+export const erpAccountingReviewExportSchema = z.object({
+  filename: nonBlankStringSchema,
+  contentType: nonBlankStringSchema,
+  contentBase64: nonBlankStringSchema,
+  payloadSha256: nonBlankStringSchema,
+});
 
 export const erpExerciseSchema = z
   .object({
@@ -3504,7 +3582,12 @@ export const erpMarocRouteIds = {
   fiscalDeadlineComplete: 'fiscal.deadline.complete',
   complianceExercises: 'compliance.exercises',
   complianceExerciseReview: 'compliance.exercise.review',
+  complianceExerciseReviewDossier: 'compliance.exercise.review-dossier',
+  complianceExerciseReviewRefresh: 'compliance.exercise.review-refresh',
+  complianceExerciseReviewExport: 'compliance.exercise.review-export',
   complianceReviewTask: 'compliance.review-task',
+  complianceReviewTaskDecision: 'compliance.review-task.decision',
+  complianceReviewAccount: 'compliance.review-account',
   compliancePeriodClose: 'compliance.period.close',
   compliancePeriodReopen: 'compliance.period.reopen',
   complianceExerciseClose: 'compliance.exercise.close',
@@ -3874,8 +3957,18 @@ export const erpMarocUpstreamRoutes = {
     exercises: '/accounting-compliance/exercises',
     initializeReview: (id: string) =>
       `/accounting-compliance/exercises/${encodeRouteId(id)}/review`,
+    reviewDossier: (id: string) =>
+      `/accounting-compliance/exercises/${encodeRouteId(id)}/review-dossier`,
+    refreshReview: (id: string) =>
+      `/accounting-compliance/exercises/${encodeRouteId(id)}/review-refresh`,
+    exportReview: (id: string) =>
+      `/accounting-compliance/exercises/${encodeRouteId(id)}/review-export`,
     reviewTask: (id: string) =>
       `/accounting-compliance/review-tasks/${encodeRouteId(id)}`,
+    reviewTaskDecision: (id: string) =>
+      `/accounting-compliance/review-tasks/${encodeRouteId(id)}/decision`,
+    reviewAccount: (id: string) =>
+      `/accounting-compliance/review-accounts/${encodeRouteId(id)}`,
     closePeriod: (id: string) =>
       `/accounting-compliance/periods/${encodeRouteId(id)}/close`,
     reopenPeriod: (id: string) =>
@@ -4268,6 +4361,15 @@ export type ErpTaxPaymentCandidate = z.infer<
 export type ErpAccountingPeriod = z.infer<typeof erpAccountingPeriodSchema>;
 export type ErpAccountingReviewTask = z.infer<
   typeof erpAccountingReviewTaskSchema
+>;
+export type ErpAccountingReviewAccount = z.infer<
+  typeof erpAccountingReviewAccountSchema
+>;
+export type ErpAccountingReviewDossier = z.infer<
+  typeof erpAccountingReviewDossierSchema
+>;
+export type ErpAccountingReviewExport = z.infer<
+  typeof erpAccountingReviewExportSchema
 >;
 export type ErpExercise = z.infer<typeof erpExerciseSchema>;
 export type ErpFinancialStatements = z.infer<

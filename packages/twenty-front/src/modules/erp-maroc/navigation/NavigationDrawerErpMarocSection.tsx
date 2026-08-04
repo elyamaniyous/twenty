@@ -13,6 +13,7 @@ import {
   IconFileText,
   IconListDetails,
   IconLink,
+  IconListCheck,
   IconLock,
   IconMail,
   IconNotes,
@@ -175,6 +176,12 @@ export const NavigationDrawerErpMarocSection = () => {
       path: erpMarocPaths.accountingReferences,
       activePaths: [erpMarocPaths.accountingReferences],
       Icon: IconSettings,
+    },
+    {
+      label: t`Révision comptable`,
+      path: erpMarocPaths.accountingReview,
+      activePaths: [erpMarocPaths.accountingReview],
+      Icon: IconListCheck,
     },
     {
       label: t`Clôture comptable`,
