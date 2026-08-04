@@ -7,13 +7,13 @@ import { matchPath, useLocation } from 'react-router-dom';
 import {
   IconBell,
   IconBook,
-  IconBuildingSkyscraper,
   IconBox,
   IconChartBar,
   IconCreditCard,
   IconFileText,
   IconListDetails,
   IconLink,
+  IconLock,
   IconMail,
   IconNotes,
   IconSettings,
@@ -145,9 +145,22 @@ export const NavigationDrawerErpMarocSection = () => {
       path: erpMarocPaths.accountingEntries,
       activePaths: [
         erpMarocPaths.accountingEntries,
+        erpMarocPaths.accountingEntryNew,
         erpMarocPaths.accountingEntryDetail,
       ],
       Icon: IconBook,
+    },
+    {
+      label: t`Plan comptable`,
+      path: erpMarocPaths.accountingReferences,
+      activePaths: [erpMarocPaths.accountingReferences],
+      Icon: IconSettings,
+    },
+    {
+      label: t`Clôture comptable`,
+      path: erpMarocPaths.accountingClosing,
+      activePaths: [erpMarocPaths.accountingClosing],
+      Icon: IconLock,
     },
     {
       label: t`Grand livre`,
@@ -166,12 +179,6 @@ export const NavigationDrawerErpMarocSection = () => {
       path: erpMarocPaths.accountingLettrage,
       activePaths: [erpMarocPaths.accountingLettrage],
       Icon: IconLink,
-    },
-    {
-      label: t`Banque`,
-      path: erpMarocPaths.bankStatements,
-      activePaths: [erpMarocPaths.bankStatements],
-      Icon: IconBuildingSkyscraper,
     },
   ];
 

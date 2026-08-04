@@ -1,14 +1,13 @@
 import {
   erpAccountingEntryPageSchema,
   erpAccountingEntrySchema,
+  erpAccountingAccountSchema,
+  erpAccountingJournalSchema,
+  erpAccountingPeriodSchema,
+  erpAccountingReferencesSchema,
+  erpAccountingReviewTaskListSchema,
+  erpAccountingReviewTaskSchema,
   erpBalanceReportSchema,
-  erpBankAccountListSchema,
-  erpBankAccountSchema,
-  erpBankReconciliationCandidatesSchema,
-  erpBankStatementDetailSchema,
-  erpBankStatementLineSchema,
-  erpBankStatementListSchema,
-  erpBankStatementSchema,
   erpChequeAlertsSchema,
   erpChequeBookListSchema,
   erpChequeBookSchema,
@@ -27,6 +26,20 @@ import {
   erpInvoiceReadSchema,
   erpInvoiceSchema,
   erpGrandLivreReportSchema,
+  erpExerciseClosingResultSchema,
+  erpExerciseListSchema,
+  erpExerciseSchema,
+  erpFecExportSchema,
+  erpFecImportResultSchema,
+  erpFinancialStatementsSchema,
+  erpLiasseDeleteResultSchema,
+  erpLiasseExportSchema,
+  erpLiasseRowSchema,
+  erpLiasseTableDetailSchema,
+  erpLiasseTableSummaryListSchema,
+  erpLiasseValidationSchema,
+  erpRegulatorySubmissionListSchema,
+  erpRegulatorySubmissionSchema,
   erpLettrageMatchSchema,
   erpLettrageSuggestionsSchema,
   hrAccessAdministrationSchema,
@@ -113,7 +126,7 @@ import {
 } from 'twenty-shared/erp-maroc';
 import { z, type ZodType } from 'zod';
 
-export type ErpMarocHttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+export type ErpMarocHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 export type ErpMarocRouteKind = 'json' | 'pdf';
 export type ErpMarocIdempotencyPolicy = 'forbidden' | 'required';
 export type ErpMarocQuery = Readonly<Record<string, unknown>> | URLSearchParams;
@@ -194,6 +207,7 @@ const grandLivreQuery = Object.freeze([
   ...accountingReportQuery,
 ]);
 const lettrageQuery = Object.freeze(['accountCode']);
+const liasseExportQuery = Object.freeze(['format']);
 const pdfSchema = z.instanceof(Uint8Array);
 
 const exact = (path: string) => new RegExp(`^${path}$`);
@@ -206,6 +220,26 @@ const staticBuilder = (path: string) => () => path;
 const idBuilder =
   (builder: (id: string) => string) => (match: RegExpMatchArray) =>
     builder(uuidSchema.parse(match[1]));
+
+const liasseTableCodeSchema = z.string().regex(/^[A-Z0-9_-]{1,20}$/);
+const liasseRowCodeSchema = z.string().regex(/^[A-Z0-9_-]{1,80}$/);
+const liasseTablePattern = new RegExp(
+  `^/liasse/exercises/${uuidSource}/tables/([^/]+)$`,
+);
+const liasseRowPattern = new RegExp(
+  `^/liasse/exercises/${uuidSource}/tables/([^/]+)/rows/([^/]+)$`,
+);
+const liasseTableBuilder = (match: RegExpMatchArray) =>
+  erpMarocUpstreamRoutes.liasse.table(
+    uuidSchema.parse(match[1]),
+    liasseTableCodeSchema.parse(match[2]),
+  );
+const liasseRowBuilder = (match: RegExpMatchArray) =>
+  erpMarocUpstreamRoutes.liasse.row(
+    uuidSchema.parse(match[1]),
+    liasseTableCodeSchema.parse(match[2]),
+    liasseRowCodeSchema.parse(match[3]),
+  );
 
 const defineRoute = (route: ErpMarocRoute): ErpMarocRoute => {
   Object.freeze(route.pattern);
@@ -537,18 +571,6 @@ const routes: ErpMarocRoute[] = [
     method: 'POST',
     pattern: action('supplier-payment-preparations', 'cancel'),
     build: idBuilder(erpMarocUpstreamRoutes.supplierPaymentPreparations.cancel),
-    queryKeys: noQuery,
-    responseSchema: erpSupplierPaymentPreparationSchema,
-    kind: 'json',
-    idempotency: 'required',
-  }),
-  defineRoute({
-    routeId: erpMarocRouteIds.supplierPaymentPreparationExecute,
-    method: 'POST',
-    pattern: action('supplier-payment-preparations', 'execute'),
-    build: idBuilder(
-      erpMarocUpstreamRoutes.supplierPaymentPreparations.execute,
-    ),
     queryKeys: noQuery,
     responseSchema: erpSupplierPaymentPreparationSchema,
     kind: 'json',
@@ -975,6 +997,16 @@ const routes: ErpMarocRoute[] = [
     idempotency: 'forbidden',
   }),
   defineRoute({
+    routeId: erpMarocRouteIds.accountingEntriesCollection,
+    method: 'POST',
+    pattern: exact('/accounting/entries'),
+    build: staticBuilder(erpMarocUpstreamRoutes.accounting.entries),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingEntrySchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
     routeId: erpMarocRouteIds.accountingEntryDetail,
     method: 'GET',
     pattern: detail('accounting/entries'),
@@ -1005,6 +1037,66 @@ const routes: ErpMarocRoute[] = [
     idempotency: 'required',
   }),
   defineRoute({
+    routeId: erpMarocRouteIds.accountingEntryReverse,
+    method: 'POST',
+    pattern: action('accounting/entries', 'reverse'),
+    build: idBuilder(erpMarocUpstreamRoutes.accounting.reverse),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingEntrySchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.accountingReferences,
+    method: 'GET',
+    pattern: exact('/accounting/references'),
+    build: staticBuilder(erpMarocUpstreamRoutes.accounting.references),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingReferencesSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.accountingAccountsCollection,
+    method: 'POST',
+    pattern: exact('/accounting/references/accounts'),
+    build: staticBuilder(erpMarocUpstreamRoutes.accounting.accounts),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingAccountSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.accountingAccountDetail,
+    method: 'PATCH',
+    pattern: detail('accounting/references/accounts'),
+    build: idBuilder(erpMarocUpstreamRoutes.accounting.account),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingAccountSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.accountingJournalsCollection,
+    method: 'POST',
+    pattern: exact('/accounting/references/journals'),
+    build: staticBuilder(erpMarocUpstreamRoutes.accounting.journals),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingJournalSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.accountingJournalDetail,
+    method: 'PATCH',
+    pattern: detail('accounting/references/journals'),
+    build: idBuilder(erpMarocUpstreamRoutes.accounting.journal),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingJournalSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
     routeId: erpMarocRouteIds.accountingGrandLivre,
     method: 'GET',
     pattern: exact('/accounting/grand-livre'),
@@ -1023,6 +1115,186 @@ const routes: ErpMarocRoute[] = [
     responseSchema: erpBalanceReportSchema,
     kind: 'json',
     idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.complianceExercises,
+    method: 'GET',
+    pattern: exact('/accounting-compliance/exercises'),
+    build: staticBuilder(erpMarocUpstreamRoutes.compliance.exercises),
+    queryKeys: noQuery,
+    responseSchema: erpExerciseListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.complianceExercises,
+    method: 'POST',
+    pattern: exact('/accounting-compliance/exercises'),
+    build: staticBuilder(erpMarocUpstreamRoutes.compliance.exercises),
+    queryKeys: noQuery,
+    responseSchema: erpExerciseSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.complianceExerciseReview,
+    method: 'POST',
+    pattern: action('accounting-compliance/exercises', 'review'),
+    build: idBuilder(erpMarocUpstreamRoutes.compliance.initializeReview),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingReviewTaskListSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.complianceReviewTask,
+    method: 'PATCH',
+    pattern: detail('accounting-compliance/review-tasks'),
+    build: idBuilder(erpMarocUpstreamRoutes.compliance.reviewTask),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingReviewTaskSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.compliancePeriodClose,
+    method: 'POST',
+    pattern: action('accounting-compliance/periods', 'close'),
+    build: idBuilder(erpMarocUpstreamRoutes.compliance.closePeriod),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingPeriodSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.compliancePeriodReopen,
+    method: 'POST',
+    pattern: action('accounting-compliance/periods', 'reopen'),
+    build: idBuilder(erpMarocUpstreamRoutes.compliance.reopenPeriod),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingPeriodSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.complianceExerciseClose,
+    method: 'POST',
+    pattern: action('accounting-compliance/exercises', 'close'),
+    build: idBuilder(erpMarocUpstreamRoutes.compliance.closeExercise),
+    queryKeys: noQuery,
+    responseSchema: erpExerciseClosingResultSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.complianceExerciseStatements,
+    method: 'GET',
+    pattern: action('accounting-compliance/exercises', 'statements'),
+    build: idBuilder(erpMarocUpstreamRoutes.compliance.statements),
+    queryKeys: noQuery,
+    responseSchema: erpFinancialStatementsSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.complianceExerciseFec,
+    method: 'GET',
+    pattern: action('accounting-compliance/exercises', 'fec'),
+    build: idBuilder(erpMarocUpstreamRoutes.compliance.fec),
+    queryKeys: noQuery,
+    responseSchema: erpFecExportSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.complianceFecImport,
+    method: 'POST',
+    pattern: exact('/accounting-compliance/fec/import'),
+    build: staticBuilder(erpMarocUpstreamRoutes.compliance.importFec),
+    queryKeys: noQuery,
+    responseSchema: erpFecImportResultSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.liasseTables,
+    method: 'GET',
+    pattern: new RegExp(`^/liasse/exercises/${uuidSource}/tables$`),
+    build: idBuilder(erpMarocUpstreamRoutes.liasse.tables),
+    queryKeys: noQuery,
+    responseSchema: erpLiasseTableSummaryListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.liasseValidation,
+    method: 'GET',
+    pattern: new RegExp(`^/liasse/exercises/${uuidSource}/validation$`),
+    build: idBuilder(erpMarocUpstreamRoutes.liasse.validation),
+    queryKeys: noQuery,
+    responseSchema: erpLiasseValidationSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.liasseTable,
+    method: 'GET',
+    pattern: liasseTablePattern,
+    build: liasseTableBuilder,
+    queryKeys: noQuery,
+    responseSchema: erpLiasseTableDetailSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.liasseRow,
+    method: 'PUT',
+    pattern: liasseRowPattern,
+    build: liasseRowBuilder,
+    queryKeys: noQuery,
+    responseSchema: erpLiasseRowSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.liasseRow,
+    method: 'DELETE',
+    pattern: liasseRowPattern,
+    build: liasseRowBuilder,
+    queryKeys: noQuery,
+    responseSchema: erpLiasseDeleteResultSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.liasseExport,
+    method: 'GET',
+    pattern: new RegExp(`^/liasse/exercises/${uuidSource}/export$`),
+    build: idBuilder(erpMarocUpstreamRoutes.liasse.export),
+    queryKeys: liasseExportQuery,
+    responseSchema: erpLiasseExportSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.regulatorySubmissions,
+    method: 'GET',
+    pattern: exact('/liasse/submissions'),
+    build: staticBuilder(erpMarocUpstreamRoutes.liasse.submissions),
+    queryKeys: noQuery,
+    responseSchema: erpRegulatorySubmissionListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.regulatorySubmissionValidation,
+    method: 'PATCH',
+    pattern: action('liasse/submissions', 'external-validation'),
+    build: idBuilder(erpMarocUpstreamRoutes.liasse.validateSubmission),
+    queryKeys: noQuery,
+    responseSchema: erpRegulatorySubmissionSchema,
+    kind: 'json',
+    idempotency: 'required',
   }),
   defineRoute({
     routeId: erpMarocRouteIds.accountingLettrageSuggestions,
@@ -1063,176 +1335,6 @@ const routes: ErpMarocRoute[] = [
     responseSchema: erpReminderPageSchema,
     kind: 'json',
     idempotency: 'forbidden',
-  }),
-  defineRoute({
-    routeId: erpMarocRouteIds.bankAccountsCollection,
-    method: 'GET',
-    pattern: exact('/bank-accounts'),
-    build: staticBuilder(erpMarocUpstreamRoutes.bankAccounts.collection),
-    queryKeys: noQuery,
-    responseSchema: erpBankAccountListSchema,
-    kind: 'json',
-    idempotency: 'forbidden',
-  }),
-  defineRoute({
-    routeId: erpMarocRouteIds.bankAccountsCollection,
-    method: 'POST',
-    pattern: exact('/bank-accounts'),
-    build: staticBuilder(erpMarocUpstreamRoutes.bankAccounts.collection),
-    queryKeys: noQuery,
-    responseSchema: erpBankAccountSchema,
-    kind: 'json',
-    idempotency: 'required',
-  }),
-  defineRoute({
-    routeId: erpMarocRouteIds.bankAccountDetail,
-    method: 'PATCH',
-    pattern: detail('bank-accounts'),
-    build: idBuilder(erpMarocUpstreamRoutes.bankAccounts.detail),
-    queryKeys: noQuery,
-    responseSchema: erpBankAccountSchema,
-    kind: 'json',
-    idempotency: 'required',
-  }),
-  defineRoute({
-    routeId: erpMarocRouteIds.bankStatementsCollection,
-    method: 'GET',
-    pattern: exact('/bank-statements'),
-    build: staticBuilder(erpMarocUpstreamRoutes.bankStatements.collection),
-    queryKeys: noQuery,
-    responseSchema: erpBankStatementListSchema,
-    kind: 'json',
-    idempotency: 'forbidden',
-  }),
-  defineRoute({
-    routeId: erpMarocRouteIds.bankStatementsCollection,
-    method: 'POST',
-    pattern: exact('/bank-statements'),
-    build: staticBuilder(erpMarocUpstreamRoutes.bankStatements.collection),
-    queryKeys: noQuery,
-    responseSchema: erpBankStatementSchema,
-    kind: 'json',
-    idempotency: 'required',
-  }),
-  defineRoute({
-    routeId: erpMarocRouteIds.bankStatementDetail,
-    method: 'GET',
-    pattern: detail('bank-statements'),
-    build: idBuilder(erpMarocUpstreamRoutes.bankStatements.detail),
-    queryKeys: noQuery,
-    responseSchema: erpBankStatementDetailSchema,
-    kind: 'json',
-    idempotency: 'forbidden',
-  }),
-  defineRoute({
-    routeId: erpMarocRouteIds.bankStatementConfirm,
-    method: 'POST',
-    pattern: action('bank-statements', 'confirm'),
-    build: idBuilder(erpMarocUpstreamRoutes.bankStatements.confirm),
-    queryKeys: noQuery,
-    responseSchema: erpBankStatementDetailSchema,
-    kind: 'json',
-    idempotency: 'required',
-  }),
-  defineRoute({
-    routeId: erpMarocRouteIds.bankStatementAssignBankAccount,
-    method: 'PATCH',
-    pattern: action('bank-statements', 'bank-account'),
-    build: idBuilder(erpMarocUpstreamRoutes.bankStatements.assignBankAccount),
-    queryKeys: noQuery,
-    responseSchema: erpBankStatementDetailSchema,
-    kind: 'json',
-    idempotency: 'required',
-  }),
-  defineRoute({
-    routeId: erpMarocRouteIds.bankStatementClose,
-    method: 'POST',
-    pattern: action('bank-statements', 'close'),
-    build: idBuilder(erpMarocUpstreamRoutes.bankStatements.close),
-    queryKeys: noQuery,
-    responseSchema: erpBankStatementDetailSchema,
-    kind: 'json',
-    idempotency: 'required',
-  }),
-  defineRoute({
-    routeId: erpMarocRouteIds.bankStatementLineReconciliationCandidates,
-    method: 'GET',
-    pattern: action('bank-statement-lines', 'reconciliation-candidates'),
-    build: idBuilder(
-      erpMarocUpstreamRoutes.bankStatementLines.reconciliationCandidates,
-    ),
-    queryKeys: noQuery,
-    responseSchema: erpBankReconciliationCandidatesSchema,
-    kind: 'json',
-    idempotency: 'forbidden',
-  }),
-  defineRoute({
-    routeId: erpMarocRouteIds.bankStatementLineReconcileSupplierPayment,
-    method: 'POST',
-    pattern: action('bank-statement-lines', 'reconcile-supplier-payment'),
-    build: idBuilder(
-      erpMarocUpstreamRoutes.bankStatementLines.reconcileSupplierPayment,
-    ),
-    queryKeys: noQuery,
-    responseSchema: erpBankStatementLineSchema,
-    kind: 'json',
-    idempotency: 'required',
-  }),
-  defineRoute({
-    routeId: erpMarocRouteIds.bankStatementLineUnreconcileSupplierPayment,
-    method: 'POST',
-    pattern: action('bank-statement-lines', 'unreconcile-supplier-payment'),
-    build: idBuilder(
-      erpMarocUpstreamRoutes.bankStatementLines.unreconcileSupplierPayment,
-    ),
-    queryKeys: noQuery,
-    responseSchema: erpBankStatementLineSchema,
-    kind: 'json',
-    idempotency: 'required',
-  }),
-  defineRoute({
-    routeId: erpMarocRouteIds.bankStatementLineReconcileCustomerPayment,
-    method: 'POST',
-    pattern: action('bank-statement-lines', 'reconcile-customer-payment'),
-    build: idBuilder(
-      erpMarocUpstreamRoutes.bankStatementLines.reconcileCustomerPayment,
-    ),
-    queryKeys: noQuery,
-    responseSchema: erpBankStatementLineSchema,
-    kind: 'json',
-    idempotency: 'required',
-  }),
-  defineRoute({
-    routeId: erpMarocRouteIds.bankStatementLineUnreconcileCustomerPayment,
-    method: 'POST',
-    pattern: action('bank-statement-lines', 'unreconcile-customer-payment'),
-    build: idBuilder(
-      erpMarocUpstreamRoutes.bankStatementLines.unreconcileCustomerPayment,
-    ),
-    queryKeys: noQuery,
-    responseSchema: erpBankStatementLineSchema,
-    kind: 'json',
-    idempotency: 'required',
-  }),
-  defineRoute({
-    routeId: erpMarocRouteIds.bankStatementLineReview,
-    method: 'POST',
-    pattern: action('bank-statement-lines', 'review'),
-    build: idBuilder(erpMarocUpstreamRoutes.bankStatementLines.review),
-    queryKeys: noQuery,
-    responseSchema: erpBankStatementLineSchema,
-    kind: 'json',
-    idempotency: 'required',
-  }),
-  defineRoute({
-    routeId: erpMarocRouteIds.bankStatementLineUnreview,
-    method: 'POST',
-    pattern: action('bank-statement-lines', 'unreview'),
-    build: idBuilder(erpMarocUpstreamRoutes.bankStatementLines.unreview),
-    queryKeys: noQuery,
-    responseSchema: erpBankStatementLineSchema,
-    kind: 'json',
-    idempotency: 'required',
   }),
   defineRoute({
     routeId: erpMarocRouteIds.remindersScan,
@@ -2139,8 +2241,25 @@ const reminderStatuses = new Set([
   'RECONCILIATION_REQUIRED',
 ]);
 const reminderLevels = new Set(['LEVEL_1', 'LEVEL_2', 'LEVEL_3']);
-const accountingEntryStatuses = new Set(['DRAFT', 'VALIDATED', 'REJECTED']);
-const accountingSourceTypes = new Set(['INVOICE', 'PAYMENT', 'CREDIT_NOTE']);
+const accountingEntryStatuses = new Set([
+  'DRAFT',
+  'VALIDATED',
+  'LOCKED',
+  'REJECTED',
+]);
+const accountingSourceTypes = new Set([
+  'MANUAL',
+  'REVERSAL',
+  'INVOICE',
+  'PAYMENT',
+  'CREDIT_NOTE',
+  'SUPPLIER_INVOICE',
+  'SUPPLIER_PAYMENT',
+  'PAYROLL',
+  'EXPENSE_NOTE',
+  'CLOSING',
+  'OPENING_BALANCE',
+]);
 
 const isValidCivilDate = (value: string): boolean => {
   if (!civilDate.test(value)) return false;
@@ -2229,6 +2348,13 @@ const assertNormalizedQueryValue = (
   if (routeId === erpMarocRouteIds.accountingEntriesCollection) {
     if (key === 'status' && accountingEntryStatuses.has(value)) return;
     if (key === 'sourceType' && accountingSourceTypes.has(value)) return;
+  }
+  if (
+    routeId === erpMarocRouteIds.liasseExport &&
+    key === 'format' &&
+    (value === 'xlsx' || value === 'json')
+  ) {
+    return;
   }
   rejectRoute();
 };

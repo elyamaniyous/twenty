@@ -23,7 +23,7 @@ import {
   type ErpAccountingEntry,
   type ErpAccountingEntryPage,
 } from 'twenty-shared/erp-maroc';
-import { IconChevronLeft, IconChevronRight } from 'twenty-ui/display';
+import { IconChevronLeft, IconChevronRight, IconPlus } from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
@@ -35,15 +35,22 @@ const STATUS: Record<
 > = {
   DRAFT: { label: 'À contrôler', tone: 'warning' },
   VALIDATED: { label: 'Validée', tone: 'success' },
+  LOCKED: { label: 'Verrouillée', tone: 'neutral' },
   REJECTED: { label: 'Rejetée', tone: 'danger' },
 };
 
 const SOURCE: Record<ErpAccountingEntry['sourceType'], string> = {
+  MANUAL: 'Saisie manuelle',
+  REVERSAL: 'Contrepassation',
   INVOICE: 'Facture',
   PAYMENT: 'Règlement',
   CREDIT_NOTE: 'Avoir',
   SUPPLIER_INVOICE: 'Facture fournisseur',
   SUPPLIER_PAYMENT: 'Paiement fournisseur',
+  PAYROLL: 'Paie',
+  EXPENSE_NOTE: 'Note de frais',
+  CLOSING: 'Clôture',
+  OPENING_BALANCE: 'À-nouveaux',
 };
 
 const formatDate = (value: string) => value.split('-').reverse().join('/');
@@ -221,6 +228,16 @@ export const ErpEntriesPage = () => {
     <ErpPageShell
       title="Écritures comptables"
       description="Journal central des factures, règlements et avoirs"
+      actions={
+        <Link to="/erp-maroc/accounting/entries/new">
+          <Button
+            title="Nouvelle OD"
+            ariaLabel="Créer une opération diverse"
+            Icon={IconPlus}
+            accent="blue"
+          />
+        </Link>
+      }
     >
       <StyledToolbar>
         <StyledFilter>

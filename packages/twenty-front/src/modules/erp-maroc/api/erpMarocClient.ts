@@ -9,7 +9,7 @@ import { createIdempotencyKey } from './createIdempotencyKey';
 import { ErpMarocError, parseErpMarocError } from './erpMarocError';
 
 type Store = ReturnType<typeof createStore>;
-type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 type RefreshTokenSessionClaims = {
   sub?: string;

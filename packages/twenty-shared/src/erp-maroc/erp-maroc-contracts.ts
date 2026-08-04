@@ -1652,6 +1652,7 @@ export const erpAccountingEntryStatusSchema = z.enum([
 ]);
 export const erpAccountingSourceTypeSchema = z.enum([
   'MANUAL',
+  'REVERSAL',
   'INVOICE',
   'PAYMENT',
   'CREDIT_NOTE',
@@ -1707,6 +1708,9 @@ export const erpAccountingEntrySchema = z
     rejectedAt: nullableInstantSchema,
     rejectedByTwentyUserId: nullableStringSchema,
     rejectionReason: nullableStringSchema,
+    reversalOfEntryId: nullableUuidSchema,
+    reversalEntryId: nullableUuidSchema,
+    reversalReason: nullableStringSchema,
     totalDebitCents: centsSchema,
     totalCreditCents: centsSchema,
     lines: z.array(erpAccountingEntryLineSchema).optional(),
@@ -1747,6 +1751,42 @@ export const erpAccountingEntrySchema = z
 export const erpAccountingEntryPageSchema = listPageSchema(
   erpAccountingEntrySchema,
 );
+
+export const erpAccountingAccountSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  code: nonBlankStringSchema,
+  libelle: nonBlankStringSchema,
+  classe: z.number().int().min(1).max(9),
+  isActive: z.boolean(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+
+export const erpAccountingJournalTypeSchema = z.enum([
+  'VENTE',
+  'ACHAT',
+  'BANQUE',
+  'CAISSE',
+  'OD',
+  'PAIE',
+]);
+
+export const erpAccountingJournalSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  code: nonBlankStringSchema,
+  libelle: nonBlankStringSchema,
+  type: erpAccountingJournalTypeSchema,
+  isActive: z.boolean(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+
+export const erpAccountingReferencesSchema = z.object({
+  accounts: z.array(erpAccountingAccountSchema),
+  journals: z.array(erpAccountingJournalSchema),
+});
 
 export const erpAccountingReportStatusSchema = z.enum(['DRAFT', 'VALIDATED']);
 
@@ -2190,7 +2230,7 @@ export const erpBankStatementLineSchema = z.object({
   boundingBox: z.array(z.number().finite()).length(4).nullable(),
   review: z
     .object({
-      reason: nonBlankStringSchema,
+      reason: nullableStringSchema,
       reviewedAt: instantSchema,
       reviewedByTwentyUserId: nonBlankStringSchema,
     })
@@ -2570,6 +2610,139 @@ export const erpExerciseClosingResultSchema = z.object({
   closingEntryId: nullableUuidSchema,
   openingEntryId: nullableUuidSchema,
 });
+
+export const erpLiasseFieldDefinitionSchema = z.object({
+  key: nonBlankStringSchema,
+  label: nonBlankStringSchema,
+  type: z.enum(['text', 'date', 'integer', 'amount', 'percentage']),
+  required: z.boolean().optional(),
+});
+
+export const erpLiasseComputedRowDefinitionSchema = z.object({
+  code: nonBlankStringSchema,
+  label: nonBlankStringSchema,
+  prefixes: z.array(nonBlankStringSchema),
+  side: z.enum(['DEBIT', 'CREDIT', 'NET_DEBIT', 'NET_CREDIT']),
+});
+
+export const erpLiasseTableDefinitionSchema = z.object({
+  code: nonBlankStringSchema,
+  label: nonBlankStringSchema,
+  category: z.enum(['ETATS', 'ANNEXES', 'SOCIAL', 'JURIDIQUE']),
+  mode: z.enum(['COMPUTED', 'MANUAL', 'MIXED']),
+  description: nonBlankStringSchema,
+  fields: z.array(erpLiasseFieldDefinitionSchema),
+  computedRows: z.array(erpLiasseComputedRowDefinitionSchema),
+});
+
+export const erpLiasseTableSummarySchema = erpLiasseTableDefinitionSchema
+  .extend({
+    manualRows: nonNegativeIntegerSchema,
+    isReady: z.boolean(),
+  })
+  .passthrough();
+export const erpLiasseTableSummaryListSchema = z.array(
+  erpLiasseTableSummarySchema,
+);
+
+export const erpLiasseRowSchema = z
+  .object({
+    id: nullableUuidSchema,
+    rowCode: nonBlankStringSchema,
+    label: nonBlankStringSchema,
+    position: nonNegativeIntegerSchema,
+    source: z.enum(['COMPUTED', 'MANUAL', 'IMPORTED']),
+    values: z
+      .object({})
+      .catchall(z.union([z.string(), safeIntegerSchema, z.null()])),
+    notes: nullableStringSchema,
+  })
+  .passthrough();
+
+export const erpLiasseTableDetailSchema = z.object({
+  exercise: z.object({
+    id: uuidSchema,
+    year: safeIntegerSchema,
+    startDate: civilDateHttpSchema,
+    endDate: civilDateHttpSchema,
+  }),
+  definition: erpLiasseTableDefinitionSchema,
+  rows: z.array(erpLiasseRowSchema),
+});
+
+export const erpLiasseDeleteResultSchema = z.object({
+  deleted: z.literal(true),
+  id: uuidSchema,
+});
+
+export const erpLiasseValidationIssueSchema = z.object({
+  code: nonBlankStringSchema,
+  message: nonBlankStringSchema,
+  tableCode: nullableStringSchema,
+  rowCode: nullableStringSchema,
+});
+
+export const erpLiasseValidationSchema = z.object({
+  valid: z.boolean(),
+  errors: z.array(erpLiasseValidationIssueSchema),
+  warnings: z.array(erpLiasseValidationIssueSchema),
+  summary: z.object({
+    tables: nonNegativeIntegerSchema,
+    readyTables: nonNegativeIntegerSchema,
+    manualRows: nonNegativeIntegerSchema,
+    rowsChecked: nonNegativeIntegerSchema,
+    errors: nonNegativeIntegerSchema,
+    warnings: nonNegativeIntegerSchema,
+  }),
+  checkedAt: instantSchema,
+  validator: nonBlankStringSchema,
+  externalAcceptanceRequired: z.boolean(),
+});
+
+export const erpLiasseExportSchema = z.object({
+  submissionId: uuidSchema,
+  filename: nonBlankStringSchema,
+  contentType: nonBlankStringSchema,
+  contentBase64: nonBlankStringSchema,
+  payloadSha256: nonBlankStringSchema,
+  validation: z.object({
+    valid: z.boolean(),
+    errors: z.array(z.string()),
+    warnings: z.array(z.string()),
+    checkedAt: instantSchema,
+    validator: nonBlankStringSchema,
+    externalAcceptanceRequired: z.boolean(),
+  }),
+});
+
+export const erpRegulatorySubmissionSchema = z
+  .object({
+    id: uuidSchema,
+    exerciceId: nullableUuidSchema,
+    kind: nonBlankStringSchema,
+    periodKey: nonBlankStringSchema,
+    formatVersion: nonBlankStringSchema,
+    filename: nonBlankStringSchema,
+    contentType: nonBlankStringSchema,
+    payloadSha256: nonBlankStringSchema,
+    validationStatus: z.enum([
+      'GENERATED',
+      'INTERNALLY_VALIDATED',
+      'EXTERNALLY_ACCEPTED',
+      'REJECTED',
+    ]),
+    validationReport: z.unknown(),
+    generatedAt: instantSchema,
+    externallyValidatedAt: nullableInstantSchema,
+    externalReference: nullableStringSchema,
+    rejectionReason: nullableStringSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpRegulatorySubmissionListSchema = z.array(
+  erpRegulatorySubmissionSchema,
+);
 
 export const erpEmployeeSchema = z
   .object({
@@ -3112,6 +3285,12 @@ export const erpMarocRouteIds = {
   accountingEntryDetail: 'accounting.entries.detail',
   accountingEntryValidate: 'accounting.entries.validate',
   accountingEntryReject: 'accounting.entries.reject',
+  accountingEntryReverse: 'accounting.entries.reverse',
+  accountingReferences: 'accounting.references',
+  accountingAccountsCollection: 'accounting.accounts.collection',
+  accountingAccountDetail: 'accounting.accounts.detail',
+  accountingJournalsCollection: 'accounting.journals.collection',
+  accountingJournalDetail: 'accounting.journals.detail',
   accountingGrandLivre: 'accounting.grand-livre',
   accountingBalance: 'accounting.balance',
   accountingLettrageSuggestions: 'accounting.lettrage.suggestions',
@@ -3263,6 +3442,7 @@ export const erpMarocRouteIds = {
   accountingAnomalyResolve: 'operations.anomaly.resolve',
   liasseDefinitions: 'liasse.definitions',
   liasseTables: 'liasse.tables',
+  liasseValidation: 'liasse.validation',
   liasseTable: 'liasse.table',
   liasseRow: 'liasse.row',
   liasseExport: 'liasse.export',
@@ -3437,6 +3617,14 @@ export const erpMarocUpstreamRoutes = {
     validate: (id: string) =>
       `/accounting/entries/${encodeRouteId(id)}/validate`,
     reject: (id: string) => `/accounting/entries/${encodeRouteId(id)}/reject`,
+    reverse: (id: string) => `/accounting/entries/${encodeRouteId(id)}/reverse`,
+    references: '/accounting/references',
+    accounts: '/accounting/references/accounts',
+    account: (id: string) =>
+      `/accounting/references/accounts/${encodeRouteId(id)}`,
+    journals: '/accounting/references/journals',
+    journal: (id: string) =>
+      `/accounting/references/journals/${encodeRouteId(id)}`,
     grandLivre: '/accounting/grand-livre',
     balance: '/accounting/balance',
     lettrageSuggestions: '/accounting/lettrage/suggestions',
@@ -3664,6 +3852,8 @@ export const erpMarocUpstreamRoutes = {
     definitions: '/liasse/definitions',
     tables: (exerciseId: string) =>
       `/liasse/exercises/${encodeRouteId(exerciseId)}/tables`,
+    validation: (exerciseId: string) =>
+      `/liasse/exercises/${encodeRouteId(exerciseId)}/validation`,
     table: (exerciseId: string, tableCode: string) =>
       `/liasse/exercises/${encodeRouteId(exerciseId)}/tables/${encodeURIComponent(tableCode)}`,
     row: (exerciseId: string, tableCode: string, rowCode: string) =>
@@ -3827,6 +4017,11 @@ export type ErpAccountingEntry = z.infer<typeof erpAccountingEntrySchema>;
 export type ErpAccountingEntryPage = z.infer<
   typeof erpAccountingEntryPageSchema
 >;
+export type ErpAccountingAccount = z.infer<typeof erpAccountingAccountSchema>;
+export type ErpAccountingJournal = z.infer<typeof erpAccountingJournalSchema>;
+export type ErpAccountingReferences = z.infer<
+  typeof erpAccountingReferencesSchema
+>;
 export type ErpBalanceItem = z.infer<typeof erpBalanceItemSchema>;
 export type ErpBalanceReport = z.infer<typeof erpBalanceReportSchema>;
 export type ErpGrandLivreItem = z.infer<typeof erpGrandLivreItemSchema>;
@@ -3885,6 +4080,20 @@ export type ErpAccountingReviewTask = z.infer<
 export type ErpExercise = z.infer<typeof erpExerciseSchema>;
 export type ErpFinancialStatements = z.infer<
   typeof erpFinancialStatementsSchema
+>;
+export type ErpLiasseTableSummary = z.infer<typeof erpLiasseTableSummarySchema>;
+export type ErpLiasseFieldDefinition = z.infer<
+  typeof erpLiasseFieldDefinitionSchema
+>;
+export type ErpLiasseRow = z.infer<typeof erpLiasseRowSchema>;
+export type ErpLiasseTableDetail = z.infer<typeof erpLiasseTableDetailSchema>;
+export type ErpLiasseValidationIssue = z.infer<
+  typeof erpLiasseValidationIssueSchema
+>;
+export type ErpLiasseValidation = z.infer<typeof erpLiasseValidationSchema>;
+export type ErpLiasseExport = z.infer<typeof erpLiasseExportSchema>;
+export type ErpRegulatorySubmission = z.infer<
+  typeof erpRegulatorySubmissionSchema
 >;
 export type ErpEmployee = z.infer<typeof erpEmployeeSchema>;
 export type ErpPayslip = z.infer<typeof erpPayslipSchema>;

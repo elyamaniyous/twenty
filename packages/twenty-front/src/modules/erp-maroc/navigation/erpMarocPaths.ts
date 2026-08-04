@@ -29,9 +29,11 @@ export const erpMarocPaths = {
   hrEmployeeDetail: '/erp-maroc/hr/employees/:id',
   payrollRegulatory: '/erp-maroc/hr/payroll-regulatory',
   accountingEntries: '/erp-maroc/accounting/entries',
+  accountingEntryNew: '/erp-maroc/accounting/entries/new',
   accountingEntryDetail: '/erp-maroc/accounting/entries/:id',
+  accountingReferences: '/erp-maroc/accounting/references',
+  accountingClosing: '/erp-maroc/accounting/closing',
   accountingGrandLivre: '/erp-maroc/accounting/grand-livre',
   accountingBalance: '/erp-maroc/accounting/balance',
   accountingLettrage: '/erp-maroc/accounting/lettrage',
-  bankStatements: '/erp-maroc/bank-statements',
 } as const;

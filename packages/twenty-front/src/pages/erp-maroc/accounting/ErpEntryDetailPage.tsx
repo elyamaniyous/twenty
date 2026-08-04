@@ -12,13 +12,13 @@ import { useErpMarocContext } from '@/erp-maroc/context/useErpMarocContext';
 import { formatMadCents } from '@/erp-maroc/utils/money';
 import { styled } from '@linaria/react';
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   erpAccountingEntrySchema,
   type ErpAccountingEntry,
   type ErpAccountingEntryLine,
 } from 'twenty-shared/erp-maroc';
-import { IconCheck, IconX } from 'twenty-ui/display';
+import { IconCheck, IconRefresh, IconX } from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
@@ -28,15 +28,22 @@ const STATUS: Record<
 > = {
   DRAFT: { label: 'À contrôler', tone: 'warning' },
   VALIDATED: { label: 'Validée', tone: 'success' },
+  LOCKED: { label: 'Verrouillée', tone: 'neutral' },
   REJECTED: { label: 'Rejetée', tone: 'danger' },
 };
 
 const SOURCE: Record<ErpAccountingEntry['sourceType'], string> = {
+  MANUAL: 'Saisie manuelle',
+  REVERSAL: 'Contrepassation',
   INVOICE: 'Facture',
   PAYMENT: 'Règlement',
   CREDIT_NOTE: 'Avoir',
   SUPPLIER_INVOICE: 'Facture fournisseur',
   SUPPLIER_PAYMENT: 'Paiement fournisseur',
+  PAYROLL: 'Paie',
+  EXPENSE_NOTE: 'Note de frais',
+  CLOSING: 'Clôture',
+  OPENING_BALANCE: 'À-nouveaux',
 };
 
 const sourcePath = (entry: ErpAccountingEntry) => {
@@ -159,6 +166,18 @@ const StyledTextarea = styled.textarea`
   width: 100%;
 `;
 
+const StyledDate = styled.input`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: ${themeCssVariables.border.radius.sm};
+  box-sizing: border-box;
+  color: ${themeCssVariables.font.color.primary};
+  font: inherit;
+  height: 34px;
+  padding: 0 ${themeCssVariables.spacing[2]};
+  width: 180px;
+`;
+
 const StyledActions = styled.div`
   align-items: center;
   display: flex;
@@ -176,6 +195,7 @@ const StyledAlert = styled.div`
 export const ErpEntryDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const { client, context } = useErpMarocContext();
+  const navigate = useNavigate();
   const [entry, setEntry] = useState<ErpAccountingEntry | null>(null);
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>(
     'loading',
@@ -183,6 +203,11 @@ export const ErpEntryDetailPage = () => {
   const [validateDialogOpen, setValidateDialogOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [reverseOpen, setReverseOpen] = useState(false);
+  const [reversalDate, setReversalDate] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
+  const [reversalReason, setReversalReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -217,6 +242,14 @@ export const ErpEntryDetailPage = () => {
     context !== null &&
     ['OWNER', 'ADMIN', 'COMPTABLE'].includes(context.role);
 
+  const canReverse =
+    entry !== null &&
+    (entry.status === 'VALIDATED' || entry.status === 'LOCKED') &&
+    entry.reversalOfEntryId === null &&
+    entry.reversalEntryId === null &&
+    context !== null &&
+    ['OWNER', 'ADMIN', 'COMPTABLE'].includes(context.role);
+
   const execute = async (action: 'validate' | 'reject') => {
     if (entry === null || isSubmitting) return;
     setIsSubmitting(true);
@@ -246,6 +279,32 @@ export const ErpEntryDetailPage = () => {
     }
   };
 
+  const executeReversal = async () => {
+    if (entry === null || isSubmitting) return;
+    setIsSubmitting(true);
+    setActionError(null);
+    try {
+      const intent = client.createMutationIntent(
+        {
+          method: 'POST',
+          path: `/accounting/entries/${entry.id}/reverse`,
+          schema: erpAccountingEntrySchema,
+          body: {
+            entryDate: reversalDate,
+            reason: reversalReason.trim(),
+          },
+        },
+        { idempotency: 'required' },
+      );
+      const reversal = await intent.execute();
+      navigate(`/erp-maroc/accounting/entries/${reversal.id}`);
+    } catch {
+      setActionError('Impossible de préparer la contrepassation.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (loadState === 'loading') {
     return (
       <ErpPageShell
@@ -270,30 +329,47 @@ export const ErpEntryDetailPage = () => {
       title={entry.label}
       description={`Exercice ${entry.exerciceYear} · Journal ${entry.journalCode}`}
       actions={
-        canReview ? (
+        canReview || canReverse ? (
           <>
-            <Button
-              title="Rejeter"
-              ariaLabel="Rejeter l'écriture"
-              Icon={IconX}
-              accent="danger"
-              disabled={isSubmitting}
-              onClick={() => {
-                setActionError(null);
-                setRejectOpen(true);
-              }}
-            />
-            <Button
-              title="Valider"
-              ariaLabel="Valider l'écriture"
-              Icon={IconCheck}
-              accent="blue"
-              disabled={isSubmitting}
-              onClick={() => {
-                setActionError(null);
-                setValidateDialogOpen(true);
-              }}
-            />
+            {canReview ? (
+              <>
+                <Button
+                  title="Rejeter"
+                  ariaLabel="Rejeter l'écriture"
+                  Icon={IconX}
+                  accent="danger"
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    setActionError(null);
+                    setRejectOpen(true);
+                  }}
+                />
+                <Button
+                  title="Valider"
+                  ariaLabel="Valider l'écriture"
+                  Icon={IconCheck}
+                  accent="blue"
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    setActionError(null);
+                    setValidateDialogOpen(true);
+                  }}
+                />
+              </>
+            ) : null}
+            {canReverse ? (
+              <Button
+                title="Contrepasser"
+                ariaLabel="Préparer la contrepassation"
+                Icon={IconRefresh}
+                accent="blue"
+                disabled={isSubmitting}
+                onClick={() => {
+                  setActionError(null);
+                  setReverseOpen(true);
+                }}
+              />
+            ) : null}
           </>
         ) : undefined
       }
@@ -344,6 +420,36 @@ export const ErpEntryDetailPage = () => {
               <dd>{entry.rejectionReason}</dd>
             </div>
           )}
+          {entry.reversalOfEntryId === null ? null : (
+            <div>
+              <dt>Contrepassation de</dt>
+              <dd>
+                <Link
+                  to={`/erp-maroc/accounting/entries/${entry.reversalOfEntryId}`}
+                >
+                  Voir l'écriture d'origine
+                </Link>
+              </dd>
+            </div>
+          )}
+          {entry.reversalEntryId === null ? null : (
+            <div>
+              <dt>Écriture de contrepassation</dt>
+              <dd>
+                <Link
+                  to={`/erp-maroc/accounting/entries/${entry.reversalEntryId}`}
+                >
+                  Voir la contrepassation
+                </Link>
+              </dd>
+            </div>
+          )}
+          {entry.reversalReason === null ? null : (
+            <div>
+              <dt>Motif de contrepassation</dt>
+              <dd>{entry.reversalReason}</dd>
+            </div>
+          )}
         </StyledSummary>
         <StyledLines aria-label="Lignes comptables">
           <StyledSectionTitle>Lignes comptables</StyledSectionTitle>
@@ -386,6 +492,53 @@ export const ErpEntryDetailPage = () => {
                 disabled={rejectionReason.trim().length < 10 || isSubmitting}
                 isLoading={isSubmitting}
                 onClick={() => void execute('reject')}
+              />
+            </StyledActions>
+          </StyledDecision>
+        ) : null}
+        {reverseOpen && canReverse ? (
+          <StyledDecision aria-label="Préparer la contrepassation">
+            <label htmlFor="accounting-reversal-date">Date comptable</label>
+            <StyledDate
+              id="accounting-reversal-date"
+              type="date"
+              value={reversalDate}
+              disabled={isSubmitting}
+              onChange={(event) => setReversalDate(event.target.value)}
+            />
+            <label htmlFor="accounting-reversal-reason">Motif</label>
+            <StyledTextarea
+              id="accounting-reversal-reason"
+              value={reversalReason}
+              minLength={10}
+              maxLength={1000}
+              disabled={isSubmitting}
+              onChange={(event) => setReversalReason(event.target.value)}
+            />
+            <StyledActions>
+              <Button
+                title="Annuler"
+                ariaLabel="Annuler la contrepassation"
+                Icon={IconX}
+                variant="secondary"
+                disabled={isSubmitting}
+                onClick={() => {
+                  setReverseOpen(false);
+                  setReversalReason('');
+                }}
+              />
+              <Button
+                title="Créer le brouillon"
+                ariaLabel="Créer la contrepassation en brouillon"
+                Icon={IconRefresh}
+                accent="blue"
+                disabled={
+                  reversalDate === '' ||
+                  reversalReason.trim().length < 10 ||
+                  isSubmitting
+                }
+                isLoading={isSubmitting}
+                onClick={() => void executeReversal()}
               />
             </StyledActions>
           </StyledDecision>
