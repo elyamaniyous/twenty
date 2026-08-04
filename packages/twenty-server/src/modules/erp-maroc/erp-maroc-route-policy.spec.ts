@@ -34,6 +34,9 @@ import {
   erpFecExportSchema,
   erpFecImportResultSchema,
   erpFinancialStatementsSchema,
+  erpFiscalDeadlineListSchema,
+  erpFiscalDeadlineSchema,
+  erpFileExportSchema,
   erpLiasseDeleteResultSchema,
   erpLiasseExportSchema,
   erpLiasseRowSchema,
@@ -44,6 +47,15 @@ import {
   erpRegulatorySubmissionSchema,
   erpLettrageMatchSchema,
   erpLettrageSuggestionsSchema,
+  erpTaxDeclarationListSchema,
+  erpTaxDeclarationSchema,
+  erpTaxPaymentCandidateListSchema,
+  erpTaxPaymentListSchema,
+  erpTaxPaymentSchema,
+  erpTvaProrataPeriodListSchema,
+  erpTvaProrataPeriodSchema,
+  erpAnnualTvaProrataSchema,
+  erpTvaProrataPostingSchema,
   hrAccessAdministrationSchema,
   hrAccessContextSchema,
   hrAccessGrantSchema,
@@ -161,6 +173,14 @@ const requiredIdempotencyRoutes = new Set([
   `POST /accounting/entries/${id}/validate`,
   `POST /accounting/entries/${id}/reject`,
   `POST /accounting/entries/${id}/reverse`,
+  'POST /fiscal/tva/calculate',
+  'POST /fiscal/tva/prorata/calculate',
+  'POST /fiscal/tva/prorata/annual/post',
+  'POST /fiscal/is/calculate',
+  `PATCH /fiscal/declarations/${id}/status`,
+  `POST /fiscal/declarations/${id}/payments`,
+  'POST /fiscal/deadlines/seed',
+  `PATCH /fiscal/deadlines/${id}/complete`,
   'POST /accounting/references/accounts',
   `PATCH /accounting/references/accounts/${id}`,
   'POST /accounting/references/journals',
@@ -592,6 +612,103 @@ const approvedRoutes = [
     erpGrandLivreReportSchema,
   ],
   ['GET', '/accounting/balance', 'accounting.balance', erpBalanceReportSchema],
+  [
+    'GET',
+    '/fiscal/declarations',
+    'fiscal.declarations',
+    erpTaxDeclarationListSchema,
+  ],
+  [
+    'POST',
+    '/fiscal/tva/calculate',
+    'fiscal.tva.calculate',
+    erpTaxDeclarationSchema,
+  ],
+  [
+    'GET',
+    '/fiscal/tva/prorata',
+    'fiscal.tva.prorata',
+    erpTvaProrataPeriodListSchema,
+  ],
+  [
+    'POST',
+    '/fiscal/tva/prorata/calculate',
+    'fiscal.tva.prorata.calculate',
+    erpTvaProrataPeriodSchema,
+  ],
+  [
+    'GET',
+    '/fiscal/tva/prorata/annual',
+    'fiscal.tva.prorata.annual',
+    erpAnnualTvaProrataSchema,
+  ],
+  [
+    'POST',
+    '/fiscal/tva/prorata/annual/post',
+    'fiscal.tva.prorata.annual.post',
+    erpTvaProrataPostingSchema,
+  ],
+  [
+    'POST',
+    '/fiscal/is/calculate',
+    'fiscal.is.calculate',
+    erpTaxDeclarationSchema,
+  ],
+  [
+    'PATCH',
+    `/fiscal/declarations/${id}/status`,
+    'fiscal.declaration.status',
+    erpTaxDeclarationSchema,
+  ],
+  [
+    'GET',
+    `/fiscal/declarations/${id}/simpl`,
+    'fiscal.declaration.simpl',
+    erpFileExportSchema,
+  ],
+  [
+    'GET',
+    `/fiscal/declarations/${id}/adc080f`,
+    'fiscal.declaration.adc080f',
+    erpFileExportSchema,
+  ],
+  [
+    'GET',
+    `/fiscal/declarations/${id}/is-xml`,
+    'fiscal.declaration.is-xml',
+    erpFileExportSchema,
+  ],
+  [
+    'GET',
+    `/fiscal/declarations/${id}/payments`,
+    'fiscal.declaration.payments',
+    erpTaxPaymentListSchema,
+  ],
+  [
+    'GET',
+    `/fiscal/declarations/${id}/payment-candidates`,
+    'fiscal.declaration.payment-candidates',
+    erpTaxPaymentCandidateListSchema,
+  ],
+  [
+    'POST',
+    `/fiscal/declarations/${id}/payments`,
+    'fiscal.declaration.payments',
+    erpTaxPaymentSchema,
+  ],
+  ['GET', '/fiscal/deadlines', 'fiscal.deadlines', erpFiscalDeadlineListSchema],
+  [
+    'POST',
+    '/fiscal/deadlines/seed',
+    'fiscal.deadlines.seed',
+    erpFiscalDeadlineListSchema,
+  ],
+  [
+    'PATCH',
+    `/fiscal/deadlines/${id}/complete`,
+    'fiscal.deadline.complete',
+    erpFiscalDeadlineSchema,
+  ],
   [
     'GET',
     '/accounting/lettrage/suggestions',
@@ -1125,12 +1242,28 @@ describe('ERP Maroc route policy', () => {
       const requiresAccountCode =
         routeId === 'accounting.grand-livre' ||
         routeId === 'accounting.lettrage.suggestions';
-      const query = requiresAccountCode ? { accountCode: '3421' } : {};
+      const requiresExercise =
+        routeId === 'fiscal.tva.prorata' ||
+        routeId === 'fiscal.tva.prorata.annual';
+      const requiresYear = routeId === 'fiscal.deadlines.seed';
+      const query = requiresAccountCode
+        ? { accountCode: '3421' }
+        : requiresExercise
+          ? { exerciceId: id }
+          : requiresYear
+            ? { year: '2026' }
+            : {};
       const resolved = resolveErpRoute(method, path, query);
 
       expect(resolved.routeId).toBe(routeId);
       expect(resolved.upstreamPath).toBe(
-        requiresAccountCode ? `${path}?accountCode=3421` : path,
+        requiresAccountCode
+          ? `${path}?accountCode=3421`
+          : requiresExercise
+            ? `${path}?exerciceId=${id}`
+            : requiresYear
+              ? `${path}?year=2026`
+              : path,
       );
       const expectsPdf =
         routeId === 'invoices.pdf' || routeId === 'cheques.depositSlips.pdf';
@@ -1310,6 +1443,21 @@ describe('ERP Maroc route policy', () => {
         format: 'xlsx',
       }).upstreamPath,
     ).toBe(`/liasse/exercises/${id}/export?format=xlsx`);
+    expect(
+      resolveErpRoute('GET', '/fiscal/tva/prorata', {
+        exerciceId: id,
+      }).upstreamPath,
+    ).toBe(`/fiscal/tva/prorata?exerciceId=${id}`);
+    expect(
+      resolveErpRoute('GET', `/fiscal/declarations/${id}/adc080f`, {
+        regime: 'ENCAISSEMENT',
+      }).upstreamPath,
+    ).toBe(`/fiscal/declarations/${id}/adc080f?regime=ENCAISSEMENT`);
+    expect(
+      resolveErpRoute('POST', '/fiscal/deadlines/seed', {
+        year: '2026',
+      }).upstreamPath,
+    ).toBe('/fiscal/deadlines/seed?year=2026');
   });
 
   it.each([
@@ -1345,6 +1493,11 @@ describe('ERP Maroc route policy', () => {
     ['/accounting/balance', { from: '2026-07-31', to: '2026-07-01' }],
     ['/accounting/lettrage/suggestions', {}],
     ['/accounting/lettrage/suggestions', { accountCode: '3421/../admin' }],
+    ['/fiscal/tva/prorata', {}],
+    ['/fiscal/tva/prorata', { exerciceId: 'not-a-uuid' }],
+    [`/fiscal/declarations/${id}/adc080f`, { regime: 'CASH' }],
+    ['/fiscal/deadlines/seed', { year: '026' }],
+    ['/fiscal/deadlines/seed', { year: '1999' }],
   ])('rejects non-normalized or unauthorized query for %s', (path, query) => {
     expect(() => resolveErpRoute('GET', path, query)).toThrow(
       'ERP route is not allowed',

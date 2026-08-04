@@ -16,6 +16,7 @@ import {
   IconLock,
   IconMail,
   IconNotes,
+  IconPercentage,
   IconSettings,
   IconUsers,
   type IconComponent,
@@ -156,6 +157,12 @@ export const NavigationDrawerErpMarocSection = () => {
       path: erpMarocPaths.accountingProvisions,
       activePaths: [erpMarocPaths.accountingProvisions],
       Icon: IconFileText,
+    },
+    {
+      label: t`Fiscalité`,
+      path: erpMarocPaths.fiscal,
+      activePaths: [erpMarocPaths.fiscal],
+      Icon: IconPercentage,
     },
     {
       label: t`Plan comptable`,

@@ -2558,6 +2558,76 @@ export const erpFiscalDeadlineSchema = z
   .passthrough();
 export const erpFiscalDeadlineListSchema = z.array(erpFiscalDeadlineSchema);
 
+export const erpTvaProrataPeriodSchema = z
+  .object({
+    id: uuidSchema,
+    exerciceId: uuidSchema,
+    periodKey: nonBlankStringSchema,
+    taxableRevenueCents: centsSchema,
+    totalRevenueCents: positiveIntegerSchema,
+    inputVatBeforeProrataCents: centsSchema,
+    rateBasisPoints: nonNegativeIntegerSchema.max(10_000),
+    deductibleVatCents: centsSchema,
+    notes: nullableStringSchema,
+    calculatedByTwentyUserId: nonBlankStringSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpTvaProrataPeriodListSchema = z.array(erpTvaProrataPeriodSchema);
+
+export const erpAnnualTvaProrataSchema = z.object({
+  exerciceId: uuidSchema,
+  periods: nonNegativeIntegerSchema,
+  taxableRevenueCents: centsSchema,
+  totalRevenueCents: positiveIntegerSchema,
+  rateBasisPoints: nonNegativeIntegerSchema.max(10_000),
+  inputVatBeforeProrataCents: centsSchema,
+  deductedVatCents: centsSchema,
+  annualDeductibleVatCents: centsSchema,
+  regularizationCents: signedCentsSchema,
+  direction: z.enum(['ADDITIONAL_DEDUCTION', 'REVERSAL', 'NONE']),
+});
+
+export const erpTvaProrataPostingSchema = z
+  .object({
+    id: uuidSchema,
+    annual: erpAnnualTvaProrataSchema,
+  })
+  .passthrough();
+
+export const erpTaxPaymentSchema = z
+  .object({
+    id: uuidSchema,
+    taxDeclarationId: uuidSchema,
+    bankStatementLineId: nullableUuidSchema,
+    kind: z.enum(['TVA', 'IS_INSTALLMENT', 'IS_BALANCE', 'OTHER']),
+    amountCents: positiveIntegerSchema,
+    paymentDate: civilDateHttpSchema,
+    reference: nullableStringSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+    totalPaidCents: centsSchema.optional(),
+  })
+  .passthrough();
+export const erpTaxPaymentListSchema = z.array(erpTaxPaymentSchema);
+
+export const erpTaxPaymentCandidateSchema = z
+  .object({
+    id: uuidSchema,
+    transactionDate: civilDateHttpSchema,
+    description: nonBlankStringSchema,
+    reference: nullableStringSchema,
+    debitCents: positiveIntegerSchema,
+    confidenceBasisPoints: nonNegativeIntegerSchema.max(10_000),
+    exactAmount: z.boolean(),
+    dayDifference: nonNegativeIntegerSchema,
+  })
+  .passthrough();
+export const erpTaxPaymentCandidateListSchema = z.array(
+  erpTaxPaymentCandidateSchema,
+);
+
 export const erpFileExportSchema = z.object({
   filename: nonBlankStringSchema,
   contentType: nonBlankStringSchema,
@@ -4188,6 +4258,13 @@ export type ErpReplenishmentSuggestionList = z.infer<
 >;
 export type ErpTaxDeclaration = z.infer<typeof erpTaxDeclarationSchema>;
 export type ErpFiscalDeadline = z.infer<typeof erpFiscalDeadlineSchema>;
+export type ErpTvaProrataPeriod = z.infer<typeof erpTvaProrataPeriodSchema>;
+export type ErpAnnualTvaProrata = z.infer<typeof erpAnnualTvaProrataSchema>;
+export type ErpTvaProrataPosting = z.infer<typeof erpTvaProrataPostingSchema>;
+export type ErpTaxPayment = z.infer<typeof erpTaxPaymentSchema>;
+export type ErpTaxPaymentCandidate = z.infer<
+  typeof erpTaxPaymentCandidateSchema
+>;
 export type ErpAccountingPeriod = z.infer<typeof erpAccountingPeriodSchema>;
 export type ErpAccountingReviewTask = z.infer<
   typeof erpAccountingReviewTaskSchema

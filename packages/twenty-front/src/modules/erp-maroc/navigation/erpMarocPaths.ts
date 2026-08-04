@@ -33,6 +33,7 @@ export const erpMarocPaths = {
   accountingEntryEdit: '/erp-maroc/accounting/entries/:id/edit',
   accountingEntryDetail: '/erp-maroc/accounting/entries/:id',
   accountingProvisions: '/erp-maroc/accounting/provisions',
+  fiscal: '/erp-maroc/accounting/fiscal',
   accountingReferences: '/erp-maroc/accounting/references',
   accountingClosing: '/erp-maroc/accounting/closing',
   accountingGrandLivre: '/erp-maroc/accounting/grand-livre',

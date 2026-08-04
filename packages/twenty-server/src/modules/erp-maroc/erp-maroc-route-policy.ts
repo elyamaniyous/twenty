@@ -34,6 +34,9 @@ import {
   erpFecExportSchema,
   erpFecImportResultSchema,
   erpFinancialStatementsSchema,
+  erpFiscalDeadlineListSchema,
+  erpFiscalDeadlineSchema,
+  erpFileExportSchema,
   erpLiasseDeleteResultSchema,
   erpLiasseExportSchema,
   erpLiasseRowSchema,
@@ -44,6 +47,15 @@ import {
   erpRegulatorySubmissionSchema,
   erpLettrageMatchSchema,
   erpLettrageSuggestionsSchema,
+  erpTaxDeclarationListSchema,
+  erpTaxDeclarationSchema,
+  erpTaxPaymentCandidateListSchema,
+  erpTaxPaymentListSchema,
+  erpTaxPaymentSchema,
+  erpTvaProrataPeriodListSchema,
+  erpTvaProrataPeriodSchema,
+  erpAnnualTvaProrataSchema,
+  erpTvaProrataPostingSchema,
   hrAccessAdministrationSchema,
   hrAccessContextSchema,
   hrAccessGrantSchema,
@@ -210,6 +222,9 @@ const grandLivreQuery = Object.freeze([
   ...accountingReportQuery,
 ]);
 const lettrageQuery = Object.freeze(['accountCode']);
+const fiscalExerciseQuery = Object.freeze(['exerciceId']);
+const fiscalAdc080fQuery = Object.freeze(['regime']);
+const fiscalDeadlineSeedQuery = Object.freeze(['year']);
 const liasseExportQuery = Object.freeze(['format']);
 const pdfSchema = z.instanceof(Uint8Array);
 
@@ -1208,6 +1223,178 @@ const routes: ErpMarocRoute[] = [
     responseSchema: erpBalanceReportSchema,
     kind: 'json',
     idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.fiscalDeclarations,
+    method: 'GET',
+    pattern: exact('/fiscal/declarations'),
+    build: staticBuilder(erpMarocUpstreamRoutes.fiscal.declarations),
+    queryKeys: noQuery,
+    responseSchema: erpTaxDeclarationListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.fiscalTvaCalculate,
+    method: 'POST',
+    pattern: exact('/fiscal/tva/calculate'),
+    build: staticBuilder(erpMarocUpstreamRoutes.fiscal.calculateTva),
+    queryKeys: noQuery,
+    responseSchema: erpTaxDeclarationSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.fiscalTvaProrata,
+    method: 'GET',
+    pattern: exact('/fiscal/tva/prorata'),
+    build: staticBuilder(erpMarocUpstreamRoutes.fiscal.tvaProrata),
+    queryKeys: fiscalExerciseQuery,
+    responseSchema: erpTvaProrataPeriodListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.fiscalTvaProrataCalculate,
+    method: 'POST',
+    pattern: exact('/fiscal/tva/prorata/calculate'),
+    build: staticBuilder(erpMarocUpstreamRoutes.fiscal.calculateTvaProrata),
+    queryKeys: noQuery,
+    responseSchema: erpTvaProrataPeriodSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.fiscalTvaProrataAnnual,
+    method: 'GET',
+    pattern: exact('/fiscal/tva/prorata/annual'),
+    build: staticBuilder(erpMarocUpstreamRoutes.fiscal.annualTvaProrata),
+    queryKeys: fiscalExerciseQuery,
+    responseSchema: erpAnnualTvaProrataSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.fiscalTvaProrataAnnualPost,
+    method: 'POST',
+    pattern: exact('/fiscal/tva/prorata/annual/post'),
+    build: staticBuilder(erpMarocUpstreamRoutes.fiscal.postAnnualTvaProrata),
+    queryKeys: noQuery,
+    responseSchema: erpTvaProrataPostingSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.fiscalIsCalculate,
+    method: 'POST',
+    pattern: exact('/fiscal/is/calculate'),
+    build: staticBuilder(erpMarocUpstreamRoutes.fiscal.calculateIs),
+    queryKeys: noQuery,
+    responseSchema: erpTaxDeclarationSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.fiscalDeclarationStatus,
+    method: 'PATCH',
+    pattern: action('fiscal/declarations', 'status'),
+    build: idBuilder(erpMarocUpstreamRoutes.fiscal.declarationStatus),
+    queryKeys: noQuery,
+    responseSchema: erpTaxDeclarationSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.fiscalDeclarationSimpl,
+    method: 'GET',
+    pattern: action('fiscal/declarations', 'simpl'),
+    build: idBuilder(erpMarocUpstreamRoutes.fiscal.declarationSimpl),
+    queryKeys: noQuery,
+    responseSchema: erpFileExportSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.fiscalDeclarationAdc080f,
+    method: 'GET',
+    pattern: action('fiscal/declarations', 'adc080f'),
+    build: idBuilder(erpMarocUpstreamRoutes.fiscal.declarationAdc080f),
+    queryKeys: fiscalAdc080fQuery,
+    responseSchema: erpFileExportSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.fiscalDeclarationIsXml,
+    method: 'GET',
+    pattern: action('fiscal/declarations', 'is-xml'),
+    build: idBuilder(erpMarocUpstreamRoutes.fiscal.declarationIsXml),
+    queryKeys: noQuery,
+    responseSchema: erpFileExportSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.fiscalDeclarationPayments,
+    method: 'GET',
+    pattern: action('fiscal/declarations', 'payments'),
+    build: idBuilder(erpMarocUpstreamRoutes.fiscal.declarationPayments),
+    queryKeys: noQuery,
+    responseSchema: erpTaxPaymentListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.fiscalDeclarationPaymentCandidates,
+    method: 'GET',
+    pattern: action('fiscal/declarations', 'payment-candidates'),
+    build: idBuilder(
+      erpMarocUpstreamRoutes.fiscal.declarationPaymentCandidates,
+    ),
+    queryKeys: noQuery,
+    responseSchema: erpTaxPaymentCandidateListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.fiscalDeclarationPayments,
+    method: 'POST',
+    pattern: action('fiscal/declarations', 'payments'),
+    build: idBuilder(erpMarocUpstreamRoutes.fiscal.declarationPayments),
+    queryKeys: noQuery,
+    responseSchema: erpTaxPaymentSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.fiscalDeadlines,
+    method: 'GET',
+    pattern: exact('/fiscal/deadlines'),
+    build: staticBuilder(erpMarocUpstreamRoutes.fiscal.deadlines),
+    queryKeys: noQuery,
+    responseSchema: erpFiscalDeadlineListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.fiscalDeadlinesSeed,
+    method: 'POST',
+    pattern: exact('/fiscal/deadlines/seed'),
+    build: staticBuilder(erpMarocUpstreamRoutes.fiscal.seedDeadlines),
+    queryKeys: fiscalDeadlineSeedQuery,
+    responseSchema: erpFiscalDeadlineListSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.fiscalDeadlineComplete,
+    method: 'PATCH',
+    pattern: action('fiscal/deadlines', 'complete'),
+    build: idBuilder(erpMarocUpstreamRoutes.fiscal.completeDeadline),
+    queryKeys: noQuery,
+    responseSchema: erpFiscalDeadlineSchema,
+    kind: 'json',
+    idempotency: 'required',
   }),
   defineRoute({
     routeId: erpMarocRouteIds.complianceExercises,
@@ -2460,6 +2647,20 @@ const assertNormalizedQueryValue = (
   ) {
     return;
   }
+  if (
+    routeId === erpMarocRouteIds.fiscalDeclarationAdc080f &&
+    key === 'regime' &&
+    (value === 'DEBIT' || value === 'ENCAISSEMENT')
+  ) {
+    return;
+  }
+  if (
+    routeId === erpMarocRouteIds.fiscalDeadlinesSeed &&
+    key === 'year' &&
+    /^(?:20\d{2}|21\d{2}|2200)$/.test(value)
+  ) {
+    return;
+  }
   rejectRoute();
 };
 
@@ -2479,6 +2680,19 @@ const buildQueryString = (
     (route.routeId === erpMarocRouteIds.accountingGrandLivre ||
       route.routeId === erpMarocRouteIds.accountingLettrageSuggestions) &&
     !values.has('accountCode')
+  ) {
+    rejectRoute();
+  }
+  if (
+    (route.routeId === erpMarocRouteIds.fiscalTvaProrata ||
+      route.routeId === erpMarocRouteIds.fiscalTvaProrataAnnual) &&
+    !values.has('exerciceId')
+  ) {
+    rejectRoute();
+  }
+  if (
+    route.routeId === erpMarocRouteIds.fiscalDeadlinesSeed &&
+    !values.has('year')
   ) {
     rejectRoute();
   }
