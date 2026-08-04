@@ -1,6 +1,8 @@
 import {
   erpAccountingEntryPageSchema,
   erpAccountingEntrySchema,
+  erpAccountingProvisionListSchema,
+  erpAccountingProvisionSchema,
   erpAccountingAccountSchema,
   erpAccountingJournalSchema,
   erpAccountingPeriodSchema,
@@ -132,6 +134,13 @@ const uuidV7 = '0193f6ea-7c39-7aa2-8000-000000000000';
 
 const requiredIdempotencyRoutes = new Set([
   'POST /accounting/entries',
+  `PATCH /accounting/entries/${id}`,
+  `POST /accounting/entries/${id}/duplicate`,
+  'POST /accounting/provisions',
+  `PATCH /accounting/provisions/${id}`,
+  `POST /accounting/provisions/${id}/post`,
+  `POST /accounting/provisions/${id}/reverse`,
+  `POST /accounting/provisions/${id}/cancel`,
   'POST /payments',
   `POST /payments/${id}/allocate`,
   `POST /payments/${id}/terminate`,
@@ -475,6 +484,18 @@ const approvedRoutes = [
     erpAccountingEntrySchema,
   ],
   [
+    'PATCH',
+    `/accounting/entries/${id}`,
+    'accounting.entries.detail',
+    erpAccountingEntrySchema,
+  ],
+  [
+    'POST',
+    `/accounting/entries/${id}/duplicate`,
+    'accounting.entries.duplicate',
+    erpAccountingEntrySchema,
+  ],
+  [
     'POST',
     `/accounting/entries/${id}/validate`,
     'accounting.entries.validate',
@@ -491,6 +512,48 @@ const approvedRoutes = [
     `/accounting/entries/${id}/reverse`,
     'accounting.entries.reverse',
     erpAccountingEntrySchema,
+  ],
+  [
+    'GET',
+    '/accounting/provisions',
+    'accounting.provisions.collection',
+    erpAccountingProvisionListSchema,
+  ],
+  [
+    'POST',
+    '/accounting/provisions',
+    'accounting.provisions.collection',
+    erpAccountingProvisionSchema,
+  ],
+  [
+    'GET',
+    `/accounting/provisions/${id}`,
+    'accounting.provisions.detail',
+    erpAccountingProvisionSchema,
+  ],
+  [
+    'PATCH',
+    `/accounting/provisions/${id}`,
+    'accounting.provisions.detail',
+    erpAccountingProvisionSchema,
+  ],
+  [
+    'POST',
+    `/accounting/provisions/${id}/post`,
+    'accounting.provisions.post',
+    erpAccountingProvisionSchema,
+  ],
+  [
+    'POST',
+    `/accounting/provisions/${id}/reverse`,
+    'accounting.provisions.reverse',
+    erpAccountingProvisionSchema,
+  ],
+  [
+    'POST',
+    `/accounting/provisions/${id}/cancel`,
+    'accounting.provisions.cancel',
+    erpAccountingProvisionSchema,
   ],
   [
     'GET',
@@ -1069,7 +1132,9 @@ describe('ERP Maroc route policy', () => {
       expect(resolved.upstreamPath).toBe(
         requiresAccountCode ? `${path}?accountCode=3421` : path,
       );
-      expect(resolved.kind).toBe(routeId === 'invoices.pdf' ? 'pdf' : 'json');
+      const expectsPdf =
+        routeId === 'invoices.pdf' || routeId === 'cheques.depositSlips.pdf';
+      expect(resolved.kind).toBe(expectsPdf ? 'pdf' : 'json');
       expect(resolved.idempotency).toBe(
         requiredIdempotencyRoutes.has(`${method} ${path}`)
           ? 'required'

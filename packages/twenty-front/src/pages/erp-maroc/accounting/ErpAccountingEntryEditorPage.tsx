@@ -3,10 +3,11 @@ import { useErpMarocContext } from '@/erp-maroc/context/useErpMarocContext';
 import { formatMadCents } from '@/erp-maroc/utils/money';
 import { styled } from '@linaria/react';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   erpAccountingEntrySchema,
   erpAccountingReferencesSchema,
+  type ErpAccountingEntry,
   type ErpAccountingReferences,
 } from 'twenty-shared/erp-maroc';
 import { IconCheck, IconPlus, IconTrash } from 'twenty-ui/display';
@@ -47,6 +48,9 @@ const parseMad = (value: string): number | null => {
   const cents = Math.round(Number(normalized) * 100);
   return Number.isSafeInteger(cents) ? cents : null;
 };
+
+const toMadInput = (cents: number): string =>
+  cents === 0 ? '' : (cents / 100).toFixed(2);
 
 const StyledForm = styled.form`
   display: flex;
@@ -125,10 +129,9 @@ const StyledLine = styled.div`
   border-bottom: 1px solid ${themeCssVariables.border.color.light};
   display: grid;
   gap: ${themeCssVariables.spacing[2]};
-  grid-template-columns: minmax(220px, 1.2fr) minmax(
-      280px,
-      2fr
-    ) 130px 130px 36px;
+  grid-template-columns:
+    minmax(220px, 1.2fr) minmax(280px, 2fr)
+    130px 130px 36px;
   padding: ${themeCssVariables.spacing[2]} ${themeCssVariables.spacing[4]};
 `;
 
@@ -137,10 +140,9 @@ const StyledTotals = styled.div`
   display: grid;
   font-weight: ${themeCssVariables.font.weight.semiBold};
   gap: ${themeCssVariables.spacing[2]};
-  grid-template-columns: minmax(220px, 1.2fr) minmax(
-      280px,
-      2fr
-    ) 130px 130px 36px;
+  grid-template-columns:
+    minmax(220px, 1.2fr) minmax(280px, 2fr)
+    130px 130px 36px;
   padding: ${themeCssVariables.spacing[3]} ${themeCssVariables.spacing[4]};
 
   span:nth-of-type(2),
@@ -156,8 +158,10 @@ const StyledAlert = styled.div`
 `;
 
 export const ErpAccountingEntryEditorPage = () => {
+  const { id } = useParams<{ id: string }>();
   const { client, context } = useErpMarocContext();
   const navigate = useNavigate();
+  const isEdit = id !== undefined;
   const [references, setReferences] =
     useState<ErpAccountingReferences>(emptyReferences);
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>(
@@ -172,20 +176,48 @@ export const ErpAccountingEntryEditorPage = () => {
 
   useEffect(() => {
     let active = true;
-    void client
-      .request({
+    void Promise.all([
+      client.request({
         method: 'GET',
         path: '/accounting/references',
         schema: erpAccountingReferencesSchema,
-      })
-      .then((result) => {
+      }),
+      id === undefined
+        ? Promise.resolve<ErpAccountingEntry | null>(null)
+        : client.request({
+            method: 'GET',
+            path: `/accounting/entries/${id}`,
+            schema: erpAccountingEntrySchema,
+          }),
+    ])
+      .then(([result, entry]) => {
         if (!active) return;
         setReferences(result);
+        if (
+          entry !== null &&
+          (entry.sourceType !== 'MANUAL' || entry.status !== 'DRAFT')
+        ) {
+          setLoadState('error');
+          return;
+        }
         const preferred =
           result.journals.find(
             (journal) => journal.isActive && journal.type === 'OD',
           ) ?? result.journals.find((journal) => journal.isActive);
-        setJournalCode(preferred?.code ?? '');
+        setJournalCode(entry?.journalCode ?? preferred?.code ?? '');
+        if (entry !== null) {
+          setEntryDate(entry.entryDate);
+          setLabel(entry.label);
+          setLines(
+            (entry.lines ?? []).map((line) => ({
+              key: nextLineKey++,
+              accountCode: line.accountCode,
+              label: line.label,
+              debit: toMadInput(line.debitCents),
+              credit: toMadInput(line.creditCents),
+            })),
+          );
+        }
         setLoadState('ready');
       })
       .catch(() => {
@@ -194,7 +226,7 @@ export const ErpAccountingEntryEditorPage = () => {
     return () => {
       active = false;
     };
-  }, [client]);
+  }, [client, id]);
 
   const amounts = useMemo(
     () =>
@@ -254,8 +286,8 @@ export const ErpAccountingEntryEditorPage = () => {
     try {
       const intent = client.createMutationIntent(
         {
-          method: 'POST',
-          path: '/accounting/entries',
+          method: isEdit ? 'PATCH' : 'POST',
+          path: isEdit ? `/accounting/entries/${id}` : '/accounting/entries',
           schema: erpAccountingEntrySchema,
           body: {
             societeId: context.societeId,
@@ -272,10 +304,14 @@ export const ErpAccountingEntryEditorPage = () => {
         },
         { idempotency: 'required' },
       );
-      const created = await intent.execute();
-      navigate(`/erp-maroc/accounting/entries/${created.id}`);
+      const saved = await intent.execute();
+      navigate(`/erp-maroc/accounting/entries/${saved.id}`);
     } catch {
-      setError("Impossible de créer l'écriture comptable.");
+      setError(
+        isEdit
+          ? "Impossible de modifier l'écriture comptable."
+          : "Impossible de créer l'écriture comptable.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -283,11 +319,17 @@ export const ErpAccountingEntryEditorPage = () => {
 
   return (
     <ErpPageShell
-      title="Nouvelle opération diverse"
+      title={
+        isEdit ? "Modifier l'opération diverse" : 'Nouvelle opération diverse'
+      }
       description="Saisie comptable en brouillon"
       state={loadState}
       loadingLabel="Chargement du plan comptable"
-      errorLabel="Impossible de charger les référentiels comptables"
+      errorLabel={
+        isEdit
+          ? 'Cette écriture ne peut pas être modifiée'
+          : 'Impossible de charger les référentiels comptables'
+      }
       actions={
         <Button
           title="Enregistrer"

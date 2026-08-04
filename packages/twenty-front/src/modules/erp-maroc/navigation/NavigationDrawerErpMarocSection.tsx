@@ -146,9 +146,16 @@ export const NavigationDrawerErpMarocSection = () => {
       activePaths: [
         erpMarocPaths.accountingEntries,
         erpMarocPaths.accountingEntryNew,
+        erpMarocPaths.accountingEntryEdit,
         erpMarocPaths.accountingEntryDetail,
       ],
       Icon: IconBook,
+    },
+    {
+      label: t`Provisions`,
+      path: erpMarocPaths.accountingProvisions,
+      activePaths: [erpMarocPaths.accountingProvisions],
+      Icon: IconFileText,
     },
     {
       label: t`Plan comptable`,

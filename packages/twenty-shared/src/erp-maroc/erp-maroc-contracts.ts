@@ -1660,6 +1660,7 @@ export const erpAccountingSourceTypeSchema = z.enum([
   'SUPPLIER_PAYMENT',
   'PAYROLL',
   'EXPENSE_NOTE',
+  'PROVISION',
   'CLOSING',
   'OPENING_BALANCE',
 ]);
@@ -1751,6 +1752,89 @@ export const erpAccountingEntrySchema = z
 export const erpAccountingEntryPageSchema = listPageSchema(
   erpAccountingEntrySchema,
 );
+
+export const erpAccountingProvisionStatusSchema = z.enum([
+  'DRAFT',
+  'ACTIVE',
+  'REVERSED',
+  'CANCELLED',
+]);
+
+export const erpAccountingProvisionTypeSchema = z.enum([
+  'RISK_AND_CHARGE',
+  'RECEIVABLE_IMPAIRMENT',
+  'INVENTORY_IMPAIRMENT',
+  'ASSET_IMPAIRMENT',
+  'OTHER',
+]);
+
+export const erpAccountingProvisionReversalSchema = z.object({
+  id: uuidSchema,
+  provisionId: uuidSchema,
+  amountCents: centsSchema,
+  entryDate: civilDateHttpSchema,
+  reason: nonBlankStringSchema,
+  accountingEntryId: uuidSchema,
+  createdByTwentyUserId: nonBlankStringSchema,
+  createdAt: instantSchema,
+});
+
+export const erpAccountingProvisionSchema = z
+  .object({
+    id: uuidSchema,
+    organisationId: uuidSchema,
+    societeId: uuidSchema,
+    exerciceId: uuidSchema,
+    exerciceYear: nonNegativeIntegerSchema,
+    type: erpAccountingProvisionTypeSchema,
+    status: erpAccountingProvisionStatusSchema,
+    label: nonBlankStringSchema,
+    provisionDate: civilDateHttpSchema,
+    reviewDate: civilDateHttpSchema.nullable(),
+    journalCode: nonBlankStringSchema,
+    expenseAccountCode: nonBlankStringSchema,
+    provisionAccountCode: nonBlankStringSchema,
+    reversalAccountCode: nonBlankStringSchema,
+    amountCents: centsSchema,
+    dotationEntryId: nullableUuidSchema,
+    postedAt: nullableInstantSchema,
+    postedByTwentyUserId: nullableStringSchema,
+    cancelledAt: nullableInstantSchema,
+    cancelledByTwentyUserId: nullableStringSchema,
+    cancellationReason: nullableStringSchema,
+    createdByTwentyUserId: nonBlankStringSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+    reversedAmountCents: centsSchema,
+    remainingAmountCents: centsSchema,
+    reversals: z.array(erpAccountingProvisionReversalSchema),
+  })
+  .superRefine((provision, context) => {
+    if (
+      provision.reversedAmountCents + provision.remainingAmountCents !==
+      provision.amountCents
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Provision reversal amounts must match the original amount',
+        path: ['remainingAmountCents'],
+      });
+    }
+    if (
+      provision.status === 'REVERSED' &&
+      provision.remainingAmountCents !== 0
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'A reversed provision cannot keep a remaining amount',
+        path: ['status'],
+      });
+    }
+  });
+
+export const erpAccountingProvisionListSchema = z.object({
+  items: z.array(erpAccountingProvisionSchema),
+});
 
 export const erpAccountingAccountSchema = z.object({
   id: uuidSchema,
@@ -3286,6 +3370,12 @@ export const erpMarocRouteIds = {
   accountingEntryValidate: 'accounting.entries.validate',
   accountingEntryReject: 'accounting.entries.reject',
   accountingEntryReverse: 'accounting.entries.reverse',
+  accountingEntryDuplicate: 'accounting.entries.duplicate',
+  accountingProvisionsCollection: 'accounting.provisions.collection',
+  accountingProvisionDetail: 'accounting.provisions.detail',
+  accountingProvisionPost: 'accounting.provisions.post',
+  accountingProvisionReverse: 'accounting.provisions.reverse',
+  accountingProvisionCancel: 'accounting.provisions.cancel',
   accountingReferences: 'accounting.references',
   accountingAccountsCollection: 'accounting.accounts.collection',
   accountingAccountDetail: 'accounting.accounts.detail',
@@ -3618,6 +3708,16 @@ export const erpMarocUpstreamRoutes = {
       `/accounting/entries/${encodeRouteId(id)}/validate`,
     reject: (id: string) => `/accounting/entries/${encodeRouteId(id)}/reject`,
     reverse: (id: string) => `/accounting/entries/${encodeRouteId(id)}/reverse`,
+    duplicate: (id: string) =>
+      `/accounting/entries/${encodeRouteId(id)}/duplicate`,
+    provisions: '/accounting/provisions',
+    provision: (id: string) => `/accounting/provisions/${encodeRouteId(id)}`,
+    postProvision: (id: string) =>
+      `/accounting/provisions/${encodeRouteId(id)}/post`,
+    reverseProvision: (id: string) =>
+      `/accounting/provisions/${encodeRouteId(id)}/reverse`,
+    cancelProvision: (id: string) =>
+      `/accounting/provisions/${encodeRouteId(id)}/cancel`,
     references: '/accounting/references',
     accounts: '/accounting/references/accounts',
     account: (id: string) =>
@@ -4016,6 +4116,21 @@ export type ErpAccountingEntryLine = z.infer<
 export type ErpAccountingEntry = z.infer<typeof erpAccountingEntrySchema>;
 export type ErpAccountingEntryPage = z.infer<
   typeof erpAccountingEntryPageSchema
+>;
+export type ErpAccountingProvisionStatus = z.infer<
+  typeof erpAccountingProvisionStatusSchema
+>;
+export type ErpAccountingProvisionType = z.infer<
+  typeof erpAccountingProvisionTypeSchema
+>;
+export type ErpAccountingProvisionReversal = z.infer<
+  typeof erpAccountingProvisionReversalSchema
+>;
+export type ErpAccountingProvision = z.infer<
+  typeof erpAccountingProvisionSchema
+>;
+export type ErpAccountingProvisionList = z.infer<
+  typeof erpAccountingProvisionListSchema
 >;
 export type ErpAccountingAccount = z.infer<typeof erpAccountingAccountSchema>;
 export type ErpAccountingJournal = z.infer<typeof erpAccountingJournalSchema>;

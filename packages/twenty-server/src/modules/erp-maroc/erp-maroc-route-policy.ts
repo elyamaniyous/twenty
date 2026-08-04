@@ -1,6 +1,8 @@
 import {
   erpAccountingEntryPageSchema,
   erpAccountingEntrySchema,
+  erpAccountingProvisionListSchema,
+  erpAccountingProvisionSchema,
   erpAccountingAccountSchema,
   erpAccountingJournalSchema,
   erpAccountingPeriodSchema,
@@ -201,6 +203,7 @@ const accountingEntryQuery = Object.freeze([
   'cursor',
   'limit',
 ]);
+const accountingProvisionQuery = Object.freeze(['status', 'exerciceId']);
 const accountingReportQuery = Object.freeze(['from', 'to', 'includeDraft']);
 const grandLivreQuery = Object.freeze([
   'accountCode',
@@ -1017,6 +1020,26 @@ const routes: ErpMarocRoute[] = [
     idempotency: 'forbidden',
   }),
   defineRoute({
+    routeId: erpMarocRouteIds.accountingEntryDetail,
+    method: 'PATCH',
+    pattern: detail('accounting/entries'),
+    build: idBuilder(erpMarocUpstreamRoutes.accounting.detail),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingEntrySchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.accountingEntryDuplicate,
+    method: 'POST',
+    pattern: action('accounting/entries', 'duplicate'),
+    build: idBuilder(erpMarocUpstreamRoutes.accounting.duplicate),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingEntrySchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
     routeId: erpMarocRouteIds.accountingEntryValidate,
     method: 'POST',
     pattern: action('accounting/entries', 'validate'),
@@ -1043,6 +1066,76 @@ const routes: ErpMarocRoute[] = [
     build: idBuilder(erpMarocUpstreamRoutes.accounting.reverse),
     queryKeys: noQuery,
     responseSchema: erpAccountingEntrySchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.accountingProvisionsCollection,
+    method: 'GET',
+    pattern: exact('/accounting/provisions'),
+    build: staticBuilder(erpMarocUpstreamRoutes.accounting.provisions),
+    queryKeys: accountingProvisionQuery,
+    responseSchema: erpAccountingProvisionListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.accountingProvisionsCollection,
+    method: 'POST',
+    pattern: exact('/accounting/provisions'),
+    build: staticBuilder(erpMarocUpstreamRoutes.accounting.provisions),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingProvisionSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.accountingProvisionDetail,
+    method: 'GET',
+    pattern: detail('accounting/provisions'),
+    build: idBuilder(erpMarocUpstreamRoutes.accounting.provision),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingProvisionSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.accountingProvisionDetail,
+    method: 'PATCH',
+    pattern: detail('accounting/provisions'),
+    build: idBuilder(erpMarocUpstreamRoutes.accounting.provision),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingProvisionSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.accountingProvisionPost,
+    method: 'POST',
+    pattern: action('accounting/provisions', 'post'),
+    build: idBuilder(erpMarocUpstreamRoutes.accounting.postProvision),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingProvisionSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.accountingProvisionReverse,
+    method: 'POST',
+    pattern: action('accounting/provisions', 'reverse'),
+    build: idBuilder(erpMarocUpstreamRoutes.accounting.reverseProvision),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingProvisionSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.accountingProvisionCancel,
+    method: 'POST',
+    pattern: action('accounting/provisions', 'cancel'),
+    build: idBuilder(erpMarocUpstreamRoutes.accounting.cancelProvision),
+    queryKeys: noQuery,
+    responseSchema: erpAccountingProvisionSchema,
     kind: 'json',
     idempotency: 'required',
   }),
@@ -2257,8 +2350,15 @@ const accountingSourceTypes = new Set([
   'SUPPLIER_PAYMENT',
   'PAYROLL',
   'EXPENSE_NOTE',
+  'PROVISION',
   'CLOSING',
   'OPENING_BALANCE',
+]);
+const accountingProvisionStatuses = new Set([
+  'DRAFT',
+  'ACTIVE',
+  'REVERSED',
+  'CANCELLED',
 ]);
 
 const isValidCivilDate = (value: string): boolean => {
@@ -2280,7 +2380,8 @@ const assertNormalizedQueryValue = (
     key === 'cursor' ||
     key === 'tierId' ||
     key === 'invoiceId' ||
-    key === 'bankAccountId'
+    key === 'bankAccountId' ||
+    key === 'exerciceId'
   ) {
     if (!uuidSchema.safeParse(value).success) rejectRoute();
     return;
@@ -2348,6 +2449,9 @@ const assertNormalizedQueryValue = (
   if (routeId === erpMarocRouteIds.accountingEntriesCollection) {
     if (key === 'status' && accountingEntryStatuses.has(value)) return;
     if (key === 'sourceType' && accountingSourceTypes.has(value)) return;
+  }
+  if (routeId === erpMarocRouteIds.accountingProvisionsCollection) {
+    if (key === 'status' && accountingProvisionStatuses.has(value)) return;
   }
   if (
     routeId === erpMarocRouteIds.liasseExport &&

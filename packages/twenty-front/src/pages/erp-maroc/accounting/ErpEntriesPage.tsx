@@ -49,6 +49,7 @@ const SOURCE: Record<ErpAccountingEntry['sourceType'], string> = {
   SUPPLIER_PAYMENT: 'Paiement fournisseur',
   PAYROLL: 'Paie',
   EXPENSE_NOTE: 'Note de frais',
+  PROVISION: 'Provision',
   CLOSING: 'Clôture',
   OPENING_BALANCE: 'À-nouveaux',
 };

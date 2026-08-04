@@ -18,7 +18,13 @@ import {
   type ErpAccountingEntry,
   type ErpAccountingEntryLine,
 } from 'twenty-shared/erp-maroc';
-import { IconCheck, IconRefresh, IconX } from 'twenty-ui/display';
+import {
+  IconCheck,
+  IconCopy,
+  IconPencil,
+  IconRefresh,
+  IconX,
+} from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
@@ -42,6 +48,7 @@ const SOURCE: Record<ErpAccountingEntry['sourceType'], string> = {
   SUPPLIER_PAYMENT: 'Paiement fournisseur',
   PAYROLL: 'Paie',
   EXPENSE_NOTE: 'Note de frais',
+  PROVISION: 'Provision',
   CLOSING: 'Clôture',
   OPENING_BALANCE: 'À-nouveaux',
 };
@@ -242,6 +249,14 @@ export const ErpEntryDetailPage = () => {
     context !== null &&
     ['OWNER', 'ADMIN', 'COMPTABLE'].includes(context.role);
 
+  const canEdit =
+    canReview && entry?.sourceType === 'MANUAL' && entry.status === 'DRAFT';
+
+  const canDuplicate =
+    entry !== null &&
+    context !== null &&
+    ['OWNER', 'ADMIN', 'COMPTABLE'].includes(context.role);
+
   const canReverse =
     entry !== null &&
     (entry.status === 'VALIDATED' || entry.status === 'LOCKED') &&
@@ -305,6 +320,29 @@ export const ErpEntryDetailPage = () => {
     }
   };
 
+  const duplicate = async () => {
+    if (entry === null || isSubmitting) return;
+    setIsSubmitting(true);
+    setActionError(null);
+    try {
+      const intent = client.createMutationIntent(
+        {
+          method: 'POST',
+          path: `/accounting/entries/${entry.id}/duplicate`,
+          schema: erpAccountingEntrySchema,
+          body: { entryDate: new Date().toISOString().slice(0, 10) },
+        },
+        { idempotency: 'required' },
+      );
+      const duplicated = await intent.execute();
+      navigate(`/erp-maroc/accounting/entries/${duplicated.id}/edit`);
+    } catch {
+      setActionError("Impossible de dupliquer l'écriture.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (loadState === 'loading') {
     return (
       <ErpPageShell
@@ -329,8 +367,30 @@ export const ErpEntryDetailPage = () => {
       title={entry.label}
       description={`Exercice ${entry.exerciceYear} · Journal ${entry.journalCode}`}
       actions={
-        canReview || canReverse ? (
+        canReview || canReverse || canDuplicate ? (
           <>
+            {canDuplicate ? (
+              <Button
+                title="Dupliquer"
+                ariaLabel="Dupliquer l'écriture"
+                Icon={IconCopy}
+                variant="secondary"
+                disabled={isSubmitting}
+                onClick={() => void duplicate()}
+              />
+            ) : null}
+            {canEdit ? (
+              <Button
+                title="Modifier"
+                ariaLabel="Modifier l'écriture"
+                Icon={IconPencil}
+                variant="secondary"
+                disabled={isSubmitting}
+                onClick={() =>
+                  navigate(`/erp-maroc/accounting/entries/${entry.id}/edit`)
+                }
+              />
+            ) : null}
             {canReview ? (
               <>
                 <Button

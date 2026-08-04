@@ -204,6 +204,12 @@ const ErpEntryDetailPage = lazy(() =>
   })),
 );
 
+const ErpAccountingProvisionsPage = lazy(() =>
+  import('~/pages/erp-maroc/accounting/ErpAccountingProvisionsPage').then(
+    (module) => ({ default: module.ErpAccountingProvisionsPage }),
+  ),
+);
+
 const ErpGrandLivrePage = lazy(() =>
   import('~/pages/erp-maroc/accounting/ErpGrandLivrePage').then((module) => ({
     default: module.ErpGrandLivrePage,
@@ -711,10 +717,26 @@ export const useCreateAppRouter = (
                 }
               />
               <Route
+                path={erpMarocPaths.accountingEntryEdit}
+                element={
+                  <LazyRoute>
+                    <ErpAccountingEntryEditorPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
                 path={erpMarocPaths.accountingEntryDetail}
                 element={
                   <LazyRoute>
                     <ErpEntryDetailPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.accountingProvisions}
+                element={
+                  <LazyRoute>
+                    <ErpAccountingProvisionsPage />
                   </LazyRoute>
                 }
               />
