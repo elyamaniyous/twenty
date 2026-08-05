@@ -174,6 +174,12 @@ const ErpDocumentsPage = lazy(() =>
   })),
 );
 
+const ErpExpenseNotesPage = lazy(() =>
+  import('~/pages/erp-maroc/expenses/ErpExpenseNotesPage').then((module) => ({
+    default: module.ErpExpenseNotesPage,
+  })),
+);
+
 const ErpPayrollRegulatoryPage = lazy(() =>
   import('~/pages/erp-maroc/hr/ErpPayrollRegulatoryPage').then((module) => ({
     default: module.ErpPayrollRegulatoryPage,
@@ -699,6 +705,14 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpDocumentsPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.expenseNotes}
+                element={
+                  <LazyRoute>
+                    <ErpExpenseNotesPage />
                   </LazyRoute>
                 }
               />

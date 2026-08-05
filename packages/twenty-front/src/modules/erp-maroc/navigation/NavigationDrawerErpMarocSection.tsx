@@ -137,6 +137,12 @@ export const NavigationDrawerErpMarocSection = () => {
       Icon: IconFileText,
     },
     {
+      label: t`Notes de frais`,
+      path: erpMarocPaths.expenseNotes,
+      activePaths: [erpMarocPaths.expenseNotes],
+      Icon: IconFileText,
+    },
+    {
       label: t`Ressources humaines`,
       path: erpMarocPaths.hrCore,
       activePaths: [erpMarocPaths.hrCore, erpMarocPaths.hrEmployeeDetail],

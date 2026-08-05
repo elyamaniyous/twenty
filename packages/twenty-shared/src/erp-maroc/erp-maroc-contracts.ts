@@ -3137,6 +3137,22 @@ export const erpDocumentContentSchema = z.object({
   contentBase64: z.string(),
 });
 
+export const erpExpenseNoteLineSchema = z
+  .object({
+    id: uuidSchema,
+    expenseNoteId: uuidSchema,
+    description: nonBlankStringSchema,
+    category: nonBlankStringSchema,
+    amountHtCents: centsSchema,
+    tvaRate: nonNegativeIntegerSchema,
+    amountTvaCents: centsSchema,
+    amountTtcCents: centsSchema,
+    documentId: nullableUuidSchema,
+    position: nonNegativeIntegerSchema,
+    createdAt: instantSchema,
+  })
+  .passthrough();
+
 export const erpExpenseNoteSchema = z
   .object({
     id: uuidSchema,
@@ -3157,8 +3173,18 @@ export const erpExpenseNoteSchema = z
     totalTtcCents: centsSchema,
     currency: nonBlankStringSchema,
     accountingEntryId: nullableUuidSchema,
+    paymentDate: civilDateHttpSchema.nullable(),
+    paymentMethod: erpPaymentMethodSchema.nullable(),
+    paymentReference: nullableStringSchema,
+    paymentAccountCode: nullableStringSchema,
+    paymentAccountingEntryId: nullableUuidSchema,
+    submittedAt: nullableInstantSchema,
+    approvedAt: nullableInstantSchema,
+    approvedByTwentyUserId: nullableStringSchema,
+    paidAt: nullableInstantSchema,
+    paidByTwentyUserId: nullableStringSchema,
     rejectionReason: nullableStringSchema,
-    lines: z.array(z.unknown()).optional(),
+    lines: z.array(erpExpenseNoteLineSchema).optional(),
     employee: erpEmployeeSchema.nullable().optional(),
     createdAt: instantSchema,
     updatedAt: instantSchema,
@@ -3670,6 +3696,7 @@ export const erpMarocRouteIds = {
   expenseNotes: 'operations.expense-notes',
   expenseNoteSubmit: 'operations.expense-note.submit',
   expenseNoteDecision: 'operations.expense-note.decision',
+  expenseNotePayment: 'operations.expense-note.payment',
   analytics: 'operations.analytics',
   analyticAllocations: 'operations.analytics.allocations',
   budgets: 'operations.budgets',
@@ -4092,6 +4119,8 @@ export const erpMarocUpstreamRoutes = {
       `/operations/expense-notes/${encodeRouteId(id)}/submit`,
     decideExpenseNote: (id: string) =>
       `/operations/expense-notes/${encodeRouteId(id)}/decision`,
+    payExpenseNote: (id: string) =>
+      `/operations/expense-notes/${encodeRouteId(id)}/pay`,
     analytics: '/operations/analytics',
     analyticAllocations: '/operations/analytics/allocations',
     budgets: '/operations/budgets',
@@ -4394,6 +4423,7 @@ export type ErpPayslip = z.infer<typeof erpPayslipSchema>;
 export type ErpLeaveRequest = z.infer<typeof erpLeaveRequestSchema>;
 export type ErpLeaveBalance = z.infer<typeof erpLeaveBalanceSchema>;
 export type ErpDocument = z.infer<typeof erpDocumentSchema>;
+export type ErpExpenseNoteLine = z.infer<typeof erpExpenseNoteLineSchema>;
 export type ErpExpenseNote = z.infer<typeof erpExpenseNoteSchema>;
 export type ErpAnalyticAxis = z.infer<typeof erpAnalyticAxisSchema>;
 export type ErpBudget = z.infer<typeof erpBudgetSchema>;
