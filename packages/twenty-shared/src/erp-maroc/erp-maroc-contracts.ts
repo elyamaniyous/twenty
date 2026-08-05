@@ -3358,6 +3358,109 @@ export const erpAnomalyScanResultSchema = z.object({
   anomalies: erpAccountingAnomalyListSchema,
 });
 
+export const erpAiAccountingQueryIdSchema = z.enum([
+  'overdue_invoices',
+  'trial_balance',
+  'unreconciled_bank_lines',
+  'tax_declarations',
+  'payroll_cost',
+]);
+export const erpAiAccountingStatusSchema = z.object({
+  providerConfigured: z.boolean(),
+  provider: nonBlankStringSchema,
+  model: nonBlankStringSchema,
+  safeQueries: z.array(erpAiAccountingQueryIdSchema),
+  policy: nonBlankStringSchema,
+});
+export const erpAiAccountingSuggestionSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  type: z.enum(['CATEGORIZATION', 'RECONCILIATION', 'ASSISTANT', 'SQL_QUERY']),
+  sourceType: nonBlankStringSchema,
+  sourceId: nullableUuidSchema,
+  inputHash: nonBlankStringSchema,
+  proposal: z.record(z.string(), z.unknown()),
+  confidenceBasisPoints: nonNegativeIntegerSchema.max(10_000),
+  status: z.enum(['PROPOSED', 'ACCEPTED', 'REJECTED', 'EXPIRED']),
+  provider: nonBlankStringSchema,
+  model: nonBlankStringSchema,
+  promptVersion: nonBlankStringSchema,
+  reviewedAt: nullableInstantSchema,
+  reviewedByTwentyUserId: nullableStringSchema,
+  reviewNotes: nullableStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+export const erpAiAccountingSuggestionListSchema = z.array(
+  erpAiAccountingSuggestionSchema,
+);
+export const erpAiAccountingSuggestionBatchSchema = z.object({
+  processed: nonNegativeIntegerSchema,
+  suggestions: erpAiAccountingSuggestionListSchema,
+});
+export const erpAiCategorizationRuleSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  name: nonBlankStringSchema,
+  pattern: nonBlankStringSchema,
+  matchMode: z.enum(['CONTAINS', 'REGEX']),
+  direction: z.enum(['BOTH', 'DEBIT', 'CREDIT']),
+  accountCode: nonBlankStringSchema,
+  category: nonBlankStringSchema,
+  confidenceBasisPoints: nonNegativeIntegerSchema.max(10_000),
+  priority: nonNegativeIntegerSchema,
+  isActive: z.boolean(),
+  createdByTwentyUserId: nonBlankStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+export const erpAiCategorizationRuleListSchema = z.array(
+  erpAiCategorizationRuleSchema,
+);
+export const erpAiAccountingSafeQueryResultSchema = z.object({
+  queryId: erpAiAccountingQueryIdSchema,
+  generatedSql: nonBlankStringSchema,
+  rows: z.array(z.record(z.string(), z.unknown())),
+  readOnly: z.literal(true),
+});
+export const erpAiAccountingMessageSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  conversationId: uuidSchema,
+  role: z.enum(['user', 'assistant']),
+  content: nonBlankStringSchema,
+  evidence: z.unknown().nullable(),
+  provider: nullableStringSchema,
+  model: nullableStringSchema,
+  createdAt: instantSchema,
+});
+export const erpAiAccountingConversationSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  title: nonBlankStringSchema,
+  createdByTwentyUserId: nonBlankStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  messages: z.array(erpAiAccountingMessageSchema),
+});
+export const erpAiAccountingConversationListSchema = z.array(
+  erpAiAccountingConversationSchema,
+);
+export const erpAiAccountingAnswerSchema = z.object({
+  conversationId: uuidSchema,
+  content: nonBlankStringSchema,
+  evidence: z.object({
+    queryId: erpAiAccountingQueryIdSchema.nullable(),
+    rows: z.array(z.record(z.string(), z.unknown())),
+  }),
+  provider: nonBlankStringSchema,
+  model: nonBlankStringSchema,
+});
+
 export const erpTreasuryScenarioCodeSchema = z.enum([
   'PRUDENT',
   'BASE',
@@ -4448,6 +4551,26 @@ export type ErpRecurringInvoice = z.infer<typeof erpRecurringInvoiceSchema>;
 export type ErpExchangeRate = z.infer<typeof erpExchangeRateSchema>;
 export type ErpPortalAccess = z.infer<typeof erpPortalAccessSchema>;
 export type ErpAccountingAnomaly = z.infer<typeof erpAccountingAnomalySchema>;
+export type ErpAiAccountingQueryId = z.infer<
+  typeof erpAiAccountingQueryIdSchema
+>;
+export type ErpAiAccountingStatus = z.infer<typeof erpAiAccountingStatusSchema>;
+export type ErpAiAccountingSuggestion = z.infer<
+  typeof erpAiAccountingSuggestionSchema
+>;
+export type ErpAiCategorizationRule = z.infer<
+  typeof erpAiCategorizationRuleSchema
+>;
+export type ErpAiAccountingSafeQueryResult = z.infer<
+  typeof erpAiAccountingSafeQueryResultSchema
+>;
+export type ErpAiAccountingMessage = z.infer<
+  typeof erpAiAccountingMessageSchema
+>;
+export type ErpAiAccountingConversation = z.infer<
+  typeof erpAiAccountingConversationSchema
+>;
+export type ErpAiAccountingAnswer = z.infer<typeof erpAiAccountingAnswerSchema>;
 export type ErpTreasuryScenarioCode = z.infer<
   typeof erpTreasuryScenarioCodeSchema
 >;

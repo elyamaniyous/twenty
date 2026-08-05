@@ -20,6 +20,7 @@ import {
   IconPercentage,
   IconCoins,
   IconSettings,
+  IconSparkles,
   IconUsers,
   type IconComponent,
 } from 'twenty-ui/display';
@@ -219,6 +220,12 @@ export const NavigationDrawerErpMarocSection = () => {
       path: erpMarocPaths.accountingLettrage,
       activePaths: [erpMarocPaths.accountingLettrage],
       Icon: IconLink,
+    },
+    {
+      label: t`Copilote comptable`,
+      path: erpMarocPaths.accountingCopilot,
+      activePaths: [erpMarocPaths.accountingCopilot],
+      Icon: IconSparkles,
     },
   ];
 

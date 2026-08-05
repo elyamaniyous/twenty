@@ -43,4 +43,5 @@ export const erpMarocPaths = {
   accountingGrandLivre: '/erp-maroc/accounting/grand-livre',
   accountingBalance: '/erp-maroc/accounting/balance',
   accountingLettrage: '/erp-maroc/accounting/lettrage',
+  accountingCopilot: '/erp-maroc/accounting/copilot',
 } as const;

@@ -270,6 +270,12 @@ const ErpAccountingReviewPage = lazy(() =>
   ),
 );
 
+const ErpAccountingCopilotPage = lazy(() =>
+  import('~/pages/erp-maroc/accounting/ErpAccountingCopilotPage').then(
+    (module) => ({ default: module.ErpAccountingCopilotPage }),
+  ),
+);
+
 const RecordIndexPage = lazy(() =>
   import('~/pages/object-record/RecordIndexPage').then((module) => ({
     default: module.RecordIndexPage,
@@ -847,6 +853,14 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpAccountingClosingPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.accountingCopilot}
+                element={
+                  <LazyRoute>
+                    <ErpAccountingCopilotPage />
                   </LazyRoute>
                 }
               />
