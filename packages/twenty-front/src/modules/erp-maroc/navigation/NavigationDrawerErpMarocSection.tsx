@@ -18,6 +18,7 @@ import {
   IconMail,
   IconNotes,
   IconPercentage,
+  IconCoins,
   IconSettings,
   IconUsers,
   type IconComponent,
@@ -141,6 +142,12 @@ export const NavigationDrawerErpMarocSection = () => {
       path: erpMarocPaths.expenseNotes,
       activePaths: [erpMarocPaths.expenseNotes],
       Icon: IconFileText,
+    },
+    {
+      label: t`Pilotage financier`,
+      path: erpMarocPaths.financialPlanning,
+      activePaths: [erpMarocPaths.financialPlanning],
+      Icon: IconCoins,
     },
     {
       label: t`Ressources humaines`,

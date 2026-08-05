@@ -3221,6 +3221,18 @@ export const erpAnalyticAllocationSchema = z
   })
   .passthrough();
 
+export const erpBudgetLineSchema = z
+  .object({
+    id: uuidSchema,
+    budgetId: uuidSchema,
+    sectionId: nullableUuidSchema,
+    accountCode: nonBlankStringSchema,
+    periodNumber: positiveIntegerSchema,
+    amountCents: signedCentsSchema,
+    section: erpAnalyticSectionSchema.nullable().optional(),
+  })
+  .passthrough();
+
 export const erpBudgetSchema = z
   .object({
     id: uuidSchema,
@@ -3229,7 +3241,8 @@ export const erpBudgetSchema = z
     label: nonBlankStringSchema,
     status: z.enum(['DRAFT', 'APPROVED', 'CLOSED']),
     approvedAt: nullableInstantSchema,
-    lines: z.array(z.unknown()).optional(),
+    lines: z.array(erpBudgetLineSchema).optional(),
+    exercice: erpExerciseSchema.optional(),
     createdAt: instantSchema,
     updatedAt: instantSchema,
   })
@@ -3703,6 +3716,7 @@ export const erpMarocRouteIds = {
   budgetApprove: 'operations.budget.approve',
   budgetVariance: 'operations.budget.variance',
   recurringInvoices: 'operations.recurring-invoices',
+  recurringInvoiceStatus: 'operations.recurring-invoice.status',
   recurringInvoicesRun: 'operations.recurring-invoices.run',
   exchangeRates: 'operations.exchange-rates',
   portalAccess: 'operations.portal-access',
@@ -4129,6 +4143,8 @@ export const erpMarocUpstreamRoutes = {
     budgetVariance: (id: string) =>
       `/operations/budgets/${encodeRouteId(id)}/variance`,
     recurringInvoices: '/operations/recurring-invoices',
+    recurringInvoiceStatus: (id: string) =>
+      `/operations/recurring-invoices/${encodeRouteId(id)}/status`,
     runRecurringInvoices: '/operations/recurring-invoices/run',
     exchangeRates: '/operations/exchange-rates',
     portalAccess: '/operations/portal-access',
@@ -4426,6 +4442,7 @@ export type ErpDocument = z.infer<typeof erpDocumentSchema>;
 export type ErpExpenseNoteLine = z.infer<typeof erpExpenseNoteLineSchema>;
 export type ErpExpenseNote = z.infer<typeof erpExpenseNoteSchema>;
 export type ErpAnalyticAxis = z.infer<typeof erpAnalyticAxisSchema>;
+export type ErpBudgetLine = z.infer<typeof erpBudgetLineSchema>;
 export type ErpBudget = z.infer<typeof erpBudgetSchema>;
 export type ErpRecurringInvoice = z.infer<typeof erpRecurringInvoiceSchema>;
 export type ErpExchangeRate = z.infer<typeof erpExchangeRateSchema>;
