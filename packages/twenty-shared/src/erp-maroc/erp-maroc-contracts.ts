@@ -209,6 +209,137 @@ export const erpContextSchema = z.object({
   }),
 });
 
+export const erpOnboardingImportKindSchema = z.enum([
+  'TIERS',
+  'PRODUCTS',
+  'OPENING_BALANCE',
+  'STOCK_INITIAL',
+  'OPEN_ITEMS',
+]);
+
+export const erpOnboardingCheckSchema = z.object({
+  key: nonBlankStringSchema,
+  label: nonBlankStringSchema,
+  required: z.boolean(),
+  complete: z.boolean(),
+  detail: nonBlankStringSchema,
+  actionPath: z.string().startsWith('/erp-maroc'),
+});
+
+export const erpOnboardingReadinessSchema = z.object({
+  readyForOperations: z.boolean(),
+  progressPercent: nonNegativeIntegerSchema.max(100),
+  completedCount: nonNegativeIntegerSchema,
+  blockingCount: nonNegativeIntegerSchema,
+  importCount: nonNegativeIntegerSchema,
+  openExercise: z
+    .object({
+      id: uuidSchema,
+      year: safeIntegerSchema,
+      startDate: civilDateSchema,
+      endDate: civilDateSchema,
+    })
+    .nullable(),
+  checks: z.array(erpOnboardingCheckSchema),
+});
+
+const erpOnboardingTierImportRowSchema = z.object({
+  type: z.enum(['CLIENT', 'FOURNISSEUR', 'MIXTE']),
+  name: nonBlankStringSchema,
+  email: nullableStringSchema,
+  phone: nullableStringSchema,
+  ice: nullableStringSchema,
+  identifiantFiscal: nullableStringSchema,
+  address: nullableStringSchema,
+  city: nullableStringSchema,
+  paymentDelayDays: nonNegativeIntegerSchema,
+  creditLimit: z.number().finite().nonnegative(),
+  compteCollectifCode: z.enum(['3421', '4411']),
+});
+
+const erpOnboardingProductImportRowSchema = z.object({
+  code: nonBlankStringSchema,
+  name: nonBlankStringSchema,
+  description: nullableStringSchema,
+  type: nonBlankStringSchema,
+  unit: nonBlankStringSchema,
+  defaultPriceHt: z.number().finite().nonnegative(),
+  tvaRate: z.union([
+    z.literal(0),
+    z.literal(7),
+    z.literal(10),
+    z.literal(14),
+    z.literal(20),
+  ]),
+  incomeAccountCode: nullableStringSchema,
+  expenseAccountCode: nullableStringSchema,
+});
+
+const erpOnboardingOpeningBalanceImportRowSchema = z.object({
+  accountCode: nonBlankStringSchema,
+  accountLabel: nonBlankStringSchema,
+  debitCents: centsSchema,
+  creditCents: centsSchema,
+});
+
+const erpOnboardingStockImportRowSchema = z.object({
+  warehouseCode: nonBlankStringSchema,
+  productCode: nonBlankStringSchema,
+  quantity: z.number().finite().positive(),
+  unitCostCents: centsSchema,
+  reference: nullableStringSchema,
+});
+
+const erpOnboardingOpenItemImportRowSchema = z.object({
+  kind: z.enum(['RECEIVABLE', 'PAYABLE']),
+  tierIce: nullableStringSchema,
+  tierName: nonBlankStringSchema,
+  reference: nonBlankStringSchema,
+  documentDate: civilDateSchema,
+  dueDate: civilDateSchema,
+  originalAmountCents: centsSchema,
+  outstandingAmountCents: centsSchema,
+  notes: nullableStringSchema,
+});
+
+export const erpOnboardingNormalizedImportRowSchema = z.union([
+  erpOnboardingTierImportRowSchema,
+  erpOnboardingProductImportRowSchema,
+  erpOnboardingOpeningBalanceImportRowSchema,
+  erpOnboardingStockImportRowSchema,
+  erpOnboardingOpenItemImportRowSchema,
+]);
+
+export const erpOnboardingImportPreviewRowSchema = z.object({
+  rowNumber: positiveIntegerSchema,
+  status: z.enum(['READY', 'SKIP_EXISTING', 'ERROR']),
+  reference: z.string(),
+  errors: z.array(nonBlankStringSchema),
+  normalized: erpOnboardingNormalizedImportRowSchema.nullable(),
+});
+
+export const erpOnboardingImportPreviewSchema = z.object({
+  kind: erpOnboardingImportKindSchema,
+  rows: z.array(erpOnboardingImportPreviewRowSchema),
+  readyCount: nonNegativeIntegerSchema,
+  skippedCount: nonNegativeIntegerSchema,
+  errorCount: nonNegativeIntegerSchema,
+  totalDebitCents: centsSchema.optional(),
+  totalCreditCents: centsSchema.optional(),
+  totalReceivableCents: centsSchema.optional(),
+  totalPayableCents: centsSchema.optional(),
+  targetReceivableCents: centsSchema.optional(),
+  targetPayableCents: centsSchema.optional(),
+  previewDigest: z.string().regex(/^[a-f0-9]{64}$/),
+});
+
+export const erpOnboardingImportApplyResultSchema = z.object({
+  kind: erpOnboardingImportKindSchema,
+  digest: z.string().regex(/^[a-f0-9]{64}$/),
+  createdCount: nonNegativeIntegerSchema,
+  skippedCount: nonNegativeIntegerSchema,
+});
+
 export const erpProductSchema = z.object({
   id: uuidSchema,
   societeId: uuidSchema,
@@ -2359,6 +2490,12 @@ export const erpWarehouseSchema = erpWarehouseSummarySchema.extend({
 });
 export const erpWarehouseListSchema = z.array(erpWarehouseSchema);
 
+export const erpOnboardingConfigurationSchema = z.object({
+  legalProfile: erpSocieteLegalSummarySchema,
+  bankAccounts: erpBankAccountListSchema,
+  warehouses: erpWarehouseListSchema,
+});
+
 export const erpStockProductSchema = z.object({
   id: uuidSchema,
   code: z.string(),
@@ -3571,6 +3708,9 @@ const encodeRouteId = (id: string): string => {
 
 export const erpMarocRouteIds = {
   context: 'context',
+  onboardingAccountingBootstrap: 'onboarding.accounting-bootstrap',
+  onboardingConfiguration: 'onboarding.configuration',
+  onboardingLegalProfile: 'onboarding.legal-profile',
   onboardingReadiness: 'onboarding.readiness',
   onboardingOpenItems: 'onboarding.open-items',
   onboardingOpenItemSettlementCandidates:
@@ -3873,6 +4013,9 @@ export const erpMarocRouteIds = {
 export const erpMarocUpstreamRoutes = {
   context: '/context',
   onboarding: {
+    accountingBootstrap: '/onboarding/accounting-bootstrap',
+    configuration: '/onboarding/configuration',
+    legalProfile: '/onboarding/legal-profile',
     readiness: '/onboarding/readiness',
     openItems: '/onboarding/open-items',
     settlementCandidates: (id: string) =>
@@ -4334,6 +4477,25 @@ export type ErpRole = z.infer<typeof erpRoleSchema>;
 export type ErpErrorCode = z.infer<typeof erpErrorCodeSchema>;
 export type ErpError = z.infer<typeof erpErrorSchema>;
 export type ErpContext = z.infer<typeof erpContextSchema>;
+export type ErpOnboardingImportKind = z.infer<
+  typeof erpOnboardingImportKindSchema
+>;
+export type ErpOnboardingCheck = z.infer<typeof erpOnboardingCheckSchema>;
+export type ErpOnboardingReadiness = z.infer<
+  typeof erpOnboardingReadinessSchema
+>;
+export type ErpOnboardingNormalizedImportRow = z.infer<
+  typeof erpOnboardingNormalizedImportRowSchema
+>;
+export type ErpOnboardingImportPreviewRow = z.infer<
+  typeof erpOnboardingImportPreviewRowSchema
+>;
+export type ErpOnboardingImportPreview = z.infer<
+  typeof erpOnboardingImportPreviewSchema
+>;
+export type ErpOnboardingImportApplyResult = z.infer<
+  typeof erpOnboardingImportApplyResultSchema
+>;
 export type ErpProduct = z.infer<typeof erpProductSchema>;
 export type ErpProductList = z.infer<typeof erpProductListSchema>;
 export type ErpTier = z.infer<typeof erpTierSchema>;
@@ -4477,6 +4639,9 @@ export type ErpBankStatementDetail = z.infer<
 >;
 export type ErpWarehouse = z.infer<typeof erpWarehouseSchema>;
 export type ErpWarehouseList = z.infer<typeof erpWarehouseListSchema>;
+export type ErpOnboardingConfiguration = z.infer<
+  typeof erpOnboardingConfigurationSchema
+>;
 export type ErpStockLevel = z.infer<typeof erpStockLevelSchema>;
 export type ErpStockLevelList = z.infer<typeof erpStockLevelListSchema>;
 export type ErpStockMovement = z.infer<typeof erpStockMovementSchema>;

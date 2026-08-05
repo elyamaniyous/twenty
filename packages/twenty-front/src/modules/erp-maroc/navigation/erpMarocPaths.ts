@@ -1,5 +1,6 @@
 export const erpMarocPaths = {
   cockpit: '/erp-maroc',
+  onboarding: '/erp-maroc/onboarding',
   products: '/erp-maroc/products',
   tiers: '/erp-maroc/tiers',
   quotes: '/erp-maroc/quotes',

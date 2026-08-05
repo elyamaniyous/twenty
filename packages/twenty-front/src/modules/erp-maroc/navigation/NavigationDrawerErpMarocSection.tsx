@@ -46,6 +46,12 @@ export const NavigationDrawerErpMarocSection = () => {
       Icon: IconChartBar,
     },
     {
+      label: t`Mise en service`,
+      path: erpMarocPaths.onboarding,
+      activePaths: [erpMarocPaths.onboarding],
+      Icon: IconListCheck,
+    },
+    {
       label: t`Produits`,
       path: erpMarocPaths.products,
       activePaths: [erpMarocPaths.products],

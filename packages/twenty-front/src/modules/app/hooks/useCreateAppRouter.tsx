@@ -28,6 +28,12 @@ const ErpMarocCockpitPage = lazy(() =>
   })),
 );
 
+const ErpOnboardingPage = lazy(() =>
+  import('~/pages/erp-maroc/onboarding/ErpOnboardingPage').then((module) => ({
+    default: module.ErpOnboardingPage,
+  })),
+);
+
 const ErpMarocProductsPage = lazy(() =>
   import('~/pages/erp-maroc/products/ErpProductsPage').then((module) => ({
     default: module.ErpProductsPage,
@@ -509,6 +515,14 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpMarocCockpitPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.onboarding}
+                element={
+                  <LazyRoute>
+                    <ErpOnboardingPage />
                   </LazyRoute>
                 }
               />

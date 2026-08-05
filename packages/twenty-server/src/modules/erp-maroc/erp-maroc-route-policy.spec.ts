@@ -13,6 +13,8 @@ import {
   erpAccountingReviewTaskListSchema,
   erpAccountingReviewTaskSchema,
   erpBalanceReportSchema,
+  erpBankAccountListSchema,
+  erpBankAccountSchema,
   erpChequeAlertsSchema,
   erpChequeBookListSchema,
   erpChequeBookSchema,
@@ -55,6 +57,11 @@ import {
   erpInvoicePageSchema,
   erpInvoiceReadSchema,
   erpInvoiceSchema,
+  erpOnboardingImportApplyResultSchema,
+  erpOnboardingImportPreviewSchema,
+  erpOnboardingConfigurationSchema,
+  erpOnboardingReadinessSchema,
+  erpSocieteLegalSummarySchema,
   erpGrandLivreReportSchema,
   erpExerciseClosingResultSchema,
   erpExerciseListSchema,
@@ -161,6 +168,8 @@ import {
   erpReminderSchema,
   erpTierListSchema,
   erpTierSchema,
+  erpWarehouseListSchema,
+  erpWarehouseSchema,
 } from 'twenty-shared/erp-maroc';
 
 import {
@@ -173,6 +182,11 @@ const otherId = '22222222-2222-4222-8222-222222222222';
 const uuidV7 = '0193f6ea-7c39-7aa2-8000-000000000000';
 
 const requiredIdempotencyRoutes = new Set([
+  'POST /onboarding/accounting-bootstrap',
+  'POST /onboarding/imports/preview',
+  'POST /onboarding/imports/apply',
+  'POST /bank-accounts',
+  'POST /warehouses',
   'POST /accounting/entries',
   `PATCH /accounting/entries/${id}`,
   `POST /accounting/entries/${id}/duplicate`,
@@ -308,6 +322,51 @@ const requiredIdempotencyRoutes = new Set([
 
 const approvedRoutes = [
   ['GET', '/context', 'context', erpContextSchema],
+  [
+    'POST',
+    '/onboarding/accounting-bootstrap',
+    'onboarding.accounting-bootstrap',
+    erpOnboardingReadinessSchema,
+  ],
+  [
+    'GET',
+    '/onboarding/configuration',
+    'onboarding.configuration',
+    erpOnboardingConfigurationSchema,
+  ],
+  [
+    'PATCH',
+    '/onboarding/legal-profile',
+    'onboarding.legal-profile',
+    erpSocieteLegalSummarySchema,
+  ],
+  [
+    'GET',
+    '/onboarding/readiness',
+    'onboarding.readiness',
+    erpOnboardingReadinessSchema,
+  ],
+  [
+    'POST',
+    '/onboarding/imports/preview',
+    'onboarding.import.preview',
+    erpOnboardingImportPreviewSchema,
+  ],
+  [
+    'POST',
+    '/onboarding/imports/apply',
+    'onboarding.import.apply',
+    erpOnboardingImportApplyResultSchema,
+  ],
+  [
+    'GET',
+    '/bank-accounts',
+    'bank-accounts.collection',
+    erpBankAccountListSchema,
+  ],
+  ['POST', '/bank-accounts', 'bank-accounts.collection', erpBankAccountSchema],
+  ['GET', '/warehouses', 'warehouses.collection', erpWarehouseListSchema],
+  ['POST', '/warehouses', 'warehouses.collection', erpWarehouseSchema],
   ['GET', '/products', 'products.collection', erpProductListSchema],
   ['POST', '/products', 'products.collection', erpProductSchema],
   ['GET', `/products/${id}`, 'products.detail', erpProductSchema],
