@@ -26,6 +26,9 @@ const getPathnameOrPrefix = (pathname: string) => {
 export const getPageTitleFromPath = (pathname: string): string => {
   const pathnameOrPrefix = getPathnameOrPrefix(pathname);
   switch (pathnameOrPrefix) {
+    case '/portal':
+    case '/portal/':
+      return 'Espace client | Zowka';
     case AppPath.Verify:
       return t`Verify`;
     case AppPath.SignInUp:

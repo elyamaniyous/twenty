@@ -232,6 +232,12 @@ export const erpOnboardingReadinessSchema = z.object({
   completedCount: nonNegativeIntegerSchema,
   blockingCount: nonNegativeIntegerSchema,
   importCount: nonNegativeIntegerSchema,
+  completion: z
+    .object({
+      completedAt: instantSchema,
+      completedByTwentyUserId: nonBlankStringSchema,
+    })
+    .nullable(),
   openExercise: z
     .object({
       id: uuidSchema,
@@ -1792,6 +1798,7 @@ export const erpAccountingSourceTypeSchema = z.enum([
   'PAYROLL',
   'EXPENSE_NOTE',
   'PROVISION',
+  'FIXED_ASSET',
   'CLOSING',
   'OPENING_BALANCE',
 ]);
@@ -1965,6 +1972,121 @@ export const erpAccountingProvisionSchema = z
 
 export const erpAccountingProvisionListSchema = z.object({
   items: z.array(erpAccountingProvisionSchema),
+});
+
+export const erpFixedAssetStatusSchema = z.enum([
+  'DRAFT',
+  'ACTIVE',
+  'FULLY_DEPRECIATED',
+  'DISPOSED',
+  'CANCELLED',
+]);
+
+export const erpFixedAssetCategorySchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  code: nonBlankStringSchema,
+  name: nonBlankStringSchema,
+  journalCode: nonBlankStringSchema,
+  assetAccountCode: nonBlankStringSchema,
+  accumulatedDepreciationAccountCode: nonBlankStringSchema,
+  depreciationExpenseAccountCode: nonBlankStringSchema,
+  disposalGainAccountCode: nonBlankStringSchema,
+  disposalLossAccountCode: nonBlankStringSchema,
+  defaultUsefulLifeMonths: z.number().int().min(1).max(600),
+  isActive: z.boolean(),
+  createdByTwentyUserId: nonBlankStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+
+export const erpFixedAssetCategoryListSchema = z.object({
+  items: z.array(erpFixedAssetCategorySchema),
+});
+
+export const erpFixedAssetDepreciationSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  fixedAssetId: uuidSchema,
+  periodNumber: z.number().int().positive(),
+  periodKey: z.string().regex(/^\d{4}-\d{2}$/),
+  periodStart: civilDateHttpSchema,
+  periodEnd: civilDateHttpSchema,
+  depreciationCents: centsSchema,
+  accumulatedCents: centsSchema,
+  netBookValueCents: centsSchema,
+  status: z.enum(['PLANNED', 'POSTED', 'CANCELLED']),
+  accountingEntryId: nullableUuidSchema,
+  postedAt: nullableInstantSchema,
+  postedByTwentyUserId: nullableStringSchema,
+  cancelledAt: nullableInstantSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+
+export const erpFixedAssetDisposalSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  fixedAssetId: uuidSchema,
+  type: z.enum(['SALE', 'SCRAP', 'LOSS']),
+  disposalDate: civilDateHttpSchema,
+  proceedsCents: centsSchema,
+  proceedsAccountCode: nullableStringSchema,
+  gainLossCents: signedCentsSchema,
+  reason: nonBlankStringSchema,
+  accountingEntryId: uuidSchema,
+  createdByTwentyUserId: nonBlankStringSchema,
+  createdAt: instantSchema,
+});
+
+export const erpFixedAssetSchema = z.object({
+  id: uuidSchema,
+  organisationId: uuidSchema,
+  societeId: uuidSchema,
+  categoryId: uuidSchema,
+  categoryCode: nonBlankStringSchema,
+  categoryName: nonBlankStringSchema,
+  code: nonBlankStringSchema,
+  name: nonBlankStringSchema,
+  description: nullableStringSchema,
+  acquisitionDate: civilDateHttpSchema,
+  inServiceDate: civilDateHttpSchema,
+  acquisitionCostCents: centsSchema,
+  residualValueCents: centsSchema,
+  usefulLifeMonths: z.number().int().min(1).max(600),
+  journalCode: nonBlankStringSchema,
+  assetAccountCode: nonBlankStringSchema,
+  accumulatedDepreciationAccountCode: nonBlankStringSchema,
+  depreciationExpenseAccountCode: nonBlankStringSchema,
+  disposalGainAccountCode: nonBlankStringSchema,
+  disposalLossAccountCode: nonBlankStringSchema,
+  supplierInvoiceReference: nullableStringSchema,
+  serialNumber: nullableStringSchema,
+  location: nullableStringSchema,
+  status: erpFixedAssetStatusSchema,
+  accumulatedDepreciationCents: centsSchema,
+  activatedAt: nullableInstantSchema,
+  activatedByTwentyUserId: nullableStringSchema,
+  cancelledAt: nullableInstantSchema,
+  cancelledByTwentyUserId: nullableStringSchema,
+  cancellationReason: nullableStringSchema,
+  createdByTwentyUserId: nonBlankStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  depreciableAmountCents: centsSchema,
+  netBookValueCents: centsSchema,
+  depreciations: z.array(erpFixedAssetDepreciationSchema),
+  disposal: erpFixedAssetDisposalSchema.nullable(),
+});
+
+export const erpFixedAssetListSchema = z.object({
+  items: z.array(erpFixedAssetSchema),
+  summary: z.object({
+    acquisitionCostCents: centsSchema,
+    accumulatedDepreciationCents: centsSchema,
+    netBookValueCents: centsSchema,
+  }),
 });
 
 export const erpAccountingAccountSchema = z.object({
@@ -3174,6 +3296,394 @@ export const erpPayslipSchema = z
   .passthrough();
 export const erpPayslipListSchema = z.array(erpPayslipSchema);
 
+export const attendancePolicySchema = z
+  .object({
+    id: uuidSchema,
+    code: nonBlankStringSchema,
+    name: nonBlankStringSchema,
+    scheduledStartMinutes: nonNegativeIntegerSchema,
+    dailyMinutes: nonNegativeIntegerSchema,
+    monthlyMinutes: nonNegativeIntegerSchema,
+    lateToleranceMinutes: nonNegativeIntegerSchema,
+    weekdaysMask: nonNegativeIntegerSchema,
+    overtime25RateBasisPoints: nonNegativeIntegerSchema,
+    overtime50RateBasisPoints: nonNegativeIntegerSchema,
+    overtime100RateBasisPoints: nonNegativeIntegerSchema,
+    deductAbsence: z.boolean(),
+    deductLate: z.boolean(),
+    isActive: z.boolean(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const attendancePolicyListSchema = z.array(attendancePolicySchema);
+
+export const attendanceAssignmentSchema = z
+  .object({
+    id: uuidSchema,
+    employeeId: uuidSchema,
+    policyId: uuidSchema,
+    effectiveFrom: civilDateHttpSchema,
+    effectiveTo: nullableCivilDateHttpSchema,
+    employee: erpEmployeeSchema.optional(),
+    policy: attendancePolicySchema.optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const attendanceAssignmentListSchema = z.array(
+  attendanceAssignmentSchema,
+);
+
+export const attendanceRecordSchema = z
+  .object({
+    id: uuidSchema,
+    employeeId: uuidSchema,
+    policyId: uuidSchema,
+    attendanceDate: civilDateHttpSchema,
+    dayType: z.enum([
+      'WORKDAY',
+      'WEEKEND',
+      'PUBLIC_HOLIDAY',
+      'PAID_LEAVE',
+      'UNPAID_LEAVE',
+    ]),
+    source: z.enum(['MANUAL', 'IMPORT', 'CLOCK']),
+    clockInMinutes: z.number().int().nonnegative().nullable(),
+    clockOutMinutes: z.number().int().nonnegative().nullable(),
+    breakMinutes: nonNegativeIntegerSchema,
+    scheduledMinutes: nonNegativeIntegerSchema,
+    workedMinutes: nonNegativeIntegerSchema,
+    lateMinutes: nonNegativeIntegerSchema,
+    absenceMinutes: nonNegativeIntegerSchema,
+    overtime25Minutes: nonNegativeIntegerSchema,
+    overtime50Minutes: nonNegativeIntegerSchema,
+    overtime100Minutes: nonNegativeIntegerSchema,
+    anomalyCodes: z.array(nonBlankStringSchema),
+    status: z.enum(['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED']),
+    notes: nullableStringSchema,
+    rejectionReason: nullableStringSchema,
+    submittedAt: nullableInstantSchema,
+    approvedAt: nullableInstantSchema,
+    rejectedAt: nullableInstantSchema,
+    employee: erpEmployeeSchema.optional(),
+    policy: attendancePolicySchema.optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const attendanceRecordListSchema = z.array(attendanceRecordSchema);
+
+export const attendancePeriodSchema = z
+  .object({
+    id: uuidSchema,
+    employeeId: uuidSchema,
+    periodKey: nonBlankStringSchema,
+    periodStart: civilDateHttpSchema,
+    periodEnd: civilDateHttpSchema,
+    status: z.enum(['OPEN', 'APPROVED', 'LOCKED']),
+    scheduledMinutes: nonNegativeIntegerSchema,
+    workedMinutes: nonNegativeIntegerSchema,
+    lateMinutes: nonNegativeIntegerSchema,
+    absenceMinutes: nonNegativeIntegerSchema,
+    overtime25Minutes: nonNegativeIntegerSchema,
+    overtime50Minutes: nonNegativeIntegerSchema,
+    overtime100Minutes: nonNegativeIntegerSchema,
+    overtime25PayCents: centsSchema,
+    overtime50PayCents: centsSchema,
+    overtime100PayCents: centsSchema,
+    absenceDeductionCents: centsSchema,
+    lateDeductionCents: centsSchema,
+    recordCount: nonNegativeIntegerSchema,
+    anomalyCount: nonNegativeIntegerSchema,
+    unresolvedCount: nonNegativeIntegerSchema,
+    snapshot: z.unknown(),
+    approvedAt: nullableInstantSchema,
+    lockedAt: nullableInstantSchema,
+    employee: erpEmployeeSchema.optional(),
+    payslip: erpPayslipSchema.nullable().optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const attendancePeriodListSchema = z.array(attendancePeriodSchema);
+
+export const talentRecruitmentJobSchema = z
+  .object({
+    id: uuidSchema,
+    code: nonBlankStringSchema,
+    title: nonBlankStringSchema,
+    description: nullableStringSchema,
+    requirements: nullableStringSchema,
+    departmentId: uuidSchema.nullable(),
+    jobPositionId: uuidSchema.nullable(),
+    contractType: z.enum(['CDI', 'CDD', 'ANAPEC', 'INTERIM', 'STAGE']),
+    vacancies: nonNegativeIntegerSchema,
+    location: nullableStringSchema,
+    salaryMinCents: centsSchema.nullable(),
+    salaryMaxCents: centsSchema.nullable(),
+    status: z.enum(['DRAFT', 'OPEN', 'PAUSED', 'CLOSED', 'FILLED']),
+    publishedAt: nullableInstantSchema,
+    closedAt: nullableInstantSchema,
+    department: z
+      .object({
+        id: uuidSchema,
+        code: nonBlankStringSchema,
+        name: nonBlankStringSchema,
+      })
+      .passthrough()
+      .nullable()
+      .optional(),
+    jobPosition: z
+      .object({
+        id: uuidSchema,
+        code: nonBlankStringSchema,
+        title: nonBlankStringSchema,
+      })
+      .passthrough()
+      .nullable()
+      .optional(),
+    _count: z.object({ applications: nonNegativeIntegerSchema }).optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const talentRecruitmentJobListSchema = z.array(
+  talentRecruitmentJobSchema,
+);
+
+export const talentRecruitmentCandidateSchema = z
+  .object({
+    id: uuidSchema,
+    firstName: nonBlankStringSchema,
+    lastName: nonBlankStringSchema,
+    email: nonBlankStringSchema,
+    phone: nullableStringSchema,
+    city: nullableStringSchema,
+    currentTitle: nullableStringSchema,
+    source: nullableStringSchema,
+    cvUrl: nullableStringSchema,
+    consentAt: nullableInstantSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+
+export const talentRecruitmentInterviewSchema = z
+  .object({
+    id: uuidSchema,
+    applicationId: uuidSchema,
+    scheduledAt: instantSchema,
+    durationMinutes: nonNegativeIntegerSchema,
+    interviewType: nonBlankStringSchema,
+    location: nullableStringSchema,
+    interviewerTwentyUserId: nonBlankStringSchema,
+    status: z.enum(['SCHEDULED', 'COMPLETED', 'CANCELLED']),
+    score: z.number().int().min(0).max(100).nullable(),
+    feedback: nullableStringSchema,
+    completedAt: nullableInstantSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+
+export const talentRecruitmentApplicationSchema = z
+  .object({
+    id: uuidSchema,
+    jobId: uuidSchema,
+    candidateId: uuidSchema,
+    status: z.enum([
+      'NEW',
+      'SCREENING',
+      'SHORTLISTED',
+      'INTERVIEW',
+      'OFFER',
+      'HIRED',
+      'REJECTED',
+      'WITHDRAWN',
+    ]),
+    score: z.number().int().min(0).max(100).nullable(),
+    expectedSalaryCents: centsSchema.nullable(),
+    availableFrom: nullableCivilDateHttpSchema,
+    coverNote: nullableStringSchema,
+    rejectionReason: nullableStringSchema,
+    hiredEmployeeId: uuidSchema.nullable(),
+    hiredAt: nullableInstantSchema,
+    lastTransitionAt: instantSchema,
+    job: talentRecruitmentJobSchema,
+    candidate: talentRecruitmentCandidateSchema,
+    hiredEmployee: erpEmployeeSchema.nullable().optional(),
+    interviews: z.array(talentRecruitmentInterviewSchema).optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const talentRecruitmentApplicationListSchema = z.array(
+  talentRecruitmentApplicationSchema,
+);
+
+export const talentTrainingCourseSchema = z
+  .object({
+    id: uuidSchema,
+    code: nonBlankStringSchema,
+    title: nonBlankStringSchema,
+    description: nullableStringSchema,
+    category: nullableStringSchema,
+    provider: nullableStringSchema,
+    durationHours: nonNegativeIntegerSchema,
+    defaultCostCents: centsSchema,
+    isCertification: z.boolean(),
+    certificateValidityMonths: nonNegativeIntegerSchema.nullable(),
+    isActive: z.boolean(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const talentTrainingCourseListSchema = z.array(
+  talentTrainingCourseSchema,
+);
+
+const talentTrainingEnrollmentBaseSchema = z
+  .object({
+    id: uuidSchema,
+    sessionId: uuidSchema,
+    employeeId: uuidSchema,
+    status: z.enum([
+      'REGISTERED',
+      'ATTENDED',
+      'COMPLETED',
+      'FAILED',
+      'CANCELLED',
+    ]),
+    attendancePercent: z.number().int().min(0).max(100).nullable(),
+    score: z.number().int().min(0).max(100).nullable(),
+    completedAt: nullableInstantSchema,
+    certificateNumber: nullableStringSchema,
+    certificateIssuedAt: nullableCivilDateHttpSchema,
+    certificateExpiresAt: nullableCivilDateHttpSchema,
+    notes: nullableStringSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+
+const talentTrainingSessionBaseSchema = z
+  .object({
+    id: uuidSchema,
+    courseId: uuidSchema,
+    startDate: civilDateHttpSchema,
+    endDate: civilDateHttpSchema,
+    location: nullableStringSchema,
+    capacity: nonNegativeIntegerSchema.nullable(),
+    status: z.enum(['DRAFT', 'OPEN', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
+    trainerName: nullableStringSchema,
+    actualCostCents: centsSchema.nullable(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+
+export const talentTrainingEnrollmentSchema =
+  talentTrainingEnrollmentBaseSchema.extend({
+    employee: erpEmployeeSchema.optional(),
+    session: talentTrainingSessionBaseSchema
+      .extend({ course: talentTrainingCourseSchema })
+      .optional(),
+  });
+export const talentTrainingEnrollmentListSchema = z.array(
+  talentTrainingEnrollmentSchema,
+);
+
+export const talentTrainingSessionSchema =
+  talentTrainingSessionBaseSchema.extend({
+    course: talentTrainingCourseSchema,
+    enrollments: z
+      .array(
+        talentTrainingEnrollmentBaseSchema.extend({
+          employee: erpEmployeeSchema.optional(),
+        }),
+      )
+      .optional(),
+  });
+export const talentTrainingSessionListSchema = z.array(
+  talentTrainingSessionSchema,
+);
+
+export const talentSkillSchema = z
+  .object({
+    id: uuidSchema,
+    code: nonBlankStringSchema,
+    name: nonBlankStringSchema,
+    category: nullableStringSchema,
+    description: nullableStringSchema,
+    isActive: z.boolean(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const talentSkillListSchema = z.array(talentSkillSchema);
+
+export const talentEmployeeSkillSchema = z
+  .object({
+    id: uuidSchema,
+    employeeId: uuidSchema,
+    skillId: uuidSchema,
+    level: z.number().int().min(1).max(5),
+    targetLevel: z.number().int().min(1).max(5).nullable(),
+    acquiredAt: nullableCivilDateHttpSchema,
+    verifiedAt: nullableInstantSchema,
+    notes: nullableStringSchema,
+    employee: erpEmployeeSchema.optional(),
+    skill: talentSkillSchema.optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const talentEmployeeSkillListSchema = z.array(talentEmployeeSkillSchema);
+
+export const talentPerformanceCycleSchema = z
+  .object({
+    id: uuidSchema,
+    name: nonBlankStringSchema,
+    startDate: civilDateHttpSchema,
+    endDate: civilDateHttpSchema,
+    status: z.enum(['DRAFT', 'OPEN', 'CLOSED']),
+    instructions: nullableStringSchema,
+    _count: z.object({ reviews: nonNegativeIntegerSchema }).optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const talentPerformanceCycleListSchema = z.array(
+  talentPerformanceCycleSchema,
+);
+
+export const talentPerformanceReviewSchema = z
+  .object({
+    id: uuidSchema,
+    cycleId: uuidSchema,
+    employeeId: uuidSchema,
+    reviewerTwentyUserId: nonBlankStringSchema,
+    status: z.enum(['DRAFT', 'SELF_REVIEW', 'MANAGER_REVIEW', 'FINALIZED']),
+    objectives: z.unknown(),
+    selfScore: z.number().int().min(0).max(100).nullable(),
+    managerScore: z.number().int().min(0).max(100).nullable(),
+    finalScore: z.number().int().min(0).max(100).nullable(),
+    selfComments: nullableStringSchema,
+    managerComments: nullableStringSchema,
+    developmentPlan: nullableStringSchema,
+    submittedAt: nullableInstantSchema,
+    finalizedAt: nullableInstantSchema,
+    cycle: talentPerformanceCycleSchema,
+    employee: erpEmployeeSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const talentPerformanceReviewListSchema = z.array(
+  talentPerformanceReviewSchema,
+);
+
 export const erpLeaveRequestSchema = z
   .object({
     id: uuidSchema,
@@ -3218,6 +3728,160 @@ export const erpLeaveBalanceSchema = z
   })
   .passthrough();
 export const erpLeaveBalanceListSchema = z.array(erpLeaveBalanceSchema);
+
+export const employeePortalEmployeeSchema = z
+  .object({
+    id: uuidSchema,
+    employeeNumber: nonBlankStringSchema,
+    firstName: nonBlankStringSchema,
+    lastName: nonBlankStringSchema,
+    email: nullableStringSchema,
+    phone: nullableStringSchema,
+    address: nullableStringSchema.optional(),
+    jobTitle: nonBlankStringSchema,
+    department: nullableStringSchema,
+    contractType: z.enum(['CDI', 'CDD', 'ANAPEC', 'INTERIM', 'STAGE']),
+    status: z.enum(['ACTIVE', 'INACTIVE', 'TERMINATED']),
+    hireDate: civilDateHttpSchema,
+    terminationDate: nullableCivilDateHttpSchema,
+    baseSalaryCents: centsSchema.optional(),
+    privateProfile: z.unknown().optional(),
+    bankDetails: z
+      .array(
+        z
+          .object({
+            id: uuidSchema,
+            bankName: nonBlankStringSchema,
+            accountHolderName: nonBlankStringSchema,
+            ribLastFour: nonBlankStringSchema,
+            maskedRib: nonBlankStringSchema,
+            effectiveFrom: civilDateHttpSchema,
+            effectiveTo: nullableCivilDateHttpSchema,
+            isPrimary: z.boolean(),
+            verifiedAt: nullableInstantSchema,
+          })
+          .passthrough(),
+      )
+      .optional(),
+  })
+  .passthrough();
+export const employeePortalEmployeeListSchema = z.array(
+  employeePortalEmployeeSchema,
+);
+
+export const employeePortalRequestSchema = z
+  .object({
+    id: uuidSchema,
+    employeeId: uuidSchema,
+    type: z.enum([
+      'PROFILE_CHANGE',
+      'BANK_CHANGE',
+      'DOCUMENT_REQUEST',
+      'HR_SUPPORT',
+    ]),
+    status: z.enum([
+      'SUBMITTED',
+      'IN_REVIEW',
+      'APPROVED',
+      'REJECTED',
+      'CANCELLED',
+    ]),
+    subject: nonBlankStringSchema,
+    payload: z.record(z.string(), z.unknown()),
+    reviewerComment: nullableStringSchema,
+    reviewedAt: nullableInstantSchema,
+    cancelledAt: nullableInstantSchema,
+    employee: employeePortalEmployeeSchema.optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const employeePortalRequestListSchema = z.array(
+  employeePortalRequestSchema,
+);
+
+export const employeePortalDocumentSchema = z
+  .object({
+    id: uuidSchema,
+    employeeId: uuidSchema,
+    category: nonBlankStringSchema,
+    title: nonBlankStringSchema,
+    isRequired: z.boolean(),
+    versions: z.array(
+      z
+        .object({
+          id: uuidSchema,
+          version: positiveIntegerSchema,
+          filename: nonBlankStringSchema,
+          mimeType: nonBlankStringSchema,
+          sizeBytes: nonNegativeIntegerSchema,
+          issuedAt: nullableCivilDateHttpSchema,
+          expiresAt: nullableCivilDateHttpSchema,
+          createdAt: instantSchema,
+        })
+        .passthrough(),
+    ),
+  })
+  .passthrough();
+
+export const employeePortalDashboardSchema = z.object({
+  employee: employeePortalEmployeeSchema,
+  contract: z
+    .object({
+      id: uuidSchema,
+      contractNumber: nonBlankStringSchema,
+      contractType: z.enum(['CDI', 'CDD', 'ANAPEC', 'INTERIM', 'STAGE']),
+      status: z.enum(['DRAFT', 'ACTIVE', 'SUSPENDED', 'ENDED', 'CANCELLED']),
+      startDate: civilDateHttpSchema,
+      endDate: nullableCivilDateHttpSchema,
+      baseSalaryCents: centsSchema,
+      establishment: z.unknown().optional(),
+      department: z.unknown().optional(),
+      jobPosition: z.unknown().optional(),
+    })
+    .passthrough()
+    .nullable(),
+  leaveBalance: z.object({
+    year: nonNegativeIntegerSchema,
+    entitledDays: z.number().finite(),
+    carriedDays: z.number().finite(),
+    adjustmentDays: z.number().finite(),
+    consumedDays: z.number().finite(),
+    availableDays: z.number().finite(),
+  }),
+  payslips: erpPayslipListSchema,
+  leaves: erpLeaveRequestListSchema,
+  attendance: attendanceRecordListSchema,
+  documents: z.array(employeePortalDocumentSchema),
+  enrollments: talentTrainingEnrollmentListSchema,
+  skills: talentEmployeeSkillListSchema,
+  reviews: z.array(
+    z
+      .object({
+        id: uuidSchema,
+        cycleId: uuidSchema,
+        employeeId: uuidSchema,
+        status: z.enum(['DRAFT', 'SELF_REVIEW', 'MANAGER_REVIEW', 'FINALIZED']),
+        objectives: z.unknown(),
+        selfScore: z.number().int().min(0).max(100).nullable(),
+        managerScore: z.number().int().min(0).max(100).nullable(),
+        finalScore: z.number().int().min(0).max(100).nullable(),
+        selfComments: nullableStringSchema,
+        managerComments: nullableStringSchema,
+        developmentPlan: nullableStringSchema,
+        cycle: talentPerformanceCycleSchema,
+        createdAt: instantSchema,
+        updatedAt: instantSchema,
+      })
+      .passthrough(),
+  ),
+  requests: employeePortalRequestListSchema,
+});
+export const employeePortalFileSchema = z.object({
+  filename: nonBlankStringSchema,
+  contentType: nonBlankStringSchema,
+  contentBase64: nonBlankStringSchema,
+});
 export const erpEmployeeTerminationResultSchema = z.object({
   employee: erpEmployeeSchema,
   settlement: z.unknown(),
@@ -3430,30 +4094,183 @@ export const erpExchangeRateSchema = z
   .passthrough();
 export const erpExchangeRateListSchema = z.array(erpExchangeRateSchema);
 
-export const erpPortalAccessSchema = z
-  .object({
-    id: uuidSchema,
-    tierId: uuidSchema,
-    twentyUserId: nullableStringSchema,
-    email: nullableStringSchema,
-    tokenExpiresAt: nullableInstantSchema,
-    lastAuthenticatedAt: nullableInstantSchema,
-    status: z.enum(['ACTIVE', 'REVOKED']),
-    canViewInvoices: z.boolean(),
-    canViewDocuments: z.boolean(),
-    canSubmitDocuments: z.boolean(),
-    grantedAt: instantSchema,
-    revokedAt: nullableInstantSchema,
-    createdAt: instantSchema,
-    updatedAt: instantSchema,
-  })
-  .passthrough();
+export const erpPortalAccessSchema = z.object({
+  id: uuidSchema,
+  tierId: uuidSchema,
+  twentyUserId: nullableStringSchema,
+  email: nullableStringSchema,
+  tokenExpiresAt: nullableInstantSchema,
+  lastAuthenticatedAt: nullableInstantSchema,
+  status: z.enum(['ACTIVE', 'REVOKED']),
+  canViewInvoices: z.boolean(),
+  canViewDocuments: z.boolean(),
+  canSubmitDocuments: z.boolean(),
+  grantedAt: instantSchema,
+  revokedAt: nullableInstantSchema,
+  tier: z
+    .object({
+      id: uuidSchema,
+      name: nonBlankStringSchema,
+      email: nullableStringSchema,
+      phone: nullableStringSchema.optional(),
+    })
+    .optional(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
 export const erpPortalAccessListSchema = z.array(erpPortalAccessSchema);
 export const erpPortalAccessGrantSchema = z.object({
   access: erpPortalAccessSchema,
   token: nonBlankStringSchema,
   portalPath: nonBlankStringSchema,
   securityNotice: nonBlankStringSchema,
+});
+
+export const clientPortalSessionSchema = z.object({
+  company: z.object({
+    name: nonBlankStringSchema,
+    city: nullableStringSchema,
+  }),
+  customer: z.object({
+    id: uuidSchema,
+    name: nonBlankStringSchema,
+    email: nullableStringSchema,
+  }),
+  permissions: z.object({
+    canViewInvoices: z.boolean(),
+    canViewDocuments: z.boolean(),
+    canSubmitDocuments: z.boolean(),
+  }),
+  expiresAt: instantSchema,
+});
+
+export const clientPortalInvoiceSchema = z.object({
+  id: uuidSchema,
+  number: nullableStringSchema,
+  title: nonBlankStringSchema,
+  issueDate: civilDateHttpSchema,
+  dueDate: civilDateHttpSchema,
+  status: erpInvoiceStatusSchema,
+  currency: nonBlankStringSchema,
+  totalHtCents: centsSchema,
+  totalTvaCents: centsSchema,
+  totalTtcCents: centsSchema,
+  paymentCents: signedCentsSchema,
+  creditAppliedCents: centsSchema,
+  paidCents: signedCentsSchema,
+  outstandingCents: centsSchema,
+  isOverdue: z.boolean(),
+  pdfAvailable: z.boolean(),
+});
+export const clientPortalInvoiceListSchema = z.array(clientPortalInvoiceSchema);
+
+export const clientPortalPaymentSchema = z.object({
+  id: uuidSchema,
+  kind: erpPaymentKindSchema,
+  status: erpPaymentStatusSchema,
+  amountCents: centsSchema,
+  currency: nonBlankStringSchema,
+  paymentDate: civilDateHttpSchema,
+  method: erpPaymentMethodSchema,
+  reference: nullableStringSchema,
+  postedAt: nullableInstantSchema,
+  reversedAt: nullableInstantSchema,
+  createdAt: instantSchema,
+});
+export const clientPortalPaymentListSchema = z.array(clientPortalPaymentSchema);
+
+export const clientPortalCreditNoteSchema = z.object({
+  id: uuidSchema,
+  number: nullableStringSchema,
+  sourceInvoiceId: uuidSchema,
+  issueDate: civilDateHttpSchema,
+  currency: nonBlankStringSchema,
+  totalHtCents: centsSchema,
+  totalTvaCents: centsSchema,
+  totalTtcCents: centsSchema,
+  allocatedCents: centsSchema,
+  remainingCents: centsSchema,
+  status: erpCreditNoteStatusSchema,
+  createdAt: instantSchema,
+});
+export const clientPortalCreditNoteListSchema = z.array(
+  clientPortalCreditNoteSchema,
+);
+
+export const clientPortalCommentSchema = z.object({
+  id: uuidSchema,
+  body: nonBlankStringSchema,
+  isInternal: z.boolean(),
+  fromCustomer: z.boolean(),
+  createdAt: instantSchema,
+});
+
+export const clientPortalDocumentSchema = z.object({
+  id: uuidSchema,
+  filename: nonBlankStringSchema,
+  mimeType: nonBlankStringSchema,
+  sizeBytes: nonNegativeIntegerSchema,
+  title: nullableStringSchema,
+  uploadedByPortal: z.boolean(),
+  createdAt: instantSchema,
+});
+
+export const clientPortalRequestSchema = z.object({
+  id: uuidSchema,
+  tierId: uuidSchema,
+  type: z.enum(['DOCUMENT', 'INVOICE', 'ACCOUNTING', 'SUPPORT', 'OTHER']),
+  status: z.enum([
+    'OPEN',
+    'IN_PROGRESS',
+    'WAITING_CLIENT',
+    'RESOLVED',
+    'CLOSED',
+  ]),
+  subject: nonBlankStringSchema,
+  description: nonBlankStringSchema,
+  assignedToTwentyUserId: nullableStringSchema,
+  resolvedAt: nullableInstantSchema,
+  closedAt: nullableInstantSchema,
+  comments: z.array(clientPortalCommentSchema),
+  documents: z.array(clientPortalDocumentSchema),
+  tier: z
+    .object({
+      id: uuidSchema,
+      name: nonBlankStringSchema,
+      email: nullableStringSchema,
+      phone: nullableStringSchema,
+    })
+    .optional(),
+  portalAccess: z
+    .object({
+      id: uuidSchema,
+      email: nullableStringSchema,
+      status: z.enum(['ACTIVE', 'REVOKED']),
+      lastAuthenticatedAt: nullableInstantSchema,
+    })
+    .optional(),
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+});
+export const clientPortalRequestListSchema = z.array(clientPortalRequestSchema);
+
+export const clientPortalNotificationSchema = z.object({
+  id: uuidSchema,
+  requestId: nullableUuidSchema,
+  title: nonBlankStringSchema,
+  body: nonBlankStringSchema,
+  status: z.enum(['UNREAD', 'READ']),
+  readAt: nullableInstantSchema,
+  createdAt: instantSchema,
+});
+export const clientPortalNotificationListSchema = z.array(
+  clientPortalNotificationSchema,
+);
+
+export const clientPortalFileSchema = z.object({
+  filename: nonBlankStringSchema,
+  contentType: nonBlankStringSchema,
+  contentBase64: nonBlankStringSchema,
 });
 
 export const erpRegulatoryFileSchema = z
@@ -3709,6 +4526,7 @@ const encodeRouteId = (id: string): string => {
 export const erpMarocRouteIds = {
   context: 'context',
   onboardingAccountingBootstrap: 'onboarding.accounting-bootstrap',
+  onboardingComplete: 'onboarding.complete',
   onboardingConfiguration: 'onboarding.configuration',
   onboardingLegalProfile: 'onboarding.legal-profile',
   onboardingReadiness: 'onboarding.readiness',
@@ -3806,6 +4624,13 @@ export const erpMarocRouteIds = {
   accountingProvisionPost: 'accounting.provisions.post',
   accountingProvisionReverse: 'accounting.provisions.reverse',
   accountingProvisionCancel: 'accounting.provisions.cancel',
+  fixedAssetCategories: 'accounting.fixedAssets.categories',
+  fixedAssetCategoryDetail: 'accounting.fixedAssets.categoryDetail',
+  fixedAssetsCollection: 'accounting.fixedAssets.collection',
+  fixedAssetDetail: 'accounting.fixedAssets.detail',
+  fixedAssetActivate: 'accounting.fixedAssets.activate',
+  fixedAssetDepreciationPost: 'accounting.fixedAssets.depreciationPost',
+  fixedAssetDispose: 'accounting.fixedAssets.dispose',
   accountingReferences: 'accounting.references',
   accountingAccountsCollection: 'accounting.accounts.collection',
   accountingAccountDetail: 'accounting.accounts.detail',
@@ -3899,6 +4724,44 @@ export const erpMarocRouteIds = {
   payrollRegulatoryControls: 'payroll.regulatory.controls',
   payrollRegulatorySources: 'payroll.regulatory.sources',
   payrollRegulatorySeed: 'payroll.regulatory.seed',
+  attendancePolicies: 'attendance.policies',
+  attendancePolicyDetail: 'attendance.policy.detail',
+  attendanceAssignments: 'attendance.assignments',
+  attendanceRecords: 'attendance.records',
+  attendanceRecordSubmit: 'attendance.record.submit',
+  attendanceRecordDecision: 'attendance.record.decision',
+  attendancePeriods: 'attendance.periods',
+  attendancePeriodRecompute: 'attendance.period.recompute',
+  attendancePeriodApprove: 'attendance.period.approve',
+  talentRecruitmentJobs: 'talent.recruitment.jobs',
+  talentRecruitmentJobStatus: 'talent.recruitment.job.status',
+  talentRecruitmentApplications: 'talent.recruitment.applications',
+  talentRecruitmentApplicationStatus: 'talent.recruitment.application.status',
+  talentRecruitmentInterviews: 'talent.recruitment.interviews',
+  talentRecruitmentInterviewDetail: 'talent.recruitment.interview.detail',
+  talentRecruitmentHire: 'talent.recruitment.hire',
+  talentTrainingCourses: 'talent.training.courses',
+  talentTrainingSessions: 'talent.training.sessions',
+  talentTrainingSessionStatus: 'talent.training.session.status',
+  talentTrainingEnrollments: 'talent.training.enrollments',
+  talentTrainingEnrollmentDetail: 'talent.training.enrollment.detail',
+  talentSkills: 'talent.skills',
+  talentEmployeeSkills: 'talent.employee-skills',
+  talentPerformanceCycles: 'talent.performance.cycles',
+  talentPerformanceCycleStatus: 'talent.performance.cycle.status',
+  talentPerformanceReviews: 'talent.performance.reviews',
+  talentPerformanceReviewDetail: 'talent.performance.review.detail',
+  employeePortalEmployees: 'employee-portal.employees',
+  employeePortalDashboard: 'employee-portal.dashboard',
+  employeePortalLeaves: 'employee-portal.leaves',
+  employeePortalLeaveCancel: 'employee-portal.leave.cancel',
+  employeePortalRequests: 'employee-portal.requests',
+  employeePortalRequestCancel: 'employee-portal.request.cancel',
+  employeePortalPayslipPdf: 'employee-portal.payslip.pdf',
+  employeePortalAttestation: 'employee-portal.attestation',
+  employeePortalDocumentContent: 'employee-portal.document.content',
+  employeePortalAdminRequests: 'employee-portal.admin.requests',
+  employeePortalAdminRequestReview: 'employee-portal.admin.request.review',
   hrCoreSummary: 'hr-core.summary',
   hrAccessMe: 'hr-core.access.me',
   hrAccessAdministration: 'hr-core.access.administration',
@@ -4014,6 +4877,7 @@ export const erpMarocUpstreamRoutes = {
   context: '/context',
   onboarding: {
     accountingBootstrap: '/onboarding/accounting-bootstrap',
+    complete: '/onboarding/complete',
     configuration: '/onboarding/configuration',
     legalProfile: '/onboarding/legal-profile',
     readiness: '/onboarding/readiness',
@@ -4158,6 +5022,17 @@ export const erpMarocUpstreamRoutes = {
       `/accounting/provisions/${encodeRouteId(id)}/reverse`,
     cancelProvision: (id: string) =>
       `/accounting/provisions/${encodeRouteId(id)}/cancel`,
+    fixedAssetCategories: '/accounting/fixed-assets/categories',
+    fixedAssetCategory: (id: string) =>
+      `/accounting/fixed-assets/categories/${encodeRouteId(id)}`,
+    fixedAssets: '/accounting/fixed-assets',
+    fixedAsset: (id: string) => `/accounting/fixed-assets/${encodeRouteId(id)}`,
+    activateFixedAsset: (id: string) =>
+      `/accounting/fixed-assets/${encodeRouteId(id)}/activate`,
+    postFixedAssetDepreciation: (id: string) =>
+      `/accounting/fixed-assets/depreciations/${encodeRouteId(id)}/post`,
+    disposeFixedAsset: (id: string) =>
+      `/accounting/fixed-assets/${encodeRouteId(id)}/dispose`,
     references: '/accounting/references',
     accounts: '/accounting/references/accounts',
     account: (id: string) =>
@@ -4299,6 +5174,67 @@ export const erpMarocUpstreamRoutes = {
     regulatoryControls: '/payroll/regulatory/controls',
     regulatorySources: '/payroll/regulatory/sources',
     regulatorySeed: '/payroll/regulatory/seed/morocco-2026',
+  },
+  attendance: {
+    policies: '/attendance/policies',
+    policy: (id: string) => `/attendance/policies/${encodeRouteId(id)}`,
+    assignments: '/attendance/assignments',
+    records: '/attendance/records',
+    submitRecord: (id: string) =>
+      `/attendance/records/${encodeRouteId(id)}/submit`,
+    decideRecord: (id: string) =>
+      `/attendance/records/${encodeRouteId(id)}/decision`,
+    periods: '/attendance/periods',
+    recomputePeriod: '/attendance/periods/recompute',
+    approvePeriod: (id: string) =>
+      `/attendance/periods/${encodeRouteId(id)}/approve`,
+  },
+  talent: {
+    recruitmentJobs: '/talent/recruitment/jobs',
+    recruitmentJobStatus: (id: string) =>
+      `/talent/recruitment/jobs/${encodeRouteId(id)}/status`,
+    recruitmentApplications: '/talent/recruitment/applications',
+    recruitmentApplicationStatus: (id: string) =>
+      `/talent/recruitment/applications/${encodeRouteId(id)}/status`,
+    recruitmentInterviews: (id: string) =>
+      `/talent/recruitment/applications/${encodeRouteId(id)}/interviews`,
+    recruitmentInterview: (id: string) =>
+      `/talent/recruitment/interviews/${encodeRouteId(id)}`,
+    recruitmentHire: (id: string) =>
+      `/talent/recruitment/applications/${encodeRouteId(id)}/hire`,
+    trainingCourses: '/talent/training/courses',
+    trainingSessions: '/talent/training/sessions',
+    trainingSessionStatus: (id: string) =>
+      `/talent/training/sessions/${encodeRouteId(id)}/status`,
+    trainingEnrollments: '/talent/training/enrollments',
+    trainingEnrollment: (id: string) =>
+      `/talent/training/enrollments/${encodeRouteId(id)}`,
+    skills: '/talent/skills',
+    employeeSkills: '/talent/employee-skills',
+    performanceCycles: '/talent/performance/cycles',
+    performanceCycleStatus: (id: string) =>
+      `/talent/performance/cycles/${encodeRouteId(id)}/status`,
+    performanceReviews: '/talent/performance/reviews',
+    performanceReview: (id: string) =>
+      `/talent/performance/reviews/${encodeRouteId(id)}`,
+  },
+  employeePortal: {
+    employees: '/employee-portal/employees',
+    dashboard: '/employee-portal/dashboard',
+    leaves: '/employee-portal/leaves',
+    cancelLeave: (id: string) =>
+      `/employee-portal/leaves/${encodeRouteId(id)}/cancel`,
+    requests: '/employee-portal/requests',
+    cancelRequest: (id: string) =>
+      `/employee-portal/requests/${encodeRouteId(id)}/cancel`,
+    payslipPdf: (id: string) =>
+      `/employee-portal/payslips/${encodeRouteId(id)}/pdf`,
+    attestation: '/employee-portal/attestation',
+    documentContent: (id: string) =>
+      `/employee-portal/documents/${encodeRouteId(id)}/content`,
+    adminRequests: '/employee-portal/admin/requests',
+    adminRequest: (id: string) =>
+      `/employee-portal/admin/requests/${encodeRouteId(id)}`,
   },
   hrCore: {
     summary: '/hr-core/summary',
@@ -4605,6 +5541,16 @@ export type ErpAccountingProvision = z.infer<
 export type ErpAccountingProvisionList = z.infer<
   typeof erpAccountingProvisionListSchema
 >;
+export type ErpFixedAssetStatus = z.infer<typeof erpFixedAssetStatusSchema>;
+export type ErpFixedAssetCategory = z.infer<typeof erpFixedAssetCategorySchema>;
+export type ErpFixedAssetCategoryList = z.infer<
+  typeof erpFixedAssetCategoryListSchema
+>;
+export type ErpFixedAssetDepreciation = z.infer<
+  typeof erpFixedAssetDepreciationSchema
+>;
+export type ErpFixedAsset = z.infer<typeof erpFixedAssetSchema>;
+export type ErpFixedAssetList = z.infer<typeof erpFixedAssetListSchema>;
 export type ErpAccountingAccount = z.infer<typeof erpAccountingAccountSchema>;
 export type ErpAccountingJournal = z.infer<typeof erpAccountingJournalSchema>;
 export type ErpAccountingReferences = z.infer<
@@ -4704,6 +5650,43 @@ export type ErpRegulatorySubmission = z.infer<
 >;
 export type ErpEmployee = z.infer<typeof erpEmployeeSchema>;
 export type ErpPayslip = z.infer<typeof erpPayslipSchema>;
+export type AttendancePolicy = z.infer<typeof attendancePolicySchema>;
+export type AttendanceAssignment = z.infer<typeof attendanceAssignmentSchema>;
+export type AttendanceRecord = z.infer<typeof attendanceRecordSchema>;
+export type AttendancePeriod = z.infer<typeof attendancePeriodSchema>;
+export type TalentRecruitmentJob = z.infer<typeof talentRecruitmentJobSchema>;
+export type TalentRecruitmentCandidate = z.infer<
+  typeof talentRecruitmentCandidateSchema
+>;
+export type TalentRecruitmentInterview = z.infer<
+  typeof talentRecruitmentInterviewSchema
+>;
+export type TalentRecruitmentApplication = z.infer<
+  typeof talentRecruitmentApplicationSchema
+>;
+export type TalentTrainingCourse = z.infer<typeof talentTrainingCourseSchema>;
+export type TalentTrainingSession = z.infer<typeof talentTrainingSessionSchema>;
+export type TalentTrainingEnrollment = z.infer<
+  typeof talentTrainingEnrollmentSchema
+>;
+export type TalentSkill = z.infer<typeof talentSkillSchema>;
+export type TalentEmployeeSkill = z.infer<typeof talentEmployeeSkillSchema>;
+export type TalentPerformanceCycle = z.infer<
+  typeof talentPerformanceCycleSchema
+>;
+export type TalentPerformanceReview = z.infer<
+  typeof talentPerformanceReviewSchema
+>;
+export type EmployeePortalEmployee = z.infer<
+  typeof employeePortalEmployeeSchema
+>;
+export type EmployeePortalRequest = z.infer<typeof employeePortalRequestSchema>;
+export type EmployeePortalDocument = z.infer<
+  typeof employeePortalDocumentSchema
+>;
+export type EmployeePortalDashboard = z.infer<
+  typeof employeePortalDashboardSchema
+>;
 export type ErpLeaveRequest = z.infer<typeof erpLeaveRequestSchema>;
 export type ErpLeaveBalance = z.infer<typeof erpLeaveBalanceSchema>;
 export type ErpDocument = z.infer<typeof erpDocumentSchema>;
@@ -4715,6 +5698,18 @@ export type ErpBudget = z.infer<typeof erpBudgetSchema>;
 export type ErpRecurringInvoice = z.infer<typeof erpRecurringInvoiceSchema>;
 export type ErpExchangeRate = z.infer<typeof erpExchangeRateSchema>;
 export type ErpPortalAccess = z.infer<typeof erpPortalAccessSchema>;
+export type ClientPortalSession = z.infer<typeof clientPortalSessionSchema>;
+export type ClientPortalInvoice = z.infer<typeof clientPortalInvoiceSchema>;
+export type ClientPortalPayment = z.infer<typeof clientPortalPaymentSchema>;
+export type ClientPortalCreditNote = z.infer<
+  typeof clientPortalCreditNoteSchema
+>;
+export type ClientPortalComment = z.infer<typeof clientPortalCommentSchema>;
+export type ClientPortalDocument = z.infer<typeof clientPortalDocumentSchema>;
+export type ClientPortalRequest = z.infer<typeof clientPortalRequestSchema>;
+export type ClientPortalNotification = z.infer<
+  typeof clientPortalNotificationSchema
+>;
 export type ErpAccountingAnomaly = z.infer<typeof erpAccountingAnomalySchema>;
 export type ErpAiAccountingQueryId = z.infer<
   typeof erpAiAccountingQueryIdSchema

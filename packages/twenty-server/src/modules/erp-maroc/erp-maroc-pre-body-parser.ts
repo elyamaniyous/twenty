@@ -1,8 +1,10 @@
 import { json, type RequestHandler } from 'express';
 
 const ERP_MAROC_PREFIX = '/erp-maroc-api';
+const ERP_MAROC_PUBLIC_PORTAL_PREFIX = '/erp-maroc-public/portal';
 const ERP_MAROC_JSON_LIMIT = 1024 * 1024;
 const ERP_BANK_STATEMENT_JSON_LIMIT = 21 * 1024 * 1024;
+const ERP_PORTAL_DOCUMENT_JSON_LIMIT = 20 * 1024 * 1024;
 
 type ErpMarocEnabledConfig = Readonly<{
   get(key: 'ERP_MAROC_ENABLED'): boolean;
@@ -14,7 +16,9 @@ const isErpMarocRequest = (originalUrl: string): boolean => {
 
   return (
     normalizedPathname === ERP_MAROC_PREFIX ||
-    normalizedPathname.startsWith(`${ERP_MAROC_PREFIX}/`)
+    normalizedPathname.startsWith(`${ERP_MAROC_PREFIX}/`) ||
+    normalizedPathname === ERP_MAROC_PUBLIC_PORTAL_PREFIX ||
+    normalizedPathname.startsWith(`${ERP_MAROC_PUBLIC_PORTAL_PREFIX}/`)
   );
 };
 
@@ -24,6 +28,10 @@ export const createErpMarocPreBodyParser = (
   const strictJsonParser = json({ limit: ERP_MAROC_JSON_LIMIT, strict: true });
   const bankStatementParser = json({
     limit: ERP_BANK_STATEMENT_JSON_LIMIT,
+    strict: true,
+  });
+  const portalDocumentParser = json({
+    limit: ERP_PORTAL_DOCUMENT_JSON_LIMIT,
     strict: true,
   });
 
@@ -51,6 +59,16 @@ export const createErpMarocPreBodyParser = (
       pathname.toLowerCase() === `${ERP_MAROC_PREFIX}/bank-statements`
     ) {
       bankStatementParser(request, response, next);
+      return;
+    }
+    if (
+      request.method === 'POST' &&
+      new RegExp(
+        `^${ERP_MAROC_PUBLIC_PORTAL_PREFIX}/requests/[0-9a-f-]+/documents$`,
+        'i',
+      ).test(pathname)
+    ) {
+      portalDocumentParser(request, response, next);
       return;
     }
 

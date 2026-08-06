@@ -40,6 +40,18 @@ const ErpMarocProductsPage = lazy(() =>
   })),
 );
 
+const ErpInventoryPage = lazy(() =>
+  import('~/pages/erp-maroc/inventory/ErpInventoryPage').then((module) => ({
+    default: module.ErpInventoryPage,
+  })),
+);
+
+const ErpSalesOperationsPage = lazy(() =>
+  import('~/pages/erp-maroc/sales-orders/ErpSalesOperationsPage').then(
+    (module) => ({ default: module.ErpSalesOperationsPage }),
+  ),
+);
+
 const ErpMarocTiersPage = lazy(() =>
   import('~/pages/erp-maroc/tiers/ErpTiersPage').then((module) => ({
     default: module.ErpTiersPage,
@@ -198,6 +210,24 @@ const ErpPayrollRegulatoryPage = lazy(() =>
   })),
 );
 
+const ErpTimeAttendancePage = lazy(() =>
+  import('~/pages/erp-maroc/hr/ErpTimeAttendancePage').then((module) => ({
+    default: module.ErpTimeAttendancePage,
+  })),
+);
+
+const ErpTalentPage = lazy(() =>
+  import('~/pages/erp-maroc/hr/ErpTalentPage').then((module) => ({
+    default: module.ErpTalentPage,
+  })),
+);
+
+const ErpEmployeePortalPage = lazy(() =>
+  import('~/pages/erp-maroc/hr/ErpEmployeePortalPage').then((module) => ({
+    default: module.ErpEmployeePortalPage,
+  })),
+);
+
 const ErpHrCorePage = lazy(() =>
   import('~/pages/erp-maroc/hr/ErpHrCorePage').then((module) => ({
     default: module.ErpHrCorePage,
@@ -232,6 +262,12 @@ const ErpAccountingProvisionsPage = lazy(() =>
   import('~/pages/erp-maroc/accounting/ErpAccountingProvisionsPage').then(
     (module) => ({ default: module.ErpAccountingProvisionsPage }),
   ),
+);
+
+const ErpFixedAssetsPage = lazy(() =>
+  import('~/pages/erp-maroc/accounting/ErpFixedAssetsPage').then((module) => ({
+    default: module.ErpFixedAssetsPage,
+  })),
 );
 
 const ErpFiscalPage = lazy(() =>
@@ -280,6 +316,18 @@ const ErpAccountingCopilotPage = lazy(() =>
   import('~/pages/erp-maroc/accounting/ErpAccountingCopilotPage').then(
     (module) => ({ default: module.ErpAccountingCopilotPage }),
   ),
+);
+
+const ErpClientPortalAdminPage = lazy(() =>
+  import('~/pages/erp-maroc/portal/ErpClientPortalAdminPage').then(
+    (module) => ({ default: module.ErpClientPortalAdminPage }),
+  ),
+);
+
+const ClientPortalPage = lazy(() =>
+  import('~/pages/erp-maroc/portal/ClientPortalPage').then((module) => ({
+    default: module.ClientPortalPage,
+  })),
 );
 
 const RecordIndexPage = lazy(() =>
@@ -535,10 +583,34 @@ export const useCreateAppRouter = (
                 }
               />
               <Route
+                path={erpMarocPaths.inventory}
+                element={
+                  <LazyRoute>
+                    <ErpInventoryPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.salesOperations}
+                element={
+                  <LazyRoute>
+                    <ErpSalesOperationsPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
                 path={erpMarocPaths.tiers}
                 element={
                   <LazyRoute>
                     <ErpMarocTiersPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.clientPortal}
+                element={
+                  <LazyRoute>
+                    <ErpClientPortalAdminPage />
                   </LazyRoute>
                 }
               />
@@ -767,6 +839,30 @@ export const useCreateAppRouter = (
                 }
               />
               <Route
+                path={erpMarocPaths.timeAttendance}
+                element={
+                  <LazyRoute>
+                    <ErpTimeAttendancePage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.talent}
+                element={
+                  <LazyRoute>
+                    <ErpTalentPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.employeePortal}
+                element={
+                  <LazyRoute>
+                    <ErpEmployeePortalPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
                 path={erpMarocPaths.payrollRegulatory}
                 element={
                   <LazyRoute>
@@ -811,6 +907,14 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpAccountingProvisionsPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.fixedAssets}
+                element={
+                  <LazyRoute>
+                    <ErpFixedAssetsPage />
                   </LazyRoute>
                 }
               />
@@ -899,6 +1003,14 @@ export const useCreateAppRouter = (
           />
         </Route>
         <Route element={<BlankLayout />}>
+          <Route
+            path="/portal"
+            element={
+              <LazyRoute>
+                <ClientPortalPage />
+              </LazyRoute>
+            }
+          />
           <Route
             path={AppPath.Authorize}
             element={

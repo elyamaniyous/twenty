@@ -27,6 +27,9 @@ describe('ERP Maroc pre-body parser', () => {
     app.all(/^\/erp-maroc-api(?:\/.*)?$/i, (req, res) => {
       res.status(200).json({ body: req.body });
     });
+    app.all(/^\/erp-maroc-public\/portal(?:\/.*)?$/i, (req, res) => {
+      res.status(200).json({ body: req.body });
+    });
     app.use(
       (
         error: { status?: number },
@@ -76,6 +79,18 @@ describe('ERP Maroc pre-body parser', () => {
       .send({ filename: 'releve.pdf', contentBase64 })
       .expect(200)
       .expect({ body: { filename: 'releve.pdf', contentBase64 } });
+  });
+
+  it('accepts a client portal document over the standard 1 MiB limit', async () => {
+    const contentBase64 = 'A'.repeat(2 * MiB);
+
+    await request(createApp())
+      .post(
+        '/erp-maroc-public/portal/requests/11111111-1111-4111-8111-111111111111/documents',
+      )
+      .send({ filename: 'piece.pdf', contentBase64 })
+      .expect(200)
+      .expect({ body: { filename: 'piece.pdf', contentBase64 } });
   });
 
   it('parses an enabled body within the limit and the global parser skips it', async () => {

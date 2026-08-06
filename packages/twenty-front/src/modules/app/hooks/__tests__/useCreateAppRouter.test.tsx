@@ -49,6 +49,14 @@ jest.mock('~/pages/erp-maroc/products/ErpProductsPage', () => ({
   ErpProductsPage: () => <div>Task 12 products</div>,
 }));
 
+jest.mock('~/pages/erp-maroc/inventory/ErpInventoryPage', () => ({
+  ErpInventoryPage: () => <div>Phase 3 inventory</div>,
+}));
+
+jest.mock('~/pages/erp-maroc/sales-orders/ErpSalesOperationsPage', () => ({
+  ErpSalesOperationsPage: () => <div>Phase 3 sales operations</div>,
+}));
+
 jest.mock('~/pages/erp-maroc/tiers/ErpTiersPage', () => ({
   ErpTiersPage: () => <div>Task 12 tiers</div>,
 }));
@@ -329,6 +337,8 @@ describe('useCreateAppRouter ERP Maroc registration', () => {
 
   it.each([
     [erpMarocPaths.products, 'Task 12 products'],
+    [erpMarocPaths.inventory, 'Phase 3 inventory'],
+    [erpMarocPaths.salesOperations, 'Phase 3 sales operations'],
     [erpMarocPaths.tiers, 'Task 12 tiers'],
   ])('resolves %s to its Task 12 page module', async (path, expectedText) => {
     const { router, view } = renderEnabledErpRoute(

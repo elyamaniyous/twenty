@@ -19,6 +19,7 @@ import {
   IconNotes,
   IconPercentage,
   IconCoins,
+  IconClock,
   IconSettings,
   IconSparkles,
   IconUsers,
@@ -58,10 +59,22 @@ export const NavigationDrawerErpMarocSection = () => {
       Icon: IconBox,
     },
     {
+      label: t`Stocks`,
+      path: erpMarocPaths.inventory,
+      activePaths: [erpMarocPaths.inventory],
+      Icon: IconListDetails,
+    },
+    {
       label: t`Tiers`,
       path: erpMarocPaths.tiers,
       activePaths: [erpMarocPaths.tiers],
       Icon: IconUsers,
+    },
+    {
+      label: t`Portail clients`,
+      path: erpMarocPaths.clientPortal,
+      activePaths: [erpMarocPaths.clientPortal],
+      Icon: IconLink,
     },
     {
       label: t`Devis`,
@@ -73,6 +86,12 @@ export const NavigationDrawerErpMarocSection = () => {
         erpMarocPaths.quoteDetail,
       ],
       Icon: IconNotes,
+    },
+    {
+      label: t`Commandes et livraisons`,
+      path: erpMarocPaths.salesOperations,
+      activePaths: [erpMarocPaths.salesOperations],
+      Icon: IconListCheck,
     },
     {
       label: t`Factures`,
@@ -163,6 +182,24 @@ export const NavigationDrawerErpMarocSection = () => {
       Icon: IconUsers,
     },
     {
+      label: t`Temps & paie`,
+      path: erpMarocPaths.timeAttendance,
+      activePaths: [erpMarocPaths.timeAttendance],
+      Icon: IconClock,
+    },
+    {
+      label: t`Talents`,
+      path: erpMarocPaths.talent,
+      activePaths: [erpMarocPaths.talent],
+      Icon: IconUsers,
+    },
+    {
+      label: t`Mon espace`,
+      path: erpMarocPaths.employeePortal,
+      activePaths: [erpMarocPaths.employeePortal],
+      Icon: IconUsers,
+    },
+    {
       label: t`Référentiel paie`,
       path: erpMarocPaths.payrollRegulatory,
       activePaths: [erpMarocPaths.payrollRegulatory],
@@ -184,6 +221,12 @@ export const NavigationDrawerErpMarocSection = () => {
       path: erpMarocPaths.accountingProvisions,
       activePaths: [erpMarocPaths.accountingProvisions],
       Icon: IconFileText,
+    },
+    {
+      label: t`Immobilisations`,
+      path: erpMarocPaths.fixedAssets,
+      activePaths: [erpMarocPaths.fixedAssets],
+      Icon: IconCoins,
     },
     {
       label: t`Fiscalité`,

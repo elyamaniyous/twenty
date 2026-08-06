@@ -26,11 +26,15 @@ import {
   type ErpOnboardingNormalizedImportRow,
   type ErpOnboardingReadiness,
 } from 'twenty-shared/erp-maroc';
+import { SettingsPath } from 'twenty-shared/types';
+import { getSettingsPath } from 'twenty-shared/utils';
 import {
   IconCheck,
   IconDownload,
+  IconLock,
   IconRefresh,
   IconUpload,
+  IconUsers,
   IconX,
 } from 'twenty-ui/display';
 import { Button } from 'twenty-ui/input';
@@ -307,6 +311,36 @@ const StyledCheckTitle = styled.strong`
   font-size: ${themeCssVariables.font.size.sm};
   font-weight: ${themeCssVariables.font.weight.medium};
   letter-spacing: 0;
+`;
+
+const StyledLaunchPanel = styled.div`
+  align-items: center;
+  border-top: 1px solid ${themeCssVariables.border.color.light};
+  display: grid;
+  gap: ${themeCssVariables.spacing[3]};
+  grid-template-columns: minmax(220px, 1fr) minmax(320px, auto);
+  padding: ${themeCssVariables.spacing[3]} ${themeCssVariables.spacing[4]};
+
+  @media (max-width: 760px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const StyledLaunchCopy = styled.div`
+  display: grid;
+  gap: ${themeCssVariables.spacing[1]};
+`;
+
+const StyledLaunchActions = styled.div`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${themeCssVariables.spacing[2]};
+  justify-content: flex-end;
+
+  @media (max-width: 760px) {
+    justify-content: flex-start;
+  }
 `;
 
 const StyledConfigurationGrid = styled.div`
@@ -610,7 +644,7 @@ const normalizedSummary = (row: ErpOnboardingNormalizedImportRow | null) => {
 };
 
 export const ErpOnboardingPage = () => {
-  const { client } = useErpMarocContext();
+  const { client, context } = useErpMarocContext();
   const navigate = useNavigate();
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [readiness, setReadiness] = useState<ErpOnboardingReadiness | null>(
@@ -633,7 +667,7 @@ export const ErpOnboardingPage = () => {
   });
   const [exerciceStartMonth, setExerciceStartMonth] = useState('1');
   const [configBusy, setConfigBusy] = useState<
-    'LEGAL' | 'BANK' | 'WAREHOUSE' | 'ACCOUNTING' | null
+    'LEGAL' | 'BANK' | 'WAREHOUSE' | 'ACCOUNTING' | 'COMPLETE' | null
   >(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const [configSuccess, setConfigSuccess] = useState<string | null>(null);
@@ -824,6 +858,30 @@ export const ErpOnboardingPage = () => {
     }
   };
 
+  const completeOnboarding = async () => {
+    setConfigBusy('COMPLETE');
+    setConfigError(null);
+    setConfigSuccess(null);
+    try {
+      const intent = client.createMutationIntent(
+        {
+          method: 'POST',
+          path: '/onboarding/complete',
+          schema: erpOnboardingReadinessSchema,
+        },
+        { idempotency: 'required' },
+      );
+      setReadiness(await intent.execute());
+      setConfigSuccess('Mise en service Zowka finalisée.');
+    } catch {
+      setConfigError(
+        "La mise en service n'a pas été finalisée. Terminez les prérequis obligatoires ou vérifiez vos droits.",
+      );
+    } finally {
+      setConfigBusy(null);
+    }
+  };
+
   useEffect(() => {
     void loadReadiness();
   }, [loadReadiness]);
@@ -960,7 +1018,9 @@ export const ErpOnboardingPage = () => {
             <StyledReadinessCopy>
               <ErpStatusBadge
                 label={
-                  readiness.readyForOperations
+                  readiness.completion !== null
+                    ? 'Mise en service finalisée'
+                    : readiness.readyForOperations
                     ? 'Prête pour les opérations'
                     : `${readiness.blockingCount} prérequis bloquant${readiness.blockingCount > 1 ? 's' : ''}`
                 }
@@ -1340,6 +1400,86 @@ export const ErpOnboardingPage = () => {
                 );
               })}
             </StyledChecks>
+          </StyledSection>
+
+          <StyledSection id="activation">
+            <StyledSectionHeader>
+              <StyledSectionTitle>Démarrage de l’équipe</StyledSectionTitle>
+              <StyledSecondary>
+                Accès, salariés et activation opérationnelle
+              </StyledSecondary>
+            </StyledSectionHeader>
+            <StyledLaunchPanel>
+              <StyledLaunchCopy>
+                <ErpStatusBadge
+                  label={
+                    readiness.completion === null
+                      ? readiness.readyForOperations
+                        ? 'Activation disponible'
+                        : 'Prérequis en attente'
+                      : 'Activation terminée'
+                  }
+                  tone={
+                    readiness.completion !== null
+                      ? 'success'
+                      : readiness.readyForOperations
+                        ? 'warning'
+                        : 'neutral'
+                  }
+                />
+                <StyledSecondary>
+                  {readiness.completion === null
+                    ? `${readiness.blockingCount} prérequis bloquant${readiness.blockingCount > 1 ? 's' : ''}`
+                    : `Finalisée le ${new Intl.DateTimeFormat('fr-MA', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                      }).format(new Date(readiness.completion.completedAt))}`}
+                </StyledSecondary>
+              </StyledLaunchCopy>
+              <StyledLaunchActions>
+                <Button
+                  title="Salariés"
+                  ariaLabel="Ouvrir les salariés et leur import"
+                  Icon={IconUsers}
+                  variant="secondary"
+                  onClick={() => navigate(erpMarocPaths.hrCore)}
+                />
+                <Button
+                  title="Membres"
+                  ariaLabel="Inviter les membres de l’équipe"
+                  Icon={IconUsers}
+                  variant="secondary"
+                  onClick={() =>
+                    navigate(getSettingsPath(SettingsPath.WorkspaceMembersPage))
+                  }
+                />
+                <Button
+                  title="Rôles"
+                  ariaLabel="Configurer les rôles de l’équipe"
+                  Icon={IconLock}
+                  variant="secondary"
+                  onClick={() => navigate(getSettingsPath(SettingsPath.Roles))}
+                />
+                {context?.role === 'OWNER' || context?.role === 'ADMIN' ? (
+                  <Button
+                    title={
+                      readiness.completion === null
+                        ? 'Finaliser'
+                        : 'Finalisée'
+                    }
+                    ariaLabel="Finaliser la mise en service Zowka"
+                    Icon={IconCheck}
+                    accent="blue"
+                    disabled={
+                      configBusy !== null ||
+                      readiness.blockingCount > 0 ||
+                      readiness.completion !== null
+                    }
+                    onClick={() => void completeOnboarding()}
+                  />
+                ) : null}
+              </StyledLaunchActions>
+            </StyledLaunchPanel>
           </StyledSection>
 
           <StyledSection id="imports">
