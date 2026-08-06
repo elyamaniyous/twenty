@@ -12,14 +12,20 @@ import {
   clientPortalDocumentSchema,
   clientPortalFileSchema,
   clientPortalInvoiceListSchema,
+  clientPortalHistorySchema,
   clientPortalNotificationListSchema,
   clientPortalNotificationSchema,
+  clientPortalOtpRequestSchema,
+  clientPortalOtpVerificationSchema,
+  clientPortalPaymentCheckoutSchema,
   clientPortalPaymentListSchema,
   clientPortalRequestListSchema,
   clientPortalRequestSchema,
   clientPortalSessionSchema,
+  clientPortalSignatureSchema,
   type ClientPortalCreditNote,
   type ClientPortalInvoice,
+  type ClientPortalHistoryEvent,
   type ClientPortalNotification,
   type ClientPortalPayment,
   type ClientPortalRequest,
@@ -27,20 +33,25 @@ import {
 } from 'twenty-shared/erp-maroc';
 import {
   IconBell,
+  IconCreditCard,
   IconDownload,
   IconFileText,
   IconMessage,
+  IconPencil,
   IconRefresh,
   IconSend,
   IconUpload,
 } from 'twenty-ui/display';
 import { type z } from 'zod';
 
-type View = 'invoices' | 'payments' | 'requests' | 'notifications';
+type View = 'invoices' | 'payments' | 'requests' | 'notifications' | 'history';
 type LoadState = 'loading' | 'ready' | 'error' | 'unauthorized';
 
 const STORAGE_KEY = 'zowka-client-portal-token';
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{40,100}$/;
+
+const emailFromLocation = () =>
+  new URLSearchParams(window.location.search).get('email')?.trim() ?? '';
 
 const formatMoney = (cents: number, currency = 'MAD') =>
   new Intl.NumberFormat('fr-MA', { style: 'currency', currency }).format(
@@ -103,6 +114,22 @@ const requestPortal = async <TSchema extends z.ZodType>(
   return schema.parse(payload);
 };
 
+const requestPublicPortal = async <TSchema extends z.ZodType>(
+  path: string,
+  schema: TSchema,
+  body: unknown,
+): Promise<z.infer<TSchema>> => {
+  const response = await fetch(`/erp-maroc-public/portal${path}`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    credentials: 'omit',
+  });
+  const payload = (await response.json().catch(() => null)) as unknown;
+  if (!response.ok || payload === null) throw new Error('request-failed');
+  return schema.parse(payload);
+};
+
 const downloadBase64 = (file: {
   filename: string;
   contentType: string;
@@ -150,6 +177,26 @@ const statusLabel: Record<string, string> = {
   CANCELLED: 'Annulé',
   UNREAD: 'Nouveau',
   READ: 'Lu',
+};
+
+const historyLabel: Record<string, string> = {
+  INVITED: 'Accès invité',
+  INVITATION_SENT: 'Invitation envoyée',
+  OTP_REQUESTED: 'Code de connexion demandé',
+  OTP_VERIFIED: 'Connexion sécurisée réussie',
+  OTP_FAILED: 'Tentative de connexion refusée',
+  ACCESS_RENEWED: 'Accès renouvelé',
+  ACCESS_REVOKED: 'Accès révoqué',
+  REQUEST_CREATED: 'Demande créée',
+  COMMENT_ADDED: 'Message ajouté',
+  DOCUMENT_UPLOADED: 'Document déposé',
+  REQUEST_SIGNED: 'Document signé électroniquement',
+  PAYMENT_CHECKOUT_CREATED: 'Paiement en ligne initié',
+  NOTIFICATION_READ: 'Notification consultée',
+  RESPONSE_SENT: 'Réponse envoyée par votre interlocuteur',
+  REQUEST_STATUS_CHANGED: 'Statut de demande mis à jour',
+  EMAIL_NOTIFICATION_SENT: 'Notification envoyée par email',
+  EMAIL_NOTIFICATION_FAILED: 'Échec d’envoi d’une notification email',
 };
 
 const Shell = styled.div`
@@ -568,8 +615,19 @@ const Centered = styled.div`
   }
 `;
 
+const LoginForm = styled.form`
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  max-width: 380px;
+  width: 100%;
+`;
+
 export const ClientPortalPage = () => {
-  const [token] = useState(tokenFromLocation);
+  const [token, setToken] = useState(tokenFromLocation);
+  const [loginEmail, setLoginEmail] = useState(emailFromLocation);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpRequested, setOtpRequested] = useState(false);
   const [view, setView] = useState<View>('invoices');
   const [loadState, setLoadState] = useState<LoadState>(
     token ? 'loading' : 'unauthorized',
@@ -587,6 +645,7 @@ export const ClientPortalPage = () => {
   const [notifications, setNotifications] = useState<
     ClientPortalNotification[]
   >([]);
+  const [history, setHistory] = useState<ClientPortalHistoryEvent[]>([]);
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [requestForm, setRequestForm] = useState({
     type: 'SUPPORT',
@@ -594,6 +653,9 @@ export const ClientPortalPage = () => {
     description: '',
   });
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>(
+    {},
+  );
+  const [signatureNames, setSignatureNames] = useState<Record<string, string>>(
     {},
   );
 
@@ -612,6 +674,7 @@ export const ClientPortalPage = () => {
         nextCredits,
         nextRequests,
         nextNotifications,
+        nextHistory,
       ] = await Promise.all([
         currentSession.permissions.canViewInvoices
           ? requestPortal(token, '/invoices', clientPortalInvoiceListSchema)
@@ -632,6 +695,7 @@ export const ClientPortalPage = () => {
           '/notifications',
           clientPortalNotificationListSchema,
         ),
+        requestPortal(token, '/history', clientPortalHistorySchema),
       ]);
       setSession(currentSession);
       setInvoices(nextInvoices);
@@ -639,13 +703,13 @@ export const ClientPortalPage = () => {
       setCredits(nextCredits);
       setRequests(nextRequests);
       setNotifications(nextNotifications);
+      setHistory(nextHistory);
       setLoadState('ready');
     } catch (error) {
-      setLoadState(
-        error instanceof Error && error.message === 'unauthorized'
-          ? 'unauthorized'
-          : 'error',
-      );
+      if (error instanceof Error && error.message === 'unauthorized') {
+        setToken('');
+        setLoadState('unauthorized');
+      } else setLoadState('error');
     }
   }, [token]);
 
@@ -673,6 +737,20 @@ export const ClientPortalPage = () => {
       unread: notifications.filter(({ status }) => status === 'UNREAD').length,
     };
   }, [credits, invoices, notifications]);
+
+  const signedRequestIds = useMemo(
+    () =>
+      new Set(
+        history.flatMap((event) => {
+          if (event.type !== 'REQUEST_SIGNED' || !event.metadata) return [];
+          const metadata = event.metadata as Record<string, unknown>;
+          return typeof metadata.requestId === 'string'
+            ? [metadata.requestId]
+            : [];
+        }),
+      ),
+    [history],
+  );
 
   const mutate = async (
     operation: () => Promise<unknown>,
@@ -754,6 +832,50 @@ export const ClientPortalPage = () => {
     }, 'Document déposé.');
   };
 
+  const signRequest = (requestId: string) => {
+    const signerName = signatureNames[requestId]?.trim() ?? '';
+    if (!signerName) {
+      setNotice({
+        danger: true,
+        text: 'Indiquez le nom complet du signataire.',
+      });
+      return;
+    }
+    void mutate(
+      () =>
+        requestPortal(
+          token,
+          `/requests/${requestId}/signatures`,
+          clientPortalSignatureSchema,
+          {
+            method: 'POST',
+            body: { signerName, signatureMark: signerName, consent: true },
+          },
+        ),
+      'Signature électronique enregistrée et horodatée.',
+    );
+  };
+
+  const startPayment = async (invoiceId: string) => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const checkout = await requestPortal(
+        token,
+        `/invoices/${invoiceId}/payment-checkout`,
+        clientPortalPaymentCheckoutSchema,
+        { method: 'POST' },
+      );
+      window.location.assign(checkout.checkoutUrl);
+    } catch {
+      setNotice({
+        danger: true,
+        text: "Le paiement en ligne n'est pas encore configuré pour cet espace.",
+      });
+      setBusy(false);
+    }
+  };
+
   const download = async (path: string) => {
     setBusy(true);
     try {
@@ -780,13 +902,103 @@ export const ClientPortalPage = () => {
     );
   };
 
+  const requestOtp = (event: FormEvent) => {
+    event.preventDefault();
+    if (!loginEmail.trim()) return;
+    setBusy(true);
+    setNotice(null);
+    void requestPublicPortal(
+      '/auth/request-otp',
+      clientPortalOtpRequestSchema,
+      { email: loginEmail },
+    )
+      .then((result) => {
+        setOtpRequested(true);
+        setNotice({ danger: false, text: result.message });
+      })
+      .catch(() =>
+        setNotice({ danger: true, text: "Le code n'a pas pu être envoyé." }),
+      )
+      .finally(() => setBusy(false));
+  };
+
+  const verifyOtp = (event: FormEvent) => {
+    event.preventDefault();
+    if (!/^\d{6}$/.test(otpCode)) return;
+    setBusy(true);
+    setNotice(null);
+    void requestPublicPortal(
+      '/auth/verify-otp',
+      clientPortalOtpVerificationSchema,
+      { email: loginEmail, code: otpCode },
+    )
+      .then((result) => {
+        window.sessionStorage.setItem(STORAGE_KEY, result.token);
+        setToken(result.token);
+        setLoadState('loading');
+        setOtpCode('');
+      })
+      .catch(() =>
+        setNotice({ danger: true, text: 'Code invalide ou expiré.' }),
+      )
+      .finally(() => setBusy(false));
+  };
+
   if (loadState === 'unauthorized') {
     return (
       <Shell>
         <Centered>
           <Mark>Z</Mark>
-          <h1>Lien invalide ou expiré</h1>
-          <p>Demandez un nouveau lien sécurisé à votre interlocuteur Zowka.</p>
+          <h1>Connexion à votre espace</h1>
+          <p>
+            Recevez un code à usage unique sur l’adresse autorisée par votre
+            entreprise.
+          </p>
+          {notice && <Notice danger={notice.danger}>{notice.text}</Notice>}
+          {!otpRequested ? (
+            <LoginForm onSubmit={requestOtp}>
+              <Input
+                type="email"
+                autoComplete="email"
+                placeholder="vous@entreprise.ma"
+                value={loginEmail}
+                onChange={(event) => setLoginEmail(event.target.value)}
+                required
+              />
+              <PrimaryButton type="submit" disabled={busy}>
+                Recevoir mon code
+              </PrimaryButton>
+            </LoginForm>
+          ) : (
+            <LoginForm onSubmit={verifyOtp}>
+              <Input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                placeholder="Code à 6 chiffres"
+                value={otpCode}
+                onChange={(event) =>
+                  setOtpCode(event.target.value.replace(/\D/g, ''))
+                }
+                required
+              />
+              <PrimaryButton
+                type="submit"
+                disabled={busy || otpCode.length !== 6}
+              >
+                Se connecter
+              </PrimaryButton>
+              <SecondaryButton
+                type="button"
+                disabled={busy}
+                onClick={() => setOtpRequested(false)}
+              >
+                Changer d’adresse
+              </SecondaryButton>
+            </LoginForm>
+          )}
         </Centered>
       </Shell>
     );
@@ -869,6 +1081,7 @@ export const ClientPortalPage = () => {
               ['payments', 'Paiements et avoirs'],
               ['requests', 'Demandes'],
               ['notifications', 'Notifications'],
+              ['history', 'Historique'],
             ] as const
           ).map(([key, label]) => (
             <Tab
@@ -933,6 +1146,16 @@ export const ClientPortalPage = () => {
                         </strong>
                       </td>
                       <td data-align="right">
+                        {invoice.outstandingCents > 0 && (
+                          <IconButton
+                            type="button"
+                            title="Payer en ligne"
+                            disabled={busy}
+                            onClick={() => void startPayment(invoice.id)}
+                          >
+                            <IconCreditCard size={16} />
+                          </IconButton>
+                        )}
                         {invoice.pdfAvailable && (
                           <IconButton
                             type="button"
@@ -1187,6 +1410,31 @@ export const ClientPortalPage = () => {
                             />
                           </UploadLabel>
                         )}
+                        {!signedRequestIds.has(request.id) ? (
+                          <>
+                            <Input
+                              maxLength={180}
+                              placeholder="Nom complet du signataire"
+                              value={signatureNames[request.id] ?? ''}
+                              onChange={(event) =>
+                                setSignatureNames((current) => ({
+                                  ...current,
+                                  [request.id]: event.target.value,
+                                }))
+                              }
+                            />
+                            <IconButton
+                              type="button"
+                              disabled={busy}
+                              title="Signer électroniquement"
+                              onClick={() => signRequest(request.id)}
+                            >
+                              <IconPencil size={16} />
+                            </IconButton>
+                          </>
+                        ) : (
+                          <Status success>Signé électroniquement</Status>
+                        )}
                       </InlineForm>
                     )}
                   </Request>
@@ -1227,6 +1475,26 @@ export const ClientPortalPage = () => {
               ))
             ) : (
               <Empty>Aucune notification.</Empty>
+            ))}
+          {view === 'history' &&
+            (history.length ? (
+              <div>
+                {history.map((event) => (
+                  <Request key={event.id}>
+                    <RequestHeader>
+                      <div>
+                        <h3>
+                          {historyLabel[event.type] ??
+                            event.type.replaceAll('_', ' ')}
+                        </h3>
+                        <p>{formatDate(event.createdAt)}</p>
+                      </div>
+                    </RequestHeader>
+                  </Request>
+                ))}
+              </div>
+            ) : (
+              <Empty>Aucun événement enregistré.</Empty>
             ))}
         </Panel>
       </Main>

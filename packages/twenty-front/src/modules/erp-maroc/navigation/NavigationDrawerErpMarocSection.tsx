@@ -206,6 +206,12 @@ export const NavigationDrawerErpMarocSection = () => {
       Icon: IconSettings,
     },
     {
+      label: t`Pilotage RH`,
+      path: erpMarocPaths.hrOperations,
+      activePaths: [erpMarocPaths.hrOperations],
+      Icon: IconChartBar,
+    },
+    {
       label: t`Écritures`,
       path: erpMarocPaths.accountingEntries,
       activePaths: [

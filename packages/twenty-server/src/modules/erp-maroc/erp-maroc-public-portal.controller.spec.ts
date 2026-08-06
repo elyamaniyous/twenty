@@ -71,6 +71,35 @@ describe('ErpMarocPublicPortalController', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it('forwards OTP requests without requiring an existing session token', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ accepted: true, retryAfterSeconds: 60 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const response = new TestResponse();
+
+    await controller.requestOtp(
+      {
+        headers: { 'content-type': 'application/json' },
+        body: { email: 'client@example.com' },
+      } as never,
+      response as never,
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      new URL('http://erp-api:4000/portal-public/auth/request-otp'),
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.not.objectContaining({
+          Authorization: expect.anything(),
+        }),
+      }),
+    );
+  });
+
   it('rejects an unsafe resource identifier', async () => {
     const fetchSpy = jest.spyOn(global, 'fetch');
     const response = new TestResponse();
@@ -83,5 +112,49 @@ describe('ErpMarocPublicPortalController', () => {
 
     expect(response.statusCode).toBe(400);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('forwards payment checkout and electronic signature commands', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ accepted: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const authorization = `Bearer ${'a'.repeat(43)}`;
+    const id = '33333333-3333-4333-8333-333333333333';
+
+    await controller.paymentCheckout(
+      {
+        headers: { authorization, 'content-type': 'application/json' },
+        body: {},
+      } as never,
+      new TestResponse() as never,
+      id,
+    );
+    await controller.signature(
+      {
+        headers: { authorization, 'content-type': 'application/json' },
+        body: { signerName: 'Sara Benali', consent: true },
+      } as never,
+      new TestResponse() as never,
+      id,
+    );
+
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      1,
+      new URL(
+        `http://erp-api:4000/portal-public/invoices/${id}/payment-checkout`,
+      ),
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      2,
+      new URL(`http://erp-api:4000/portal-public/requests/${id}/signatures`),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ signerName: 'Sara Benali', consent: true }),
+      }),
+    );
   });
 });

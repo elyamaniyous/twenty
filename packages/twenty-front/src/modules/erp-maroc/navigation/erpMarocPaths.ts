@@ -38,6 +38,7 @@ export const erpMarocPaths = {
   talent: '/erp-maroc/hr/talent',
   employeePortal: '/erp-maroc/hr/employee-portal',
   payrollRegulatory: '/erp-maroc/hr/payroll-regulatory',
+  hrOperations: '/erp-maroc/hr/operations',
   accountingEntries: '/erp-maroc/accounting/entries',
   accountingEntryNew: '/erp-maroc/accounting/entries/new',
   accountingEntryEdit: '/erp-maroc/accounting/entries/:id/edit',

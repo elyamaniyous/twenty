@@ -373,11 +373,13 @@ export const ErpClientPortalAdminPage = () => {
       })
       .execute()
       .then(async (result) => {
-        const absoluteLink = `${window.location.origin}${result.portalPath}`;
-        setPortalLink(absoluteLink);
+        setPortalLink(result.portalPath);
         setNotice({
-          danger: false,
-          text: 'Accès créé. Le lien ne sera plus affiché après avoir quitté cette page.',
+          danger: result.invitation.status === 'FAILED',
+          text:
+            result.invitation.status === 'SENT'
+              ? 'Invitation envoyée par email. Le client se connectera avec un code OTP.'
+              : "Accès créé, mais l'email Brevo n'a pas été envoyé. Utilisez Renvoyer.",
         });
         setShowForm(false);
         await load();
@@ -464,7 +466,7 @@ export const ErpClientPortalAdminPage = () => {
         key: 'expires',
         header: 'Expiration',
         width: '130px',
-        render: ({ tokenExpiresAt }) => formatDate(tokenExpiresAt),
+        render: ({ accessExpiresAt }) => formatDate(accessExpiresAt),
       },
       {
         key: 'last',
@@ -488,10 +490,58 @@ export const ErpClientPortalAdminPage = () => {
       {
         key: 'actions',
         header: '',
-        width: '70px',
+        width: '150px',
         align: 'right',
-        render: (access) =>
-          access.status === 'ACTIVE' ? (
+        render: (access) => (
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+            {access.status !== 'REVOKED' && (
+              <Button
+                title="Renvoyer l’invitation"
+                ariaLabel="Renvoyer l’invitation"
+                Icon={IconRefresh}
+                variant="secondary"
+                disabled={busy}
+                onClick={() =>
+                  void mutate(
+                    () =>
+                      client
+                        .createMutationIntent({
+                          method: 'POST',
+                          path: `/operations/portal-access/${access.id}/resend`,
+                          schema: erpPortalAccessGrantSchema.shape.invitation,
+                          body: {},
+                        })
+                        .execute(),
+                    'Invitation renvoyée.',
+                  )
+                }
+              />
+            )}
+            <Button
+              title="Renouveler 30 jours"
+              ariaLabel="Renouveler 30 jours"
+              Icon={IconLink}
+              variant="secondary"
+              disabled={busy}
+              onClick={() =>
+                void mutate(
+                  () =>
+                    client
+                      .createMutationIntent({
+                        method: 'POST',
+                        path: `/operations/portal-access/${access.id}/renew`,
+                        schema: erpPortalAccessGrantSchema.pick({
+                          access: true,
+                          invitation: true,
+                        }),
+                        body: { expiresInDays: 30 },
+                      })
+                      .execute(),
+                  'Accès renouvelé pour 30 jours.',
+                )
+              }
+            />
+            {access.status !== 'REVOKED' && (
             <Button
               title="Révoquer"
               ariaLabel="Révoquer"
@@ -513,7 +563,9 @@ export const ErpClientPortalAdminPage = () => {
                 )
               }
             />
-          ) : null,
+            )}
+          </div>
+        ),
       },
     ],
     [busy, client, tiers],

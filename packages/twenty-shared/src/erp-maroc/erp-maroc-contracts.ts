@@ -3272,6 +3272,52 @@ export const erpPayslipLineSchema = z
     position: nonNegativeIntegerSchema,
   })
   .passthrough();
+
+export const erpPayrollDeductionSchema = z
+  .object({
+    id: uuidSchema,
+    employeeId: uuidSchema,
+    type: z.enum([
+      'LOAN',
+      'ADVANCE',
+      'MUTUAL_INSURANCE',
+      'SUPPLEMENTARY_RETIREMENT',
+      'GARNISHMENT',
+      'OTHER',
+    ]),
+    status: z.enum(['ACTIVE', 'SUSPENDED', 'SETTLED', 'CANCELLED']),
+    reference: nonBlankStringSchema,
+    label: nonBlankStringSchema,
+    creditor: nullableStringSchema,
+    principalCents: centsSchema,
+    remainingCents: centsSchema,
+    installmentCents: centsSchema,
+    priority: positiveIntegerSchema,
+    effectiveFrom: civilDateHttpSchema,
+    effectiveTo: nullableCivilDateHttpSchema,
+    settledAt: nullableInstantSchema,
+    cancelledAt: nullableInstantSchema,
+    employee: erpEmployeeSchema.optional(),
+    applications: z.array(z.unknown()).optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpPayrollDeductionListSchema = z.array(erpPayrollDeductionSchema);
+
+export const erpPayslipDeductionApplicationSchema = z
+  .object({
+    id: uuidSchema,
+    employeeId: uuidSchema,
+    payslipId: uuidSchema,
+    deductionId: uuidSchema,
+    amountCents: centsSchema,
+    appliedAt: instantSchema,
+    settledAt: nullableInstantSchema,
+    deduction: erpPayrollDeductionSchema.optional(),
+  })
+  .passthrough();
+
 export const erpPayslipSchema = z
   .object({
     id: uuidSchema,
@@ -3279,6 +3325,10 @@ export const erpPayslipSchema = z
     periodKey: nonBlankStringSchema,
     periodStart: civilDateHttpSchema,
     periodEnd: civilDateHttpSchema,
+    runType: z.enum(['REGULAR', 'OFF_CYCLE', 'RETROACTIVE']),
+    runSequence: positiveIntegerSchema,
+    effectiveChangeDate: nullableCivilDateHttpSchema,
+    correctionForPayslipId: nullableUuidSchema,
     status: z.enum(['DRAFT', 'VALIDATED', 'PAID', 'CANCELLED']),
     grossSalaryCents: centsSchema,
     cnssEmployeeCents: centsSchema,
@@ -3290,11 +3340,264 @@ export const erpPayslipSchema = z
     paidAt: nullableInstantSchema,
     employee: erpEmployeeSchema.optional(),
     lines: z.array(erpPayslipLineSchema).optional(),
+    deductionApplications: z
+      .array(erpPayslipDeductionApplicationSchema)
+      .optional(),
+    bankBatchLine: z.unknown().nullable().optional(),
     createdAt: instantSchema,
     updatedAt: instantSchema,
   })
   .passthrough();
 export const erpPayslipListSchema = z.array(erpPayslipSchema);
+
+export const erpPayrollBankLineSchema = z
+  .object({
+    id: uuidSchema,
+    batchId: uuidSchema,
+    employeeId: uuidSchema,
+    payslipId: uuidSchema,
+    beneficiaryName: nonBlankStringSchema,
+    beneficiaryRib: nonBlankStringSchema,
+    amountCents: centsSchema,
+    reference: nonBlankStringSchema,
+    status: z.enum(['PENDING', 'MATCHED', 'REJECTED']),
+    bankStatementLineId: nullableUuidSchema,
+    reconciledAt: nullableInstantSchema,
+    employee: erpEmployeeSchema.optional(),
+    payslip: erpPayslipSchema.optional(),
+    bankStatementLine: z.unknown().nullable().optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+
+export const erpPayrollBankBatchSchema = z
+  .object({
+    id: uuidSchema,
+    periodKey: nonBlankStringSchema,
+    batchNumber: nonBlankStringSchema,
+    status: z.enum([
+      'DRAFT',
+      'GENERATED',
+      'PARTIALLY_RECONCILED',
+      'RECONCILED',
+      'CANCELLED',
+    ]),
+    executionDate: civilDateHttpSchema,
+    debitAccountRib: nonBlankStringSchema,
+    totalAmountCents: centsSchema,
+    currency: nonBlankStringSchema,
+    format: nonBlankStringSchema,
+    payloadSha256: nullableStringSchema,
+    generatedAt: nullableInstantSchema,
+    lines: z.array(erpPayrollBankLineSchema).optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpPayrollBankBatchListSchema = z.array(erpPayrollBankBatchSchema);
+
+export const erpPayrollBankFileSchema = z.object({
+  filename: nonBlankStringSchema,
+  contentType: nonBlankStringSchema,
+  contentBase64: nonBlankStringSchema,
+  payloadSha256: nonBlankStringSchema,
+  format: nonBlankStringSchema,
+  bankAcceptanceStatus: z.literal('TO_BE_CONFIRMED'),
+  lines: nonNegativeIntegerSchema,
+  totalAmountCents: centsSchema,
+});
+
+export const erpPayrollIrExportSchema = z.object({
+  submissionId: uuidSchema,
+  filename: nonBlankStringSchema,
+  contentType: nonBlankStringSchema,
+  contentBase64: nonBlankStringSchema,
+  payloadSha256: nonBlankStringSchema,
+  validation: z.object({
+    valid: z.boolean(),
+    employeeCount: nonNegativeIntegerSchema,
+    totalIrCents: centsSchema,
+    errors: z.array(z.unknown()),
+    externalAcceptanceRequired: z.literal(true),
+  }),
+});
+
+export const erpPayrollBankCandidateListSchema = z.array(
+  z
+    .object({
+      id: uuidSchema,
+      transactionDate: civilDateHttpSchema,
+      description: nonBlankStringSchema,
+      reference: nullableStringSchema,
+      debitCents: centsSchema,
+      scoreBasisPoints: nonNegativeIntegerSchema,
+      reasons: z.array(nonBlankStringSchema),
+    })
+    .passthrough(),
+);
+
+export const erpWorkforceBudgetLineSchema = z
+  .object({
+    id: uuidSchema,
+    budgetId: uuidSchema,
+    department: nonBlankStringSchema,
+    month: positiveIntegerSchema,
+    plannedHeadcount: nonNegativeIntegerSchema,
+    plannedGrossCents: centsSchema,
+    plannedEmployerCostCents: centsSchema,
+    plannedRecruitments: nonNegativeIntegerSchema,
+    notes: nullableStringSchema,
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+
+export const erpWorkforceBudgetSchema = z
+  .object({
+    id: uuidSchema,
+    year: positiveIntegerSchema,
+    name: nonBlankStringSchema,
+    status: z.enum(['DRAFT', 'APPROVED', 'CLOSED']),
+    approvedAt: nullableInstantSchema,
+    lines: z.array(erpWorkforceBudgetLineSchema).optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpWorkforceBudgetListSchema = z.array(erpWorkforceBudgetSchema);
+export const erpWorkforceBudgetVarianceSchema = z.object({
+  budget: erpWorkforceBudgetSchema,
+  rows: z.array(
+    erpWorkforceBudgetLineSchema.extend({
+      actualHeadcount: nonNegativeIntegerSchema,
+      actualGrossCents: centsSchema,
+      actualEmployerCostCents: centsSchema,
+      actualRecruitments: nonNegativeIntegerSchema,
+      headcountVariance: signedCentsSchema,
+      grossVarianceCents: signedCentsSchema,
+      employerCostVarianceCents: signedCentsSchema,
+      recruitmentVariance: signedCentsSchema,
+    }),
+  ),
+});
+
+export const erpHrAnalyticsSchema = z.object({
+  period: z.object({ from: instantSchema, to: instantSchema }),
+  workforce: z.object({
+    averageHeadcountApproximation: nonNegativeIntegerSchema,
+    hires: nonNegativeIntegerSchema,
+    departures: nonNegativeIntegerSchema,
+    turnoverBasisPoints: nonNegativeIntegerSchema,
+  }),
+  attendance: z.object({
+    records: nonNegativeIntegerSchema,
+    scheduledMinutes: nonNegativeIntegerSchema,
+    absenceMinutes: nonNegativeIntegerSchema,
+    lateMinutes: nonNegativeIntegerSchema,
+    absenteeismBasisPoints: nonNegativeIntegerSchema,
+  }),
+  recruitment: z.object({
+    applications: nonNegativeIntegerSchema,
+    hires: nonNegativeIntegerSchema,
+    conversionBasisPoints: nonNegativeIntegerSchema,
+    byStatus: z.array(z.unknown()),
+  }),
+  training: z.object({
+    enrollments: nonNegativeIntegerSchema,
+    completed: nonNegativeIntegerSchema,
+    completionBasisPoints: nonNegativeIntegerSchema,
+    byStatus: z.array(z.unknown()),
+  }),
+  payroll: z.object({
+    payslips: nonNegativeIntegerSchema,
+    grossSalaryCents: centsSchema,
+    employerCostCents: centsSchema,
+  }),
+});
+
+export const erpTimeClockSyncRunSchema = z
+  .object({
+    id: uuidSchema,
+    status: z.enum(['RUNNING', 'COMPLETED', 'PARTIAL', 'FAILED']),
+    receivedCount: nonNegativeIntegerSchema,
+    importedCount: nonNegativeIntegerSchema,
+    rejectedCount: nonNegativeIntegerSchema,
+    startedAt: instantSchema.optional(),
+    completedAt: nullableInstantSchema.optional(),
+    errors: z.array(z.unknown()).optional(),
+  })
+  .passthrough();
+
+export const erpTimeClockConnectorSchema = z
+  .object({
+    id: uuidSchema,
+    name: nonBlankStringSchema,
+    type: z.enum(['CSV_WEBHOOK', 'REST_API']),
+    status: z.enum(['ACTIVE', 'PAUSED', 'ERROR']),
+    externalSystem: nonBlankStringSchema,
+    endpointUrl: nullableStringSchema,
+    credentialReference: nullableStringSchema,
+    settings: z.unknown(),
+    lastSyncAt: nullableInstantSchema,
+    lastError: nullableStringSchema,
+    syncRuns: z.array(erpTimeClockSyncRunSchema).optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpTimeClockConnectorListSchema = z.array(
+  erpTimeClockConnectorSchema,
+);
+
+export const erpHrCampaignRecipientSchema = z
+  .object({
+    id: uuidSchema,
+    employeeId: uuidSchema,
+    email: nonBlankStringSchema,
+    status: z.enum(['PENDING', 'SENT', 'ACKNOWLEDGED', 'FAILED']),
+    providerMessageId: nullableStringSchema,
+    sentAt: nullableInstantSchema,
+    acknowledgedAt: nullableInstantSchema,
+    error: nullableStringSchema,
+    employee: erpEmployeeSchema.optional(),
+  })
+  .passthrough();
+
+export const erpHrCampaignSchema = z
+  .object({
+    id: uuidSchema,
+    name: nonBlankStringSchema,
+    subject: nonBlankStringSchema,
+    message: nonBlankStringSchema,
+    audience: z.enum(['ALL', 'ACTIVE_EMPLOYEES', 'DEPARTMENT', 'CUSTOM']),
+    audienceFilter: z.unknown(),
+    status: z.enum(['DRAFT', 'SCHEDULED', 'RUNNING', 'COMPLETED', 'CANCELLED']),
+    scheduledAt: nullableInstantSchema,
+    launchedAt: nullableInstantSchema,
+    completedAt: nullableInstantSchema,
+    recipients: z.array(erpHrCampaignRecipientSchema).optional(),
+    createdAt: instantSchema,
+    updatedAt: instantSchema,
+  })
+  .passthrough();
+export const erpHrCampaignListSchema = z.array(erpHrCampaignSchema);
+
+export const erpHrAlertPreviewSchema = z.object({
+  days: positiveIntegerSchema,
+  from: instantSchema,
+  to: instantSchema,
+  documents: z.array(z.unknown()),
+  certifications: z.array(z.unknown()),
+});
+export const erpHrAlertRunSchema = z.union([
+  erpHrCampaignSchema,
+  z.object({
+    status: z.enum(['NO_ALERT', 'ALREADY_RUN']),
+    recipients: nonNegativeIntegerSchema.optional(),
+    campaignId: uuidSchema.optional(),
+  }),
+]);
 
 export const attendancePolicySchema = z
   .object({
@@ -4100,12 +4403,15 @@ export const erpPortalAccessSchema = z.object({
   twentyUserId: nullableStringSchema,
   email: nullableStringSchema,
   tokenExpiresAt: nullableInstantSchema,
+  accessExpiresAt: nullableInstantSchema,
   lastAuthenticatedAt: nullableInstantSchema,
-  status: z.enum(['ACTIVE', 'REVOKED']),
+  status: z.enum(['PENDING', 'ACTIVE', 'EXPIRED', 'REVOKED']),
   canViewInvoices: z.boolean(),
   canViewDocuments: z.boolean(),
   canSubmitDocuments: z.boolean(),
   grantedAt: instantSchema,
+  invitationSentAt: nullableInstantSchema,
+  renewedAt: nullableInstantSchema,
   revokedAt: nullableInstantSchema,
   tier: z
     .object({
@@ -4121,9 +4427,57 @@ export const erpPortalAccessSchema = z.object({
 export const erpPortalAccessListSchema = z.array(erpPortalAccessSchema);
 export const erpPortalAccessGrantSchema = z.object({
   access: erpPortalAccessSchema,
-  token: nonBlankStringSchema,
   portalPath: nonBlankStringSchema,
+  invitation: z
+    .object({
+      status: z.enum(['SENT', 'FAILED']),
+      sentAt: instantSchema.optional(),
+      providerMessageId: nullableStringSchema.optional(),
+      error: nonBlankStringSchema.optional(),
+    })
+    .passthrough(),
   securityNotice: nonBlankStringSchema,
+});
+export const erpPortalInvitationSchema =
+  erpPortalAccessGrantSchema.shape.invitation;
+export const erpPortalAccessRenewSchema = erpPortalAccessGrantSchema.pick({
+  access: true,
+  invitation: true,
+});
+export const erpPortalAccessHistorySchema = z.object({
+  events: z.array(
+    z.object({
+      id: uuidSchema,
+      type: nonBlankStringSchema,
+      actorTwentyUserId: nullableStringSchema,
+      metadata: z.unknown(),
+      createdAt: instantSchema,
+    }),
+  ),
+  deliveries: z.array(
+    z.object({
+      id: uuidSchema,
+      kind: nonBlankStringSchema,
+      status: z.enum(['PENDING', 'SENT', 'FAILED']),
+      recipient: nonBlankStringSchema,
+      providerMessageId: nullableStringSchema,
+      error: nullableStringSchema,
+      sentAt: nullableInstantSchema,
+      createdAt: instantSchema,
+      updatedAt: instantSchema,
+    }),
+  ),
+});
+
+export const clientPortalOtpRequestSchema = z.object({
+  accepted: z.literal(true),
+  message: nonBlankStringSchema,
+  retryAfterSeconds: nonNegativeIntegerSchema,
+});
+
+export const clientPortalOtpVerificationSchema = z.object({
+  token: nonBlankStringSchema,
+  expiresAt: instantSchema,
 });
 
 export const clientPortalSessionSchema = z.object({
@@ -4142,6 +4496,7 @@ export const clientPortalSessionSchema = z.object({
     canSubmitDocuments: z.boolean(),
   }),
   expiresAt: instantSchema,
+  accessExpiresAt: nullableInstantSchema,
 });
 
 export const clientPortalInvoiceSchema = z.object({
@@ -4178,6 +4533,16 @@ export const clientPortalPaymentSchema = z.object({
   createdAt: instantSchema,
 });
 export const clientPortalPaymentListSchema = z.array(clientPortalPaymentSchema);
+
+export const clientPortalPaymentCheckoutSchema = z.object({
+  checkoutId: uuidSchema,
+  invoiceId: uuidSchema,
+  checkoutUrl: z.string().url(),
+  amountCents: centsSchema,
+  currency: nonBlankStringSchema,
+  expiresAt: instantSchema,
+  accountingStatus: z.literal('PENDING_BANK_RECONCILIATION'),
+});
 
 export const clientPortalCreditNoteSchema = z.object({
   id: uuidSchema,
@@ -4245,7 +4610,7 @@ export const clientPortalRequestSchema = z.object({
     .object({
       id: uuidSchema,
       email: nullableStringSchema,
-      status: z.enum(['ACTIVE', 'REVOKED']),
+      status: z.enum(['PENDING', 'ACTIVE', 'EXPIRED', 'REVOKED']),
       lastAuthenticatedAt: nullableInstantSchema,
     })
     .optional(),
@@ -4253,6 +4618,16 @@ export const clientPortalRequestSchema = z.object({
   updatedAt: instantSchema,
 });
 export const clientPortalRequestListSchema = z.array(clientPortalRequestSchema);
+
+export const clientPortalSignatureSchema = z.object({
+  id: uuidSchema,
+  requestId: uuidSchema,
+  signerName: nonBlankStringSchema,
+  signerEmail: nullableStringSchema,
+  consentText: nonBlankStringSchema,
+  signedPayloadSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  signedAt: instantSchema,
+});
 
 export const clientPortalNotificationSchema = z.object({
   id: uuidSchema,
@@ -4265,6 +4640,16 @@ export const clientPortalNotificationSchema = z.object({
 });
 export const clientPortalNotificationListSchema = z.array(
   clientPortalNotificationSchema,
+);
+
+export const clientPortalHistoryEventSchema = z.object({
+  id: uuidSchema,
+  type: nonBlankStringSchema,
+  metadata: z.unknown(),
+  createdAt: instantSchema,
+});
+export const clientPortalHistorySchema = z.array(
+  clientPortalHistoryEventSchema,
 );
 
 export const clientPortalFileSchema = z.object({
@@ -4718,6 +5103,24 @@ export const erpMarocRouteIds = {
   payrollEmployeeAttestation: 'payroll.employee.attestation',
   payrollFinalSettlementPdf: 'payroll.employee.final-settlement.pdf',
   payrollStatementPdf: 'payroll.statement.pdf',
+  payrollDeductions: 'payroll-operations.deductions',
+  payrollDeductionDetail: 'payroll-operations.deduction.detail',
+  payrollBankBatches: 'payroll-operations.bank-batches',
+  payrollBankBatchGenerate: 'payroll-operations.bank-batch.generate',
+  payrollBankLineCandidates: 'payroll-operations.bank-line.candidates',
+  payrollBankLineReconcile: 'payroll-operations.bank-line.reconcile',
+  payrollIrExport: 'payroll-operations.ir.export',
+  hrWorkforceBudgets: 'hr-operations.budgets',
+  hrWorkforceBudgetLines: 'hr-operations.budget.lines',
+  hrWorkforceBudgetApprove: 'hr-operations.budget.approve',
+  hrWorkforceBudgetVariance: 'hr-operations.budget.variance',
+  hrAnalytics: 'hr-operations.analytics',
+  hrTimeClockConnectors: 'hr-operations.time-clock-connectors',
+  hrTimeClockSync: 'hr-operations.time-clock.sync',
+  hrCampaigns: 'hr-operations.campaigns',
+  hrCampaignLaunch: 'hr-operations.campaign.launch',
+  hrAlertsPreview: 'hr-operations.alerts.preview',
+  hrAlertsRun: 'hr-operations.alerts.run',
   payrollRegulatorySummary: 'payroll.regulatory.summary',
   payrollRegulatoryRules: 'payroll.regulatory.rules',
   payrollRegulatoryComponents: 'payroll.regulatory.components',
@@ -4827,6 +5230,9 @@ export const erpMarocRouteIds = {
   exchangeRates: 'operations.exchange-rates',
   portalAccess: 'operations.portal-access',
   portalAccessRevoke: 'operations.portal-access.revoke',
+  portalAccessResend: 'operations.portal-access.resend',
+  portalAccessRenew: 'operations.portal-access.renew',
+  portalAccessHistory: 'operations.portal-access.history',
   accountingAnomalies: 'operations.anomalies',
   accountingAnomaliesScan: 'operations.anomalies.scan',
   accountingAnomalyResolve: 'operations.anomaly.resolve',
@@ -5175,6 +5581,37 @@ export const erpMarocUpstreamRoutes = {
     regulatorySources: '/payroll/regulatory/sources',
     regulatorySeed: '/payroll/regulatory/seed/morocco-2026',
   },
+  payrollOperations: {
+    deductions: '/payroll-operations/deductions',
+    deduction: (id: string) =>
+      `/payroll-operations/deductions/${encodeRouteId(id)}`,
+    bankBatches: '/payroll-operations/bank-batches',
+    generateBankBatch: (id: string) =>
+      `/payroll-operations/bank-batches/${encodeRouteId(id)}/generate`,
+    bankLineCandidates: (id: string) =>
+      `/payroll-operations/bank-lines/${encodeRouteId(id)}/reconciliation-candidates`,
+    reconcileBankLine: (id: string) =>
+      `/payroll-operations/bank-lines/${encodeRouteId(id)}/reconcile`,
+    irExport: '/payroll-operations/ir/export',
+  },
+  hrOperations: {
+    budgets: '/hr-operations/budgets',
+    budgetLines: (id: string) =>
+      `/hr-operations/budgets/${encodeRouteId(id)}/lines`,
+    approveBudget: (id: string) =>
+      `/hr-operations/budgets/${encodeRouteId(id)}/approve`,
+    budgetVariance: (id: string) =>
+      `/hr-operations/budgets/${encodeRouteId(id)}/variance`,
+    analytics: '/hr-operations/analytics',
+    timeClockConnectors: '/hr-operations/time-clock-connectors',
+    syncTimeClock: (id: string) =>
+      `/hr-operations/time-clock-connectors/${encodeRouteId(id)}/sync`,
+    campaigns: '/hr-operations/campaigns',
+    launchCampaign: (id: string) =>
+      `/hr-operations/campaigns/${encodeRouteId(id)}/launch`,
+    alertsPreview: '/hr-operations/alerts/preview',
+    alertsRun: '/hr-operations/alerts/run',
+  },
   attendance: {
     policies: '/attendance/policies',
     policy: (id: string) => `/attendance/policies/${encodeRouteId(id)}`,
@@ -5332,6 +5769,12 @@ export const erpMarocUpstreamRoutes = {
     portalAccess: '/operations/portal-access',
     revokePortalAccess: (id: string) =>
       `/operations/portal-access/${encodeRouteId(id)}/revoke`,
+    resendPortalInvitation: (id: string) =>
+      `/operations/portal-access/${encodeRouteId(id)}/resend`,
+    renewPortalAccess: (id: string) =>
+      `/operations/portal-access/${encodeRouteId(id)}/renew`,
+    portalAccessHistory: (id: string) =>
+      `/operations/portal-access/${encodeRouteId(id)}/history`,
     anomalies: '/operations/anomalies',
     treasuryForecast: '/operations/treasury-forecast',
     scanAnomalies: '/operations/anomalies/scan',
@@ -5650,6 +6093,16 @@ export type ErpRegulatorySubmission = z.infer<
 >;
 export type ErpEmployee = z.infer<typeof erpEmployeeSchema>;
 export type ErpPayslip = z.infer<typeof erpPayslipSchema>;
+export type ErpPayrollDeduction = z.infer<typeof erpPayrollDeductionSchema>;
+export type ErpPayrollBankLine = z.infer<typeof erpPayrollBankLineSchema>;
+export type ErpPayrollBankBatch = z.infer<typeof erpPayrollBankBatchSchema>;
+export type ErpWorkforceBudget = z.infer<typeof erpWorkforceBudgetSchema>;
+export type ErpWorkforceBudgetVariance = z.infer<
+  typeof erpWorkforceBudgetVarianceSchema
+>;
+export type ErpHrAnalytics = z.infer<typeof erpHrAnalyticsSchema>;
+export type ErpTimeClockConnector = z.infer<typeof erpTimeClockConnectorSchema>;
+export type ErpHrCampaign = z.infer<typeof erpHrCampaignSchema>;
 export type AttendancePolicy = z.infer<typeof attendancePolicySchema>;
 export type AttendanceAssignment = z.infer<typeof attendanceAssignmentSchema>;
 export type AttendanceRecord = z.infer<typeof attendanceRecordSchema>;
@@ -5701,14 +6154,21 @@ export type ErpPortalAccess = z.infer<typeof erpPortalAccessSchema>;
 export type ClientPortalSession = z.infer<typeof clientPortalSessionSchema>;
 export type ClientPortalInvoice = z.infer<typeof clientPortalInvoiceSchema>;
 export type ClientPortalPayment = z.infer<typeof clientPortalPaymentSchema>;
+export type ClientPortalPaymentCheckout = z.infer<
+  typeof clientPortalPaymentCheckoutSchema
+>;
 export type ClientPortalCreditNote = z.infer<
   typeof clientPortalCreditNoteSchema
 >;
 export type ClientPortalComment = z.infer<typeof clientPortalCommentSchema>;
 export type ClientPortalDocument = z.infer<typeof clientPortalDocumentSchema>;
 export type ClientPortalRequest = z.infer<typeof clientPortalRequestSchema>;
+export type ClientPortalSignature = z.infer<typeof clientPortalSignatureSchema>;
 export type ClientPortalNotification = z.infer<
   typeof clientPortalNotificationSchema
+>;
+export type ClientPortalHistoryEvent = z.infer<
+  typeof clientPortalHistoryEventSchema
 >;
 export type ErpAccountingAnomaly = z.infer<typeof erpAccountingAnomalySchema>;
 export type ErpAiAccountingQueryId = z.infer<

@@ -47,6 +47,28 @@ export class ErpMarocPublicPortalController {
     private readonly config: PublicPortalConfig,
   ) {}
 
+  @Post('auth/request-otp')
+  requestOtp(@Req() request: Request, @Res() response: Response) {
+    return this.forward(
+      request,
+      response,
+      'POST',
+      '/portal-public/auth/request-otp',
+      false,
+    );
+  }
+
+  @Post('auth/verify-otp')
+  verifyOtp(@Req() request: Request, @Res() response: Response) {
+    return this.forward(
+      request,
+      response,
+      'POST',
+      '/portal-public/auth/verify-otp',
+      false,
+    );
+  }
+
   @Get('session')
   session(@Req() request: Request, @Res() response: Response) {
     return this.forward(request, response, 'GET', '/portal-public/session');
@@ -75,6 +97,21 @@ export class ErpMarocPublicPortalController {
   @Get('payments')
   payments(@Req() request: Request, @Res() response: Response) {
     return this.forward(request, response, 'GET', '/portal-public/payments');
+  }
+
+  @Post('invoices/:id/payment-checkout')
+  paymentCheckout(
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param('id') id: string,
+  ) {
+    return this.forwardId(
+      request,
+      response,
+      'POST',
+      id,
+      (safeId) => `/portal-public/invoices/${safeId}/payment-checkout`,
+    );
   }
 
   @Get('credit-notes')
@@ -127,6 +164,21 @@ export class ErpMarocPublicPortalController {
     );
   }
 
+  @Post('requests/:id/signatures')
+  signature(
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param('id') id: string,
+  ) {
+    return this.forwardId(
+      request,
+      response,
+      'POST',
+      id,
+      (safeId) => `/portal-public/requests/${safeId}/signatures`,
+    );
+  }
+
   @Get('documents/:id/content')
   documentContent(
     @Req() request: Request,
@@ -150,6 +202,11 @@ export class ErpMarocPublicPortalController {
       'GET',
       '/portal-public/notifications',
     );
+  }
+
+  @Get('history')
+  history(@Req() request: Request, @Res() response: Response) {
+    return this.forward(request, response, 'GET', '/portal-public/history');
   }
 
   @Post('notifications/:id/read')
@@ -186,6 +243,7 @@ export class ErpMarocPublicPortalController {
     response: Response,
     method: 'GET' | 'POST',
     upstreamPath: string,
+    requiresAuthorization = true,
   ): Promise<void> {
     response.setHeader('Cache-Control', 'private, no-store');
     response.setHeader('Pragma', 'no-cache');
@@ -196,7 +254,7 @@ export class ErpMarocPublicPortalController {
     }
 
     const authorization = readHeader(request, 'authorization');
-    if (!validAuthorization(authorization)) {
+    if (requiresAuthorization && !validAuthorization(authorization)) {
       response
         .status(401)
         .json({ message: 'Invalid or expired portal access' });
@@ -238,7 +296,7 @@ export class ErpMarocPublicPortalController {
           method,
           headers: {
             Accept: 'application/json',
-            Authorization: authorization,
+            ...(requiresAuthorization ? { Authorization: authorization } : {}),
             ...(method === 'POST'
               ? { 'Content-Type': 'application/json' }
               : {}),

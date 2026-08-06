@@ -89,8 +89,11 @@ import {
   erpExchangeRateListSchema,
   erpExchangeRateSchema,
   erpPortalAccessGrantSchema,
+  erpPortalAccessHistorySchema,
   erpPortalAccessListSchema,
+  erpPortalAccessRenewSchema,
   erpPortalAccessSchema,
+  erpPortalInvitationSchema,
   erpEmployeeListSchema,
   erpPayslipListSchema,
   erpPayslipSchema,
@@ -134,6 +137,7 @@ import {
   erpLiasseTableDetailSchema,
   erpLiasseTableSummaryListSchema,
   erpLiasseValidationSchema,
+  erpRegulatoryFileSchema,
   erpRegulatorySubmissionListSchema,
   erpRegulatorySubmissionSchema,
   erpLettrageMatchSchema,
@@ -311,6 +315,8 @@ const requiredIdempotencyRoutes = new Set([
   'POST /operations/exchange-rates',
   'POST /operations/portal-access',
   `POST /operations/portal-access/${id}/revoke`,
+  `POST /operations/portal-access/${id}/resend`,
+  `POST /operations/portal-access/${id}/renew`,
   `POST /portal-admin/requests/${id}/comments`,
   `PATCH /portal-admin/requests/${id}`,
   'POST /fiscal/tva/calculate',
@@ -1201,6 +1207,24 @@ const approvedRoutes = [
     erpPortalAccessSchema,
   ],
   [
+    'POST',
+    `/operations/portal-access/${id}/resend`,
+    'operations.portal-access.resend',
+    erpPortalInvitationSchema,
+  ],
+  [
+    'POST',
+    `/operations/portal-access/${id}/renew`,
+    'operations.portal-access.renew',
+    erpPortalAccessRenewSchema,
+  ],
+  [
+    'GET',
+    `/operations/portal-access/${id}/history`,
+    'operations.portal-access.history',
+    erpPortalAccessHistorySchema,
+  ],
+  [
     'GET',
     '/portal-admin/requests',
     'portal.admin.requests',
@@ -1678,6 +1702,7 @@ const approvedRoutes = [
     'payroll.payslip.pay',
     erpPayslipSchema,
   ],
+  ['GET', '/payroll/cnss/bds', 'payroll.cnss.bds', erpRegulatoryFileSchema],
   [
     'GET',
     '/attendance/policies',
@@ -2305,6 +2330,20 @@ describe('ERP Maroc route policy', () => {
     expect(resolveErpRoute('GET', `/products/${uuidV7}`, {})).toMatchObject({
       routeId: 'products.detail',
       upstreamPath: `/products/${uuidV7}`,
+    });
+  });
+
+  it('forwards a DAMANCOM BDS export with its period and format', () => {
+    expect(
+      resolveErpRoute('GET', '/payroll/cnss/bds', {
+        periodKey: '2026-08',
+        format: 'xml',
+      }),
+    ).toMatchObject({
+      routeId: 'payroll.cnss.bds',
+      upstreamPath: '/payroll/cnss/bds?periodKey=2026-08&format=xml',
+      kind: 'json',
+      idempotency: 'forbidden',
     });
   });
 

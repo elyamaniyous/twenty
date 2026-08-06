@@ -210,6 +210,12 @@ const ErpPayrollRegulatoryPage = lazy(() =>
   })),
 );
 
+const ErpHrOperationsPage = lazy(() =>
+  import('~/pages/erp-maroc/hr/ErpHrOperationsPage').then((module) => ({
+    default: module.ErpHrOperationsPage,
+  })),
+);
+
 const ErpTimeAttendancePage = lazy(() =>
   import('~/pages/erp-maroc/hr/ErpTimeAttendancePage').then((module) => ({
     default: module.ErpTimeAttendancePage,
@@ -867,6 +873,14 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpPayrollRegulatoryPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.hrOperations}
+                element={
+                  <LazyRoute>
+                    <ErpHrOperationsPage />
                   </LazyRoute>
                 }
               />

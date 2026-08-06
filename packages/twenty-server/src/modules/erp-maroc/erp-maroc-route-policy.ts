@@ -89,11 +89,34 @@ import {
   erpExchangeRateListSchema,
   erpExchangeRateSchema,
   erpPortalAccessGrantSchema,
+  erpPortalAccessHistorySchema,
   erpPortalAccessListSchema,
+  erpPortalAccessRenewSchema,
   erpPortalAccessSchema,
+  erpPortalInvitationSchema,
   erpEmployeeListSchema,
   erpPayslipListSchema,
   erpPayslipSchema,
+  erpPayrollDeductionListSchema,
+  erpPayrollDeductionSchema,
+  erpPayrollBankBatchListSchema,
+  erpPayrollBankBatchSchema,
+  erpPayrollBankFileSchema,
+  erpPayrollBankLineSchema,
+  erpPayrollBankCandidateListSchema,
+  erpPayrollIrExportSchema,
+  erpRegulatoryFileSchema,
+  erpWorkforceBudgetListSchema,
+  erpWorkforceBudgetSchema,
+  erpWorkforceBudgetVarianceSchema,
+  erpHrAnalyticsSchema,
+  erpTimeClockConnectorListSchema,
+  erpTimeClockConnectorSchema,
+  erpTimeClockSyncRunSchema,
+  erpHrCampaignListSchema,
+  erpHrCampaignSchema,
+  erpHrAlertPreviewSchema,
+  erpHrAlertRunSchema,
   erpAiAccountingAnswerSchema,
   erpAiAccountingConversationListSchema,
   erpAiAccountingSafeQueryResultSchema,
@@ -329,6 +352,11 @@ const fiscalDeadlineSeedQuery = Object.freeze(['year']);
 const liasseExportQuery = Object.freeze(['format']);
 const accountingReviewExportQuery = Object.freeze(['format']);
 const payrollQuery = Object.freeze(['periodKey']);
+const payrollRegulatoryExportQuery = Object.freeze(['periodKey', 'format']);
+const payrollDeductionQuery = Object.freeze(['employeeId', 'status']);
+const hrBudgetQuery = Object.freeze(['year']);
+const hrAnalyticsQuery = Object.freeze(['from', 'to']);
+const hrAlertQuery = Object.freeze(['days']);
 const attendanceAssignmentQuery = Object.freeze(['employeeId']);
 const attendanceRecordQuery = Object.freeze([
   'employeeId',
@@ -2149,6 +2177,36 @@ const routes: ErpMarocRoute[] = [
     idempotency: 'required',
   }),
   defineRoute({
+    routeId: erpMarocRouteIds.portalAccessResend,
+    method: 'POST',
+    pattern: action('operations/portal-access', 'resend'),
+    build: idBuilder(erpMarocUpstreamRoutes.operations.resendPortalInvitation),
+    queryKeys: noQuery,
+    responseSchema: erpPortalInvitationSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.portalAccessRenew,
+    method: 'POST',
+    pattern: action('operations/portal-access', 'renew'),
+    build: idBuilder(erpMarocUpstreamRoutes.operations.renewPortalAccess),
+    queryKeys: noQuery,
+    responseSchema: erpPortalAccessRenewSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.portalAccessHistory,
+    method: 'GET',
+    pattern: action('operations/portal-access', 'history'),
+    build: idBuilder(erpMarocUpstreamRoutes.operations.portalAccessHistory),
+    queryKeys: noQuery,
+    responseSchema: erpPortalAccessHistorySchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
     routeId: erpMarocRouteIds.portalAdminRequests,
     method: 'GET',
     pattern: exact('/portal-admin/requests'),
@@ -3017,6 +3075,259 @@ const routes: ErpMarocRoute[] = [
     build: idBuilder(erpMarocUpstreamRoutes.payroll.payPayslip),
     queryKeys: noQuery,
     responseSchema: erpPayslipSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollDeductions,
+    method: 'GET',
+    pattern: exact('/payroll-operations/deductions'),
+    build: staticBuilder(erpMarocUpstreamRoutes.payrollOperations.deductions),
+    queryKeys: payrollDeductionQuery,
+    responseSchema: erpPayrollDeductionListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollDeductions,
+    method: 'POST',
+    pattern: exact('/payroll-operations/deductions'),
+    build: staticBuilder(erpMarocUpstreamRoutes.payrollOperations.deductions),
+    queryKeys: noQuery,
+    responseSchema: erpPayrollDeductionSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollDeductionDetail,
+    method: 'PATCH',
+    pattern: detail('payroll-operations/deductions'),
+    build: idBuilder(erpMarocUpstreamRoutes.payrollOperations.deduction),
+    queryKeys: noQuery,
+    responseSchema: erpPayrollDeductionSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollBankBatches,
+    method: 'GET',
+    pattern: exact('/payroll-operations/bank-batches'),
+    build: staticBuilder(erpMarocUpstreamRoutes.payrollOperations.bankBatches),
+    queryKeys: payrollQuery,
+    responseSchema: erpPayrollBankBatchListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollBankBatches,
+    method: 'POST',
+    pattern: exact('/payroll-operations/bank-batches'),
+    build: staticBuilder(erpMarocUpstreamRoutes.payrollOperations.bankBatches),
+    queryKeys: noQuery,
+    responseSchema: erpPayrollBankBatchSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollBankBatchGenerate,
+    method: 'POST',
+    pattern: action('payroll-operations/bank-batches', 'generate'),
+    build: idBuilder(
+      erpMarocUpstreamRoutes.payrollOperations.generateBankBatch,
+    ),
+    queryKeys: noQuery,
+    responseSchema: erpPayrollBankFileSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollBankLineCandidates,
+    method: 'GET',
+    pattern: action(
+      'payroll-operations/bank-lines',
+      'reconciliation-candidates',
+    ),
+    build: idBuilder(
+      erpMarocUpstreamRoutes.payrollOperations.bankLineCandidates,
+    ),
+    queryKeys: noQuery,
+    responseSchema: erpPayrollBankCandidateListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollBankLineReconcile,
+    method: 'POST',
+    pattern: action('payroll-operations/bank-lines', 'reconcile'),
+    build: idBuilder(
+      erpMarocUpstreamRoutes.payrollOperations.reconcileBankLine,
+    ),
+    queryKeys: noQuery,
+    responseSchema: erpPayrollBankLineSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollIrExport,
+    method: 'GET',
+    pattern: exact('/payroll-operations/ir/export'),
+    build: staticBuilder(erpMarocUpstreamRoutes.payrollOperations.irExport),
+    queryKeys: payrollQuery,
+    responseSchema: erpPayrollIrExportSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.payrollCnssBds,
+    method: 'GET',
+    pattern: exact('/payroll/cnss/bds'),
+    build: staticBuilder(erpMarocUpstreamRoutes.payroll.cnssBds),
+    queryKeys: payrollRegulatoryExportQuery,
+    responseSchema: erpRegulatoryFileSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrWorkforceBudgets,
+    method: 'GET',
+    pattern: exact('/hr-operations/budgets'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrOperations.budgets),
+    queryKeys: hrBudgetQuery,
+    responseSchema: erpWorkforceBudgetListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrWorkforceBudgets,
+    method: 'POST',
+    pattern: exact('/hr-operations/budgets'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrOperations.budgets),
+    queryKeys: noQuery,
+    responseSchema: erpWorkforceBudgetSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrWorkforceBudgetLines,
+    method: 'PATCH',
+    pattern: action('hr-operations/budgets', 'lines'),
+    build: idBuilder(erpMarocUpstreamRoutes.hrOperations.budgetLines),
+    queryKeys: noQuery,
+    responseSchema: erpWorkforceBudgetSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrWorkforceBudgetApprove,
+    method: 'POST',
+    pattern: action('hr-operations/budgets', 'approve'),
+    build: idBuilder(erpMarocUpstreamRoutes.hrOperations.approveBudget),
+    queryKeys: noQuery,
+    responseSchema: erpWorkforceBudgetSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrWorkforceBudgetVariance,
+    method: 'GET',
+    pattern: action('hr-operations/budgets', 'variance'),
+    build: idBuilder(erpMarocUpstreamRoutes.hrOperations.budgetVariance),
+    queryKeys: noQuery,
+    responseSchema: erpWorkforceBudgetVarianceSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrAnalytics,
+    method: 'GET',
+    pattern: exact('/hr-operations/analytics'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrOperations.analytics),
+    queryKeys: hrAnalyticsQuery,
+    responseSchema: erpHrAnalyticsSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrTimeClockConnectors,
+    method: 'GET',
+    pattern: exact('/hr-operations/time-clock-connectors'),
+    build: staticBuilder(
+      erpMarocUpstreamRoutes.hrOperations.timeClockConnectors,
+    ),
+    queryKeys: noQuery,
+    responseSchema: erpTimeClockConnectorListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrTimeClockConnectors,
+    method: 'POST',
+    pattern: exact('/hr-operations/time-clock-connectors'),
+    build: staticBuilder(
+      erpMarocUpstreamRoutes.hrOperations.timeClockConnectors,
+    ),
+    queryKeys: noQuery,
+    responseSchema: erpTimeClockConnectorSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrTimeClockSync,
+    method: 'POST',
+    pattern: action('hr-operations/time-clock-connectors', 'sync'),
+    build: idBuilder(erpMarocUpstreamRoutes.hrOperations.syncTimeClock),
+    queryKeys: noQuery,
+    responseSchema: erpTimeClockSyncRunSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrCampaigns,
+    method: 'GET',
+    pattern: exact('/hr-operations/campaigns'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrOperations.campaigns),
+    queryKeys: noQuery,
+    responseSchema: erpHrCampaignListSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrCampaigns,
+    method: 'POST',
+    pattern: exact('/hr-operations/campaigns'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrOperations.campaigns),
+    queryKeys: noQuery,
+    responseSchema: erpHrCampaignSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrCampaignLaunch,
+    method: 'POST',
+    pattern: action('hr-operations/campaigns', 'launch'),
+    build: idBuilder(erpMarocUpstreamRoutes.hrOperations.launchCampaign),
+    queryKeys: noQuery,
+    responseSchema: erpHrCampaignSchema,
+    kind: 'json',
+    idempotency: 'required',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrAlertsPreview,
+    method: 'GET',
+    pattern: exact('/hr-operations/alerts/preview'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrOperations.alertsPreview),
+    queryKeys: hrAlertQuery,
+    responseSchema: erpHrAlertPreviewSchema,
+    kind: 'json',
+    idempotency: 'forbidden',
+  }),
+  defineRoute({
+    routeId: erpMarocRouteIds.hrAlertsRun,
+    method: 'POST',
+    pattern: exact('/hr-operations/alerts/run'),
+    build: staticBuilder(erpMarocUpstreamRoutes.hrOperations.alertsRun),
+    queryKeys: hrAlertQuery,
+    responseSchema: erpHrAlertRunSchema,
     kind: 'json',
     idempotency: 'required',
   }),
@@ -4221,6 +4532,25 @@ const fixedAssetStatuses = new Set([
   'DISPOSED',
   'CANCELLED',
 ]);
+const payrollDeductionStatuses = new Set([
+  'ACTIVE',
+  'SUSPENDED',
+  'SETTLED',
+  'CANCELLED',
+]);
+const attendanceRecordStatuses = new Set([
+  'DRAFT',
+  'SUBMITTED',
+  'APPROVED',
+  'REJECTED',
+]);
+const employeePortalRequestStatuses = new Set([
+  'SUBMITTED',
+  'IN_REVIEW',
+  'APPROVED',
+  'REJECTED',
+  'CANCELLED',
+]);
 const documentTypes = new Set([
   'SUPPLIER_INVOICE',
   'CUSTOMER_INVOICE',
@@ -4253,7 +4583,10 @@ const assertNormalizedQueryValue = (
     key === 'invoiceId' ||
     key === 'bankAccountId' ||
     key === 'exerciceId' ||
-    key === 'categoryId'
+    key === 'categoryId' ||
+    key === 'employeeId' ||
+    key === 'jobId' ||
+    key === 'cycleId'
   ) {
     if (!uuidSchema.safeParse(value).success) rejectRoute();
     return;
@@ -4264,6 +4597,20 @@ const assertNormalizedQueryValue = (
   }
   if (key === 'from' || key === 'to' || key === 'dueBefore') {
     if (!isValidCivilDate(value)) rejectRoute();
+    return;
+  }
+  if (key === 'periodKey') {
+    if (!/^\d{4}-(?:0[1-9]|1[0-2])$/.test(value)) rejectRoute();
+    return;
+  }
+  if (key === 'year') {
+    if (!/^(?:20\d{2}|21\d{2}|2200)$/.test(value)) rejectRoute();
+    return;
+  }
+  if (key === 'days') {
+    if (!/^\d{1,3}$/.test(value) || Number(value) < 1 || Number(value) > 365) {
+      rejectRoute();
+    }
     return;
   }
   if (
@@ -4328,6 +4675,23 @@ const assertNormalizedQueryValue = (
   if (routeId === erpMarocRouteIds.fixedAssetsCollection) {
     if (key === 'status' && fixedAssetStatuses.has(value)) return;
   }
+  if (routeId === erpMarocRouteIds.payrollDeductions) {
+    if (key === 'status' && payrollDeductionStatuses.has(value)) return;
+  }
+  if (routeId === erpMarocRouteIds.attendanceRecords) {
+    if (key === 'status' && attendanceRecordStatuses.has(value)) return;
+  }
+  if (routeId === erpMarocRouteIds.employeePortalAdminRequests) {
+    if (key === 'status' && employeePortalRequestStatuses.has(value)) return;
+  }
+  if (routeId === erpMarocRouteIds.employeePortalAttestation) {
+    if (
+      key === 'type' &&
+      (value === 'travail' || value === 'salaire' || value === 'certificat')
+    ) {
+      return;
+    }
+  }
   if (routeId === erpMarocRouteIds.documentsCollection) {
     if (key === 'type' && documentTypes.has(value)) return;
     if (
@@ -4342,6 +4706,20 @@ const assertNormalizedQueryValue = (
     routeId === erpMarocRouteIds.liasseExport &&
     key === 'format' &&
     (value === 'xlsx' || value === 'json')
+  ) {
+    return;
+  }
+  if (
+    routeId === erpMarocRouteIds.complianceExerciseReviewExport &&
+    key === 'format' &&
+    (value === 'xlsx' || value === 'pdf')
+  ) {
+    return;
+  }
+  if (
+    routeId === erpMarocRouteIds.payrollCnssBds &&
+    key === 'format' &&
+    (value === 'xml' || value === 'txt')
   ) {
     return;
   }
