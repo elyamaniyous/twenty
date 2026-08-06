@@ -81,7 +81,7 @@ export const buildTwentyCompanySyncPreview = (
   existing: ExistingTier | null,
 ) => {
   if (company === null) {
-    throw new Error('A Twenty company is required');
+    throw new Error('Une entreprise CRM est requise');
   }
 
   const address = company.address;

@@ -52,6 +52,7 @@ import {
   erpAccountingReviewTaskListSchema,
   erpAccountingReviewTaskSchema,
   erpBalanceReportSchema,
+  erpBankStatementSchema,
   erpBankAccountListSchema,
   erpBankAccountSchema,
   erpChequeAlertsSchema,
@@ -301,6 +302,7 @@ const requiredIdempotencyRoutes = new Set([
   `POST /documents/${id}/ocr/retry`,
   `POST /documents/${id}/ocr/validate`,
   `POST /documents/${id}/create-supplier-invoice`,
+  `POST /documents/${id}/create-bank-statement`,
   'POST /operations/expense-notes',
   `POST /operations/expense-notes/${id}/submit`,
   `PATCH /operations/expense-notes/${id}/decision`,
@@ -1089,6 +1091,12 @@ const approvedRoutes = [
     `/documents/${id}/create-supplier-invoice`,
     'documents.create-supplier-invoice',
     erpSupplierInvoiceSchema,
+  ],
+  [
+    'POST',
+    `/documents/${id}/create-bank-statement`,
+    'documents.create-bank-statement',
+    erpBankStatementSchema,
   ],
   [
     'GET',

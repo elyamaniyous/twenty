@@ -858,7 +858,7 @@ export const ErpClientPortalAdminPage = () => {
                     </Select>
                   </Field>
                   <Field>
-                    Responsable Twenty
+                    Responsable Zowka
                     <Input
                       value={reviewForm.assignedToTwentyUserId}
                       onChange={(event) =>

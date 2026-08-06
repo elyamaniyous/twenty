@@ -296,7 +296,7 @@ export const ErpTierSyncDrawer = ({
   return (
     <ErpFormDrawer
       isOpen={isOpen}
-      title="Synchroniser depuis Twenty"
+      title="Synchroniser depuis le CRM Zowka"
       description="Vérifiez les valeurs finales avant la synchronisation."
       isBusy={mutation.isBusy}
       onClose={onClose}
@@ -324,7 +324,7 @@ export const ErpTierSyncDrawer = ({
               render={({ field }) => (
                 <ErpTierSelect
                   dropdownId="erp-tier-sync-company"
-                  label="Société Twenty"
+                  label="Société CRM"
                   value={field.value}
                   options={[
                     { label: 'Sélectionner une société', value: '' },
@@ -400,7 +400,7 @@ export const ErpTierSyncDrawer = ({
               render={({ field }) => (
                 <ErpTierSelect
                   dropdownId="erp-tier-sync-person"
-                  label="Contact Twenty"
+                  label="Contact CRM"
                   value={field.value}
                   disabled={selectedCompanyId === ''}
                   options={[
@@ -471,7 +471,7 @@ export const ErpTierSyncDrawer = ({
           </StyledPicker>
           {preview === null ? (
             <StyledAlert role="alert">
-              Sélectionnez une société Twenty
+              Sélectionnez une société CRM
             </StyledAlert>
           ) : (
             <StyledPreviewRegion
@@ -498,7 +498,7 @@ export const ErpTierSyncDrawer = ({
                       ];
                     if (previewField.crm !== null) {
                       sourceOptions.splice(1, 0, {
-                        label: 'Twenty',
+                        label: 'CRM Zowka',
                         value: 'crm',
                       });
                     }

@@ -1,16 +1,13 @@
-import { currentWorkspaceMemberState } from '@/auth/states/currentWorkspaceMemberState';
 import { SettingsEmptyPlaceholder } from '@/settings/components/SettingsEmptyPlaceholder';
 import {
   StyledActionTableCell,
   StyledNameTableCell,
 } from '@/settings/data-model/object-details/components/SettingsObjectItemTableRowStyledComponents';
 import { SettingsPublicDomainsListCard } from '@/settings/domains/components/SettingsPublicDomainsListCard';
-import { getDocumentationUrl } from '@/support/utils/getDocumentationUrl';
 import { Table } from '@/ui/layout/table/components/Table';
 import { TableCell } from '@/ui/layout/table/components/TableCell';
 import { TableHeader } from '@/ui/layout/table/components/TableHeader';
 import { TableRow } from '@/ui/layout/table/components/TableRow';
-import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 import { useQuery } from '@apollo/client/react';
 import { styled } from '@linaria/react';
 import { useLingui } from '@lingui/react/macro';
@@ -19,11 +16,9 @@ import { ThemeContext, themeCssVariables } from 'twenty-ui/theme-constants';
 import { FeatureFlagKey, SettingsPath } from 'twenty-shared/types';
 import { getSettingsPath } from 'twenty-shared/utils';
 import {
-  CommandBlock,
   H2Title,
   IconArrowUpRight,
   IconChevronRight,
-  IconCopy,
   InlineBanner,
   OverflowingTextWithTooltip,
 } from 'twenty-ui/display';
@@ -33,7 +28,6 @@ import {
   type ApplicationRegistrationFragmentFragment,
   FindManyApplicationRegistrationsDocument,
 } from '~/generated-metadata/graphql';
-import { useCopyToClipboard } from '~/hooks/useCopyToClipboard';
 import { useMarketplaceApps } from '~/modules/marketplace/hooks/useMarketplaceApps';
 import {
   APPLICATION_TABLE_ROW_GRID_TEMPLATE_COLUMNS,
@@ -63,11 +57,7 @@ const NPM_PACKAGES_GRID_COLUMNS = '200px 1fr 36px';
 export const SettingsApplicationsDeveloperTab = () => {
   const { t } = useLingui();
   const { theme } = useContext(ThemeContext);
-  const currentWorkspaceMember = useAtomStateValue(currentWorkspaceMemberState);
-
   const [displayNotVettedApps, setDisplayNotVettedApps] = useState(false);
-
-  const { copyToClipboard } = useCopyToClipboard();
 
   const { data } = useQuery(FindManyApplicationRegistrationsDocument);
 
@@ -102,26 +92,6 @@ export const SettingsApplicationsDeveloperTab = () => {
   const registrations: ApplicationRegistrationFragmentFragment[] =
     data?.findManyApplicationRegistrations ?? [];
 
-  const createCommands = [
-    // oxlint-disable-next-line lingui/no-unlocalized-strings
-    'npx create-twenty-app@latest my-twenty-app',
-    // oxlint-disable-next-line lingui/no-unlocalized-strings
-    'cd my-twenty-app',
-  ];
-
-  const createCopyButton = (
-    <Button
-      onClick={() => {
-        copyToClipboard(
-          createCommands.join('\n'),
-          t`Commands copied to clipboard`,
-        );
-      }}
-      ariaLabel={t`Copy commands`}
-      Icon={IconCopy}
-    />
-  );
-
   const getRegistrationLink = (
     registration: ApplicationRegistrationFragmentFragment,
   ) =>
@@ -133,24 +103,17 @@ export const SettingsApplicationsDeveloperTab = () => {
     <>
       <Section>
         <H2Title
-          title={t`Create an application`}
-          description={t`You can either create a private app or share it to others`}
+          title={t`Extensions métier Zowka`}
+          description={t`Faites concevoir une extension privée et intégrée à votre espace`}
         />
-        <CommandBlock commands={createCommands} button={createCopyButton} />
         <StyledButtonContainer>
           <Button
             Icon={IconArrowUpRight}
             variant={'secondary'}
             size={'small'}
-            title={t`Read documentation`}
+            title={t`Contacter Zowka`}
             onClick={() =>
-              window.open(
-                getDocumentationUrl({
-                  locale: currentWorkspaceMember?.locale,
-                  path: '/developers/extend/apps/getting-started',
-                }),
-                '_blank',
-              )
+              window.open('mailto:support@zowka.com', '_self', 'noopener')
             }
           />
         </StyledButtonContainer>

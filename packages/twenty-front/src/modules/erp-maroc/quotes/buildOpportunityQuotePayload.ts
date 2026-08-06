@@ -79,7 +79,7 @@ export const buildOpportunityQuotePayload = (
       makeError(
         'twentyOpportunityId',
         'OPPORTUNITY_REQUIRED',
-        "L'opportunité Twenty est requise.",
+        "L'opportunité CRM est requise.",
       ),
     );
   }
@@ -89,7 +89,7 @@ export const buildOpportunityQuotePayload = (
       makeError(
         'twentyCompanyId',
         'COMPANY_REQUIRED',
-        'Une société Twenty est requise.',
+        'Une société CRM est requise.',
       ),
     );
   }
@@ -99,7 +99,7 @@ export const buildOpportunityQuotePayload = (
       makeError(
         'twentyPersonId',
         'CONTACT_REQUIRED',
-        'Un contact Twenty est requis.',
+        'Un contact CRM est requis.',
       ),
     );
   }

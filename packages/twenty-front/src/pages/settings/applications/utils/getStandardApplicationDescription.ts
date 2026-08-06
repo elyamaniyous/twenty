@@ -1,11 +1,11 @@
 import { t } from '@lingui/core/macro';
 
 export const getStandardApplicationDescription =
-  (): string => t`The base data model every Twenty workspace runs on.
+  (): string => t`The base data model every Zowka workspace runs on.
 
 #### What "foundation" means
 
-Every Twenty workspace starts with this set of objects. They define the shape of your CRM, including relationships, activity, and reporting. Everything else, including marketplace apps, AI agents, and custom objects, plugs into them.
+Every Zowka workspace starts with this set of objects. They define the shape of your CRM, including relationships, activity, and reporting. Everything else, including AI agents and custom objects, plugs into them.
 
 #### Included objects
 - **People & Companies**: contact and account records
@@ -13,21 +13,20 @@ Every Twenty workspace starts with this set of objects. They define the shape of
 - **Notes & Tasks**: activity and follow-ups
 - **Workflows & Dashboards**: automation and reporting
 
-Remove this app and the rest of Twenty has nothing to hang off.
+Remove this app and the rest of Zowka has nothing to hang off.
 
 #### Build your own app
 
-Extend Twenty with your own objects, fields, logic functions, or AI skills. Scaffold a new app in one command:
+Extend Zowka with your own objects, fields, logic functions, or AI skills. Scaffold a new app in one command:
 
 \`\`\`bash
-npx create-twenty-app@latest my-twenty-app
+Contactez support@zowka.com pour créer une extension dédiée.
 \`\`\`
 
 Then inside the folder:
 
 \`\`\`bash
-cd my-twenty-app
-yarn twenty dev
+Les extensions sont validées, versionnées et déployées avec votre release Zowka.
 \`\`\`
 
-See the [Getting Started guide](https://twenty.com/developers/extend/apps/getting-started) for the full walkthrough, and [Building Apps](https://twenty.com/developers/extend/apps/building) for the \`defineApplication\` / \`defineEntity\` APIs.`;
+Consultez le [dépôt Zowka](https://github.com/elyamaniyous/zowka) pour la documentation technique.`;

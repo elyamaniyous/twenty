@@ -746,7 +746,7 @@ export const ErpTiersPage = () => {
         const company = row.twentyCompanyId
           ? companyById.get(row.twentyCompanyId)
           : undefined;
-        const companyLabel = company?.name.trim() || 'la société Twenty liée';
+        const companyLabel = company?.name.trim() || 'la société CRM liée';
         return (
           <StyledActions>
             {canManageTiers ? (
@@ -776,7 +776,7 @@ export const ErpTiersPage = () => {
                   objectNameSingular: 'company',
                   objectRecordId: row.twentyCompanyId,
                 })}
-                aria-label={`Ouvrir ${companyLabel} dans Twenty`}
+                aria-label={`Ouvrir ${companyLabel} dans Zowka`}
               >
                 Ouvrir
               </StyledCompanyLink>
@@ -796,8 +796,8 @@ export const ErpTiersPage = () => {
         canManageTiers ? (
           <StyledActions>
             <Button
-              title="Synchroniser depuis Twenty"
-              ariaLabel="Synchroniser depuis Twenty"
+              title="Synchroniser depuis le CRM Zowka"
+              ariaLabel="Synchroniser depuis le CRM Zowka"
               Icon={IconRefresh}
               variant="secondary"
               onClick={() => openSync(null)}

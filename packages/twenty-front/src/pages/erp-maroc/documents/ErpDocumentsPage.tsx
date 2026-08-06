@@ -20,6 +20,7 @@ import {
   useState,
 } from 'react';
 import {
+  erpBankStatementSchema,
   erpDocumentContentSchema,
   erpDocumentListSchema,
   erpDocumentSchema,
@@ -42,12 +43,19 @@ import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 type DocumentType = ErpDocument['type'];
+type UploadDocumentType = DocumentType | 'AUTO';
 type InvoiceLineDraft = {
   quantity: string;
   unitPriceHt: string;
   tvaRate: string;
 };
 type ExtractedInvoiceData = {
+  detectedType?: DocumentType | null;
+  classificationReasons?: string[];
+  dates?: string[];
+  amountsCents?: number[];
+  iceNumbers?: string[];
+  accountReference?: string | null;
   supplierIce?: string | null;
   externalReference?: string | null;
   issueDate?: string | null;
@@ -87,6 +95,17 @@ const documentTypes: Array<{ value: DocumentType | ''; label: string }> = [
   { value: 'FISCAL', label: 'Fiscal' },
   { value: 'PAYROLL', label: 'Paie' },
   { value: 'OTHER', label: 'Autre' },
+];
+
+const uploadDocumentTypes: Array<{
+  value: UploadDocumentType;
+  label: string;
+}> = [
+  { value: 'AUTO', label: 'Classement automatique' },
+  ...documentTypes.filter(
+    (entry): entry is { value: DocumentType; label: string } =>
+      entry.value !== '',
+  ),
 ];
 
 const StyledToolbar = styled.div`
@@ -344,8 +363,7 @@ export const ErpDocumentsPage = () => {
   });
   const [showUpload, setShowUpload] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadType, setUploadType] =
-    useState<DocumentType>('SUPPLIER_INVOICE');
+  const [uploadType, setUploadType] = useState<UploadDocumentType>('AUTO');
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadTags, setUploadTags] = useState('');
   const [selectedId, setSelectedId] = useState('');
@@ -357,6 +375,8 @@ export const ErpDocumentsPage = () => {
   const [dueDate, setDueDate] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [validationNotes, setValidationNotes] = useState('');
+  const [reviewType, setReviewType] =
+    useState<DocumentType>('SUPPLIER_INVOICE');
   const [lineDrafts, setLineDrafts] = useState<
     Record<string, InvoiceLineDraft>
   >({});
@@ -461,6 +481,7 @@ export const ErpDocumentsPage = () => {
   useEffect(() => {
     if (!selectedDocument) return;
     const extracted = asExtractedData(selectedDocument.extractedData);
+    setReviewType(selectedDocument.type);
     setExternalReference(extracted.externalReference ?? '');
     setSupplierIce(extracted.supplierIce ?? '');
     setIssueDate(extracted.issueDate ?? '');
@@ -657,7 +678,13 @@ export const ErpDocumentsPage = () => {
   const validateOcr = async (event: FormEvent) => {
     event.preventDefault();
     if (!selectedDocument) return;
-    const extractedData = correctedExtractedData();
+    const extractedData =
+      reviewType === 'SUPPLIER_INVOICE'
+        ? correctedExtractedData()
+        : {
+            ...asExtractedData(selectedDocument.extractedData),
+            detectedType: reviewType,
+          };
     if (!extractedData) {
       notify(
         'Référence, dates, bon de commande et lignes valides sont requis.',
@@ -673,6 +700,7 @@ export const ErpDocumentsPage = () => {
           method: 'POST',
           path: `/documents/${selectedDocument.id}/ocr/validate`,
           body: {
+            type: reviewType,
             extractedData,
             validationNotes: validationNotes.trim() || null,
           },
@@ -691,7 +719,8 @@ export const ErpDocumentsPage = () => {
   };
 
   const createSupplierInvoice = async () => {
-    if (!selectedDocument) return;
+    if (!selectedDocument || selectedDocument.type !== 'SUPPLIER_INVOICE')
+      return;
     const corrected = correctedExtractedData();
     if (!corrected) {
       notify('Les données validées de la facture sont incomplètes.', true);
@@ -714,6 +743,30 @@ export const ErpDocumentsPage = () => {
       notify(`Facture fournisseur ${invoice.externalReference} créée.`);
     } catch {
       notify('La création de la facture fournisseur a échoué.', true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const createBankStatement = async () => {
+    if (!selectedDocument || selectedDocument.type !== 'BANK_STATEMENT') return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const intent = client.createMutationIntent(
+        {
+          method: 'POST',
+          path: `/documents/${selectedDocument.id}/create-bank-statement`,
+          body: {},
+          schema: erpBankStatementSchema,
+        },
+        { idempotency: 'required' },
+      );
+      await intent.execute();
+      setGeneration((value) => value + 1);
+      notify('Relevé transmis au rapprochement bancaire.');
+    } catch {
+      notify("La création de l'import bancaire a échoué.", true);
     } finally {
       setBusy(false);
     }
@@ -796,7 +849,7 @@ export const ErpDocumentsPage = () => {
 
   return (
     <ErpPageShell
-      title="GED comptable"
+      title="Zowka Inbox"
       state={state}
       loadingLabel="Chargement des documents"
       errorLabel="Impossible de charger les documents"
@@ -846,16 +899,14 @@ export const ErpDocumentsPage = () => {
             aria-label="Type de document"
             value={uploadType}
             onChange={(event) =>
-              setUploadType(event.target.value as DocumentType)
+              setUploadType(event.target.value as UploadDocumentType)
             }
           >
-            {documentTypes
-              .filter(({ value }) => value !== '')
-              .map(({ value, label }) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
+            {uploadDocumentTypes.map(({ value, label }) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
           </StyledSelect>
           <StyledInput
             aria-label="Titre du document"
@@ -970,7 +1021,8 @@ export const ErpDocumentsPage = () => {
                       onClick={() => void retryOcr()}
                     />
                   ) : null}
-                  {selectedDocument.status === 'VALIDATED' &&
+                  {selectedDocument.type === 'SUPPLIER_INVOICE' &&
+                  selectedDocument.status === 'VALIDATED' &&
                   selectedDocument.linkedEntityId === null ? (
                     <Button
                       title="Créer la facture"
@@ -979,6 +1031,18 @@ export const ErpDocumentsPage = () => {
                       accent="blue"
                       disabled={!canAccount || busy}
                       onClick={() => void createSupplierInvoice()}
+                    />
+                  ) : null}
+                  {selectedDocument.type === 'BANK_STATEMENT' &&
+                  selectedDocument.status === 'VALIDATED' &&
+                  selectedDocument.linkedEntityId === null ? (
+                    <Button
+                      title="Préparer le rapprochement"
+                      ariaLabel="Créer un import de relevé bancaire"
+                      Icon={IconLink}
+                      accent="blue"
+                      disabled={!canAccount || busy}
+                      onClick={() => void createBankStatement()}
                     />
                   ) : null}
                   <Button
@@ -1005,142 +1069,190 @@ export const ErpDocumentsPage = () => {
                 </StyledMetric>
                 <StyledMetric>
                   <span>Total détecté</span>
-                  <strong>{centsLabel(extracted.totalTtcCents)}</strong>
+                  <strong>
+                    {centsLabel(
+                      extracted.totalTtcCents ?? extracted.amountsCents?.[0],
+                    )}
+                  </strong>
                 </StyledMetric>
               </StyledOcrMetrics>
               <StyledReviewForm onSubmit={validateOcr}>
-                <StyledInput
-                  aria-label="Référence de facture fournisseur"
-                  placeholder="Référence facture"
-                  value={externalReference}
-                  disabled={selectedDocument.status !== 'REVIEW_REQUIRED'}
-                  onChange={(event) => setExternalReference(event.target.value)}
-                />
-                <StyledInput
-                  aria-label="ICE fournisseur"
-                  placeholder="ICE fournisseur"
-                  value={supplierIce}
-                  disabled={selectedDocument.status !== 'REVIEW_REQUIRED'}
-                  onChange={(event) => setSupplierIce(event.target.value)}
-                />
-                <StyledInput
-                  aria-label="Date de facture fournisseur"
-                  type="date"
-                  value={issueDate}
-                  disabled={selectedDocument.status !== 'REVIEW_REQUIRED'}
-                  onChange={(event) => setIssueDate(event.target.value)}
-                />
-                <StyledInput
-                  aria-label="Échéance de facture fournisseur"
-                  type="date"
-                  value={dueDate}
-                  disabled={selectedDocument.status !== 'REVIEW_REQUIRED'}
-                  onChange={(event) => setDueDate(event.target.value)}
-                />
                 <StyledSelect
-                  aria-label="Bon de commande fournisseur"
-                  value={selectedOrderId}
+                  aria-label="Classement du document"
+                  value={reviewType}
                   disabled={selectedDocument.status !== 'REVIEW_REQUIRED'}
-                  onChange={(event) => setSelectedOrderId(event.target.value)}
+                  onChange={(event) =>
+                    setReviewType(event.target.value as DocumentType)
+                  }
                 >
-                  <option value="">Bon de commande</option>
-                  {availableOrders.map((order) => (
-                    <option key={order.id} value={order.id}>
-                      {order.number} · {order.supplier.name}
-                    </option>
-                  ))}
-                </StyledSelect>
-                <StyledTextarea
-                  aria-label="Notes de validation OCR"
-                  placeholder="Notes de validation"
-                  value={validationNotes}
-                  disabled={selectedDocument.status !== 'REVIEW_REQUIRED'}
-                  onChange={(event) => setValidationNotes(event.target.value)}
-                />
-                {selectedOrder === null ? null : (
-                  <StyledLines>
-                    {selectedOrder.lines.map((line) => (
-                      <StyledLine key={line.id}>
-                        <StyledLineLabel>
-                          {line.description}
-                          <small>
-                            Reçu {line.quantityReceived} {line.unit ?? ''}
-                          </small>
-                        </StyledLineLabel>
-                        <StyledInput
-                          aria-label={`Quantité ${line.description}`}
-                          inputMode="decimal"
-                          placeholder="Quantité"
-                          value={lineDrafts[line.id]?.quantity ?? ''}
-                          disabled={
-                            selectedDocument.status !== 'REVIEW_REQUIRED'
-                          }
-                          onChange={(event) =>
-                            setLineDrafts((current) => ({
-                              ...current,
-                              [line.id]: {
-                                ...(current[line.id] ?? {
-                                  quantity: '',
-                                  unitPriceHt: '',
-                                  tvaRate: '',
-                                }),
-                                quantity: event.target.value,
-                              },
-                            }))
-                          }
-                        />
-                        <StyledInput
-                          aria-label={`Prix unitaire ${line.description}`}
-                          inputMode="decimal"
-                          placeholder="Prix HT"
-                          value={lineDrafts[line.id]?.unitPriceHt ?? ''}
-                          disabled={
-                            selectedDocument.status !== 'REVIEW_REQUIRED'
-                          }
-                          onChange={(event) =>
-                            setLineDrafts((current) => ({
-                              ...current,
-                              [line.id]: {
-                                ...(current[line.id] ?? {
-                                  quantity: '',
-                                  unitPriceHt: '',
-                                  tvaRate: '',
-                                }),
-                                unitPriceHt: event.target.value,
-                              },
-                            }))
-                          }
-                        />
-                        <StyledSelect
-                          aria-label={`TVA ${line.description}`}
-                          value={lineDrafts[line.id]?.tvaRate ?? ''}
-                          disabled={
-                            selectedDocument.status !== 'REVIEW_REQUIRED'
-                          }
-                          onChange={(event) =>
-                            setLineDrafts((current) => ({
-                              ...current,
-                              [line.id]: {
-                                ...(current[line.id] ?? {
-                                  quantity: '',
-                                  unitPriceHt: '',
-                                  tvaRate: '',
-                                }),
-                                tvaRate: event.target.value,
-                              },
-                            }))
-                          }
-                        >
-                          {[0, 7, 10, 14, 20].map((rate) => (
-                            <option key={rate} value={rate}>
-                              {rate} %
-                            </option>
-                          ))}
-                        </StyledSelect>
-                      </StyledLine>
+                  {documentTypes
+                    .filter(({ value }) => value !== '')
+                    .map(({ value, label }) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
                     ))}
-                  </StyledLines>
+                </StyledSelect>
+                {reviewType === 'SUPPLIER_INVOICE' ? (
+                  <>
+                    <StyledInput
+                      aria-label="Référence de facture fournisseur"
+                      placeholder="Référence facture"
+                      value={externalReference}
+                      disabled={selectedDocument.status !== 'REVIEW_REQUIRED'}
+                      onChange={(event) =>
+                        setExternalReference(event.target.value)
+                      }
+                    />
+                    <StyledInput
+                      aria-label="ICE fournisseur"
+                      placeholder="ICE fournisseur"
+                      value={supplierIce}
+                      disabled={selectedDocument.status !== 'REVIEW_REQUIRED'}
+                      onChange={(event) => setSupplierIce(event.target.value)}
+                    />
+                    <StyledInput
+                      aria-label="Date de facture fournisseur"
+                      type="date"
+                      value={issueDate}
+                      disabled={selectedDocument.status !== 'REVIEW_REQUIRED'}
+                      onChange={(event) => setIssueDate(event.target.value)}
+                    />
+                    <StyledInput
+                      aria-label="Échéance de facture fournisseur"
+                      type="date"
+                      value={dueDate}
+                      disabled={selectedDocument.status !== 'REVIEW_REQUIRED'}
+                      onChange={(event) => setDueDate(event.target.value)}
+                    />
+                    <StyledSelect
+                      aria-label="Bon de commande fournisseur"
+                      value={selectedOrderId}
+                      disabled={selectedDocument.status !== 'REVIEW_REQUIRED'}
+                      onChange={(event) =>
+                        setSelectedOrderId(event.target.value)
+                      }
+                    >
+                      <option value="">Bon de commande</option>
+                      {availableOrders.map((order) => (
+                        <option key={order.id} value={order.id}>
+                          {order.number} · {order.supplier.name}
+                        </option>
+                      ))}
+                    </StyledSelect>
+                    {selectedOrder === null ? null : (
+                      <StyledLines>
+                        {selectedOrder.lines.map((line) => (
+                          <StyledLine key={line.id}>
+                            <StyledLineLabel>
+                              {line.description}
+                              <small>
+                                Reçu {line.quantityReceived} {line.unit ?? ''}
+                              </small>
+                            </StyledLineLabel>
+                            <StyledInput
+                              aria-label={`Quantité ${line.description}`}
+                              inputMode="decimal"
+                              placeholder="Quantité"
+                              value={lineDrafts[line.id]?.quantity ?? ''}
+                              disabled={
+                                selectedDocument.status !== 'REVIEW_REQUIRED'
+                              }
+                              onChange={(event) =>
+                                setLineDrafts((current) => ({
+                                  ...current,
+                                  [line.id]: {
+                                    ...(current[line.id] ?? {
+                                      quantity: '',
+                                      unitPriceHt: '',
+                                      tvaRate: '',
+                                    }),
+                                    quantity: event.target.value,
+                                  },
+                                }))
+                              }
+                            />
+                            <StyledInput
+                              aria-label={`Prix unitaire ${line.description}`}
+                              inputMode="decimal"
+                              placeholder="Prix HT"
+                              value={lineDrafts[line.id]?.unitPriceHt ?? ''}
+                              disabled={
+                                selectedDocument.status !== 'REVIEW_REQUIRED'
+                              }
+                              onChange={(event) =>
+                                setLineDrafts((current) => ({
+                                  ...current,
+                                  [line.id]: {
+                                    ...(current[line.id] ?? {
+                                      quantity: '',
+                                      unitPriceHt: '',
+                                      tvaRate: '',
+                                    }),
+                                    unitPriceHt: event.target.value,
+                                  },
+                                }))
+                              }
+                            />
+                            <StyledSelect
+                              aria-label={`TVA ${line.description}`}
+                              value={lineDrafts[line.id]?.tvaRate ?? ''}
+                              disabled={
+                                selectedDocument.status !== 'REVIEW_REQUIRED'
+                              }
+                              onChange={(event) =>
+                                setLineDrafts((current) => ({
+                                  ...current,
+                                  [line.id]: {
+                                    ...(current[line.id] ?? {
+                                      quantity: '',
+                                      unitPriceHt: '',
+                                      tvaRate: '',
+                                    }),
+                                    tvaRate: event.target.value,
+                                  },
+                                }))
+                              }
+                            >
+                              {[0, 7, 10, 14, 20].map((rate) => (
+                                <option key={rate} value={rate}>
+                                  {rate} %
+                                </option>
+                              ))}
+                            </StyledSelect>
+                          </StyledLine>
+                        ))}
+                      </StyledLines>
+                    )}
+                  </>
+                ) : (
+                  <StyledFullWidth>
+                    <strong>Classement proposé</strong>
+                    <p>
+                      {extracted.classificationReasons?.length
+                        ? extracted.classificationReasons.join(' · ')
+                        : 'Aucun indice suffisamment fiable. Vérifiez le type avant validation.'}
+                    </p>
+                    <p>
+                      Dates détectées : {extracted.dates?.join(' · ') || '—'}
+                    </p>
+                    <p>
+                      ICE détectés : {extracted.iceNumbers?.join(' · ') || '—'}
+                    </p>
+                    <p>
+                      Référence bancaire : {extracted.accountReference || '—'}
+                    </p>
+                  </StyledFullWidth>
                 )}
+                <StyledFullWidth>
+                  <StyledTextarea
+                    aria-label="Notes de validation OCR"
+                    placeholder="Notes de validation"
+                    value={validationNotes}
+                    disabled={selectedDocument.status !== 'REVIEW_REQUIRED'}
+                    onChange={(event) => setValidationNotes(event.target.value)}
+                  />
+                </StyledFullWidth>
                 {selectedDocument.lastError ? (
                   <StyledFullWidth>
                     {selectedDocument.lastError}
@@ -1148,7 +1260,7 @@ export const ErpDocumentsPage = () => {
                 ) : null}
                 {selectedDocument.linkedEntityId ? (
                   <StyledFullWidth>
-                    Facture liée · {selectedDocument.linkedEntityId}
+                    Élément ERP lié · {selectedDocument.linkedEntityId}
                   </StyledFullWidth>
                 ) : null}
                 {selectedDocument.status === 'REVIEW_REQUIRED' ? (

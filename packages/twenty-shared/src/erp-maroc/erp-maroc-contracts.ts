@@ -5215,6 +5215,7 @@ export const erpMarocRouteIds = {
   documentOcrRetry: 'documents.ocr.retry',
   documentOcrValidate: 'documents.ocr.validate',
   documentCreateSupplierInvoice: 'documents.create-supplier-invoice',
+  documentCreateBankStatement: 'documents.create-bank-statement',
   expenseNotes: 'operations.expense-notes',
   expenseNoteSubmit: 'operations.expense-note.submit',
   expenseNoteDecision: 'operations.expense-note.decision',
@@ -5745,6 +5746,8 @@ export const erpMarocUpstreamRoutes = {
     validateOcr: (id: string) => `/documents/${encodeRouteId(id)}/ocr/validate`,
     createSupplierInvoice: (id: string) =>
       `/documents/${encodeRouteId(id)}/create-supplier-invoice`,
+    createBankStatement: (id: string) =>
+      `/documents/${encodeRouteId(id)}/create-bank-statement`,
   },
   operations: {
     expenseNotes: '/operations/expense-notes',

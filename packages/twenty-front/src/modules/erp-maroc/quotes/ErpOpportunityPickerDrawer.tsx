@@ -177,7 +177,7 @@ export const ErpOpportunityPickerDrawer = ({
     <ErpFormDrawer
       isOpen={isOpen}
       title="Créer depuis une opportunité"
-      description="Sélectionnez une opportunité Twenty à convertir en brouillon de devis."
+      description="Sélectionnez une opportunité CRM à convertir en brouillon de devis."
       footer={footer}
       isBusy={isSubmitting || reconciliation !== null}
       onClose={onClose}
@@ -204,7 +204,7 @@ export const ErpOpportunityPickerDrawer = ({
             {picker.emptyLabel ?? 'Aucune opportunité sur la page chargée'}
           </StyledState>
         ) : (
-          <StyledList aria-label="Opportunités Twenty">
+          <StyledList aria-label="Opportunités CRM">
             {picker.records.map((opportunity) => (
               <StyledOpportunityButton
                 key={opportunity.id}
