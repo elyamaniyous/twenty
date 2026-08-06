@@ -153,11 +153,24 @@ const StyledToolbar = styled.div`
   min-height: 44px;
   overflow-x: auto;
   padding: 0 ${themeCssVariables.spacing[3]};
+
+  @media (max-width: 640px) {
+    align-items: stretch;
+    flex-direction: column;
+    overflow-x: visible;
+    padding: ${themeCssVariables.spacing[2]};
+  }
 `;
 
 const StyledTabs = styled.div`
   display: flex;
   gap: ${themeCssVariables.spacing[1]};
+
+  @media (max-width: 640px) {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
 `;
 
 const StyledTab = styled.button<{ active: boolean }>`
@@ -177,12 +190,23 @@ const StyledTab = styled.button<{ active: boolean }>`
   height: 30px;
   padding: 0 ${themeCssVariables.spacing[2]};
   white-space: nowrap;
+
+  @media (max-width: 640px) {
+    overflow: hidden;
+    padding: 0 ${themeCssVariables.spacing[1]};
+    text-overflow: ellipsis;
+    width: 100%;
+  }
 `;
 
 const StyledFilters = styled.div`
   align-items: center;
   display: flex;
   gap: ${themeCssVariables.spacing[2]};
+
+  @media (max-width: 640px) {
+    width: 100%;
+  }
 `;
 
 const StyledInput = styled.input`
@@ -235,6 +259,10 @@ const StyledForm = styled.form`
   gap: ${themeCssVariables.spacing[2]};
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   padding: ${themeCssVariables.spacing[3]};
+
+  @media (max-width: 640px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
 `;
 
 const StyledField = styled.label`
@@ -248,6 +276,10 @@ const StyledField = styled.label`
 
 const StyledWideField = styled(StyledField)`
   grid-column: span 2;
+
+  @media (max-width: 640px) {
+    grid-column: span 1;
+  }
 `;
 
 const StyledMetrics = styled.div`
@@ -255,6 +287,12 @@ const StyledMetrics = styled.div`
   flex: 1 1 auto;
   grid-template-columns: repeat(4, minmax(150px, 1fr));
   overflow: auto;
+
+  @media (max-width: 640px) {
+    flex: 0 0 auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+  }
 `;
 
 const StyledMetric = styled.div`
@@ -313,6 +351,11 @@ const StyledSplit = styled.div`
   grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr);
   min-height: 0;
   overflow: hidden;
+
+  @media (max-width: 760px) {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: visible;
+  }
 `;
 
 const StyledCandidatePanel = styled.aside`
@@ -321,6 +364,11 @@ const StyledCandidatePanel = styled.aside`
   flex-direction: column;
   min-height: 0;
   overflow: auto;
+
+  @media (max-width: 760px) {
+    border-left: 0;
+    border-top: 1px solid ${themeCssVariables.border.color.light};
+  }
 `;
 
 const StyledPanelTitle = styled.h2`
