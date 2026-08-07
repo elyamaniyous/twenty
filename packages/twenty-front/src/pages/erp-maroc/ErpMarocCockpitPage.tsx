@@ -314,8 +314,8 @@ export const ErpMarocCockpitPage = () => {
 
   return (
     <ErpPageShell
-      title="Vue ventes"
-      description="Files opérationnelles issues des premières pages chargées"
+      title="CRM"
+      description="Pipeline commercial, facturation client et relances"
       state={state.status === 'ready' ? 'ready' : state.status}
       loadingLabel="Chargement des files opérationnelles"
       errorLabel="Les files opérationnelles sont indisponibles"

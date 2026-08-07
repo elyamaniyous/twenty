@@ -1,4 +1,7 @@
 export const erpMarocPaths = {
+  crm: '/crm',
+  finance: '/finance',
+  hr: '/rh',
   cockpit: '/erp-maroc',
   onboarding: '/erp-maroc/onboarding',
   products: '/erp-maroc/products',
@@ -11,6 +14,7 @@ export const erpMarocPaths = {
   quoteEdit: '/erp-maroc/quotes/:id/edit',
   quoteDetail: '/erp-maroc/quotes/:id',
   purchaseOrders: '/erp-maroc/purchase-orders',
+  procurement: '/erp-maroc/procurement',
   purchaseOrderNew: '/erp-maroc/purchase-orders/new',
   purchaseOrderDetail: '/erp-maroc/purchase-orders/:id',
   invoices: '/erp-maroc/invoices',
@@ -20,6 +24,7 @@ export const erpMarocPaths = {
   payments: '/erp-maroc/payments',
   paymentNew: '/erp-maroc/payments/new',
   paymentDetail: '/erp-maroc/payments/:id',
+  bankStatements: '/erp-maroc/bank-statements',
   cheques: '/erp-maroc/cheques',
   chequeDetail: '/erp-maroc/cheques/:id',
   chequeDepositSlipDetail: '/erp-maroc/cheques/deposit-slips/:id',

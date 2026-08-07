@@ -53,6 +53,26 @@ jest.mock('~/pages/erp-maroc/inventory/ErpInventoryPage', () => ({
   ErpInventoryPage: () => <div>Phase 3 inventory</div>,
 }));
 
+jest.mock('~/pages/erp-maroc/accounting/ErpFinancialPlanningPage', () => ({
+  ErpFinancialPlanningPage: () => <div>Financial planning</div>,
+}));
+
+jest.mock('~/pages/erp-maroc/hr/ErpHrOperationsPage', () => ({
+  ErpHrOperationsPage: () => <div>HR operations</div>,
+}));
+
+jest.mock('~/pages/erp-maroc/dashboard/ErpFinanceDashboardPage', () => ({
+  ErpFinanceDashboardPage: () => <div>Zowka Finance home</div>,
+}));
+
+jest.mock('~/pages/erp-maroc/dashboard/ErpHrDashboardPage', () => ({
+  ErpHrDashboardPage: () => <div>Zowka RH home</div>,
+}));
+
+jest.mock('~/pages/erp-maroc/bank-statements/ErpBankStatementsPage', () => ({
+  ErpBankStatementsPage: () => <div>Zowka bank statements</div>,
+}));
+
 jest.mock('~/pages/erp-maroc/sales-orders/ErpSalesOperationsPage', () => ({
   ErpSalesOperationsPage: () => <div>Phase 3 sales operations</div>,
 }));
@@ -75,6 +95,10 @@ jest.mock('~/pages/erp-maroc/quotes/ErpQuoteDetailPage', () => ({
 
 jest.mock('~/pages/erp-maroc/purchase-orders/ErpPurchaseOrdersPage', () => ({
   ErpPurchaseOrdersPage: () => <div>Phase 3 purchases list</div>,
+}));
+
+jest.mock('~/pages/erp-maroc/procurement/ErpProcurementPage', () => ({
+  ErpProcurementPage: () => <div>Procurement sourcing cockpit</div>,
 }));
 
 jest.mock(
@@ -218,6 +242,51 @@ describe('useCreateAppRouter ERP Maroc registration', () => {
       expect.arrayContaining(Object.values(erpMarocPaths)),
     );
     result.current.dispose();
+  });
+
+  it.each([
+    [erpMarocPaths.crm, 'Task 12 cockpit'],
+    [erpMarocPaths.finance, 'Zowka Finance home'],
+    [erpMarocPaths.hr, 'Zowka RH home'],
+  ])(
+    'redirects the %s space entry to a real métier screen',
+    async (path, text) => {
+      const { router, view } = renderEnabledErpRoute(
+        {
+          status: 'ready',
+          context: { role: 'ADMIN' } as ErpContext,
+          spaceAccess: { crm: true, finance: true, hr: true },
+          error: null,
+          refetch,
+          client,
+        },
+        path,
+      );
+
+      expect(await screen.findByText(text)).toBeInTheDocument();
+
+      view.unmount();
+      router.dispose();
+    },
+  );
+
+  it('redirects a forbidden RH entry back to CRM', async () => {
+    const { router, view } = renderEnabledErpRoute(
+      {
+        status: 'ready',
+        context: { role: 'COMMERCIAL' } as ErpContext,
+        spaceAccess: { crm: true, finance: true, hr: false },
+        error: null,
+        refetch,
+        client,
+      },
+      erpMarocPaths.hr,
+    );
+
+    expect(await screen.findByText('Task 12 cockpit')).toBeInTheDocument();
+
+    view.unmount();
+    router.dispose();
   });
 
   it('registers payment creation before the dynamic payment detail route', () => {
@@ -420,6 +489,7 @@ describe('useCreateAppRouter ERP Maroc registration', () => {
   });
 
   it.each([
+    [erpMarocPaths.procurement, 'Procurement sourcing cockpit'],
     [erpMarocPaths.purchaseOrders, 'Phase 3 purchases list'],
     [erpMarocPaths.purchaseOrderNew, 'Phase 3 purchase editor'],
     [

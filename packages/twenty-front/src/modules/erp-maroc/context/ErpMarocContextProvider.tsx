@@ -12,13 +12,18 @@ import {
   useRef,
   useState,
 } from 'react';
-import { erpContextSchema, type ErpContext } from 'twenty-shared/erp-maroc';
+import {
+  erpContextSchema,
+  hrAccessContextSchema,
+  type ErpContext,
+} from 'twenty-shared/erp-maroc';
 
 import {
   createErpMarocClient,
   type ErpMarocClient,
 } from '../api/erpMarocClient';
 import { ErpMarocError } from '../api/erpMarocError';
+import { type ZowkaSpaceAccess } from '../navigation/zowkaSpaces';
 
 type ErpMarocContextValue = {
   client: ErpMarocClient;
@@ -27,7 +32,12 @@ type ErpMarocContextValue = {
 
 type ErpMarocLoadState =
   | { status: 'loading'; context: null; error: null }
-  | { status: 'ready'; context: ErpContext; error: null }
+  | {
+      status: 'ready';
+      context: ErpContext;
+      spaceAccess?: ZowkaSpaceAccess;
+      error: null;
+    }
   | { status: 'forbidden'; context: null; error: null }
   | {
       status: 'error';
@@ -38,6 +48,29 @@ type ErpMarocLoadState =
 export type ErpMarocContextState = ErpMarocContextValue & ErpMarocLoadState;
 
 export const ErpMarocContext = createContext<ErpMarocContextState | null>(null);
+
+const resolveSpaceAccess = async (
+  context: ErpContext,
+  client: ErpMarocClient,
+  signal: AbortSignal,
+): Promise<ZowkaSpaceAccess> => {
+  if (context.role === 'OWNER' || context.role === 'ADMIN') {
+    return { crm: true, finance: true, hr: true };
+  }
+
+  try {
+    await client.request({
+      method: 'GET',
+      path: '/hr-core/access/me',
+      schema: hrAccessContextSchema,
+      signal,
+    });
+
+    return { crm: true, finance: true, hr: true };
+  } catch {
+    return { crm: true, finance: true, hr: false };
+  }
+};
 
 export const ErpMarocContextProvider = ({
   children,
@@ -83,12 +116,18 @@ export const ErpMarocContextProvider = ({
         schema: erpContextSchema,
         signal: abortController.signal,
       })
-      .then((context) => {
+      .then(async (context) => {
+        const spaceAccess = await resolveSpaceAccess(
+          context,
+          client,
+          abortController.signal,
+        );
+
         if (
           !abortController.signal.aborted &&
           requestGeneration.current === currentGeneration
         ) {
-          setState({ status: 'ready', context, error: null });
+          setState({ status: 'ready', context, spaceAccess, error: null });
         }
       })
       .catch((error: unknown) => {

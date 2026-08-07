@@ -4,6 +4,8 @@ import { NavigationDrawerWorkspaceSectionSkeletonLoader } from '@/object-metadat
 import { isLayoutCustomizationModeEnabledState } from '@/layout-customization/states/isLayoutCustomizationModeEnabledState';
 import { isErpMarocEnabledState } from '@/client-config/states/isErpMarocEnabledState';
 import { NavigationDrawerErpMarocSection } from '@/erp-maroc/navigation/NavigationDrawerErpMarocSection';
+import { useActiveZowkaSpace } from '@/erp-maroc/navigation/useActiveZowkaSpace';
+import { ZowkaSpaceSwitcher } from '@/erp-maroc/navigation/ZowkaSpaceSwitcher';
 import { NavigationDrawerOtherSection } from '@/navigation/components/NavigationDrawerOtherSection';
 import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
 import { styled } from '@linaria/react';
@@ -33,6 +35,25 @@ const StyledScrollableItemsContainer = styled.div`
   gap: ${themeCssVariables.spacing[3]};
 `;
 
+const WorkspaceNavigationSections = () => (
+  <Suspense fallback={<NavigationDrawerWorkspaceSectionSkeletonLoader />}>
+    <FavoritesSectionDispatcher />
+    <WorkspaceSectionDispatcher />
+  </Suspense>
+);
+
+const ZowkaNavigationSections = () => {
+  const activeSpace = useActiveZowkaSpace();
+
+  return (
+    <>
+      <ZowkaSpaceSwitcher />
+      {activeSpace === 'crm' && <WorkspaceNavigationSections />}
+      <NavigationDrawerErpMarocSection />
+    </>
+  );
+};
+
 export const MainNavigationDrawerScrollableItems = () => {
   const isErpMarocEnabled = useAtomStateValue(isErpMarocEnabledState);
   const isLayoutCustomizationModeEnabled = useAtomStateValue(
@@ -42,11 +63,11 @@ export const MainNavigationDrawerScrollableItems = () => {
   return (
     <StyledScrollableItemsContainer>
       <NavigationDrawerOpenedSection />
-      <Suspense fallback={<NavigationDrawerWorkspaceSectionSkeletonLoader />}>
-        <FavoritesSectionDispatcher />
-        <WorkspaceSectionDispatcher />
-      </Suspense>
-      {isErpMarocEnabled && <NavigationDrawerErpMarocSection />}
+      {isErpMarocEnabled ? (
+        <ZowkaNavigationSections />
+      ) : (
+        <WorkspaceNavigationSections />
+      )}
       {!isLayoutCustomizationModeEnabled && <NavigationDrawerOtherSection />}
     </StyledScrollableItemsContainer>
   );

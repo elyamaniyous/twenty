@@ -28,6 +28,18 @@ const ErpMarocCockpitPage = lazy(() =>
   })),
 );
 
+const ErpFinanceDashboardPage = lazy(() =>
+  import('~/pages/erp-maroc/dashboard/ErpFinanceDashboardPage').then(
+    (module) => ({ default: module.ErpFinanceDashboardPage }),
+  ),
+);
+
+const ErpHrDashboardPage = lazy(() =>
+  import('~/pages/erp-maroc/dashboard/ErpHrDashboardPage').then((module) => ({
+    default: module.ErpHrDashboardPage,
+  })),
+);
+
 const ErpOnboardingPage = lazy(() =>
   import('~/pages/erp-maroc/onboarding/ErpOnboardingPage').then((module) => ({
     default: module.ErpOnboardingPage,
@@ -80,6 +92,12 @@ const ErpPurchaseOrdersPage = lazy(() =>
   import('~/pages/erp-maroc/purchase-orders/ErpPurchaseOrdersPage').then(
     (module) => ({ default: module.ErpPurchaseOrdersPage }),
   ),
+);
+
+const ErpProcurementPage = lazy(() =>
+  import('~/pages/erp-maroc/procurement/ErpProcurementPage').then((module) => ({
+    default: module.ErpProcurementPage,
+  })),
 );
 
 const ErpPurchaseOrderEditorPage = lazy(() =>
@@ -201,6 +219,12 @@ const ErpExpenseNotesPage = lazy(() =>
 const ErpFinancialPlanningPage = lazy(() =>
   import('~/pages/erp-maroc/accounting/ErpFinancialPlanningPage').then(
     (module) => ({ default: module.ErpFinancialPlanningPage }),
+  ),
+);
+
+const ErpBankStatementsPage = lazy(() =>
+  import('~/pages/erp-maroc/bank-statements/ErpBankStatementsPage').then(
+    (module) => ({ default: module.ErpBankStatementsPage }),
   ),
 );
 
@@ -440,7 +464,17 @@ export const useCreateAppRouter = (
         // to set scroll position before the page is rendered
         loader={async () => Promise.resolve(null)}
       >
-        <Route element={<DefaultLayout />}>
+        <Route
+          element={
+            isErpMarocEnabled ? (
+              <ErpMarocContextProvider>
+                <DefaultLayout />
+              </ErpMarocContextProvider>
+            ) : (
+              <DefaultLayout />
+            )
+          }
+        >
           <Route path={AppPath.Verify} element={<VerifyLoginTokenEffect />} />
           <Route path={AppPath.VerifyEmail} element={<VerifyEmailEffect />} />
           <Route
@@ -557,13 +591,31 @@ export const useCreateAppRouter = (
             }
           />
           {isErpMarocEnabled && (
-            <Route
-              element={
-                <ErpMarocContextProvider>
-                  <ErpMarocRouteBoundary />
-                </ErpMarocContextProvider>
-              }
-            >
+            <Route element={<ErpMarocRouteBoundary />}>
+              <Route
+                path={erpMarocPaths.crm}
+                element={
+                  <LazyRoute>
+                    <ErpMarocCockpitPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.finance}
+                element={
+                  <LazyRoute>
+                    <ErpFinanceDashboardPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.hr}
+                element={
+                  <LazyRoute>
+                    <ErpHrDashboardPage />
+                  </LazyRoute>
+                }
+              />
               <Route
                 path={erpMarocPaths.cockpit}
                 element={
@@ -657,6 +709,14 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpMarocInvoicesPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.procurement}
+                element={
+                  <LazyRoute>
+                    <ErpProcurementPage />
                   </LazyRoute>
                 }
               />
@@ -825,6 +885,14 @@ export const useCreateAppRouter = (
                 element={
                   <LazyRoute>
                     <ErpFinancialPlanningPage />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path={erpMarocPaths.bankStatements}
+                element={
+                  <LazyRoute>
+                    <ErpBankStatementsPage />
                   </LazyRoute>
                 }
               />

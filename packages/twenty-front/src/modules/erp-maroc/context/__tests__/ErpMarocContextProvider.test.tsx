@@ -44,6 +44,8 @@ const ERP_CONTEXT = {
     manageCreditNotes: true,
     allocateCustomerCredit: true,
     manageSupplierAccounting: true,
+    manageInventory: true,
+    manageMarketing: true,
   },
   features: {
     salesUi: true,
@@ -52,6 +54,7 @@ const ERP_CONTEXT = {
     invoiceEmail: true,
     reminderManagement: true,
     reminderDelivery: true,
+    marketingAutomation: true,
     whatsappDelivery: false as const,
   },
 };
@@ -93,6 +96,9 @@ const ContextProbe = () => {
       </div>
       <div data-testid="client-identity">
         {firstClient.current === state.client ? 'stable' : 'changed'}
+      </div>
+      <div data-testid="hr-space-access">
+        {state.status === 'ready' ? String(state.spaceAccess?.hr) : ''}
       </div>
       <button type="button" onClick={state.refetch}>
         Refetch
@@ -146,6 +152,23 @@ describe('ErpMarocContextProvider', () => {
       expect(screen.getByTestId('status')).toHaveTextContent('ready'),
     );
     expect(screen.getByTestId('role')).toHaveTextContent('ADMIN');
+    expect(screen.getByTestId('hr-space-access')).toHaveTextContent('true');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the RH space when a non-admin user has no HR grant', async () => {
+    mockJsonResponse({ ...ERP_CONTEXT, role: 'COMMERCIAL' });
+    mockJsonResponse({ code: 'ERP_LINK_REQUIRED', statusCode: 403 }, 403);
+
+    renderProvider();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('ready'),
+    );
+    expect(screen.getByTestId('hr-space-access')).toHaveTextContent('false');
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      '/erp-maroc-api/hr-core/access/me',
+    );
   });
 
   it('keeps one client when useAuth returns a new signOut on every render', async () => {

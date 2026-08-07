@@ -1,4 +1,6 @@
 import { isErpMarocEnabledState } from '@/client-config/states/isErpMarocEnabledState';
+import { type ErpMarocClient } from '@/erp-maroc/api/erpMarocClient';
+import { useErpMarocContext } from '@/erp-maroc/context/useErpMarocContext';
 import { NavigationDrawerErpMarocSection } from '@/erp-maroc/navigation/NavigationDrawerErpMarocSection';
 import { erpMarocPaths } from '@/erp-maroc/navigation/erpMarocPaths';
 import { MainNavigationDrawerScrollableItems } from '@/navigation/components/MainNavigationDrawerScrollableItems';
@@ -6,10 +8,15 @@ import { type NavigationDrawerItemProps } from '@/ui/navigation/navigation-drawe
 import { isNavigationDrawerExpandedState } from '@/ui/navigation/states/isNavigationDrawerExpanded';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createStore, Provider as JotaiProvider } from 'jotai';
 import { type ComponentType, type ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
+import { type ErpContext } from 'twenty-shared/erp-maroc';
+
+jest.mock('@/erp-maroc/context/useErpMarocContext', () => ({
+  useErpMarocContext: jest.fn(),
+}));
 
 jest.mock(
   '@/navigation-menu-item/display/sections/components/NavigationDrawerOpenedSection',
@@ -59,9 +66,22 @@ jest.mock(
 jest.mock(
   '@/ui/navigation/navigation-drawer/components/NavigationDrawerSectionTitle',
   () => ({
-    NavigationDrawerSectionTitle: ({ label }: { label: string }) => (
-      <h2>{label}</h2>
-    ),
+    NavigationDrawerSectionTitle: ({
+      label,
+      onClick,
+      isOpen,
+    }: {
+      label: string;
+      onClick?: () => void;
+      isOpen?: boolean;
+    }) =>
+      onClick ? (
+        <button type="button" aria-expanded={isOpen} onClick={onClick}>
+          {label}
+        </button>
+      ) : (
+        <h2>{label}</h2>
+      ),
   }),
 );
 
@@ -95,41 +115,56 @@ const ActualNavigationDrawerItem = jest.requireActual(
   '@/ui/navigation/navigation-drawer/components/NavigationDrawerItem',
 ).NavigationDrawerItem as ComponentType<NavigationDrawerItemProps>;
 
-const labels = [
-  'Vue ventes',
-  'Mise en service',
-  'Produits',
-  'Stocks',
-  'Tiers',
-  'Portail clients',
-  'Devis',
-  'Commandes et livraisons',
-  'Factures',
-  'Achats',
-  'Paiements',
-  'Chèques',
-  'Avoirs',
-  'Relances',
-  'Marketing',
-  'GED / OCR',
-  'Notes de frais',
-  'Pilotage financier',
-  'Ressources humaines',
-  'Temps & paie',
-  'Talents',
-  'Mon espace',
-  'Référentiel paie',
-  'Pilotage RH',
-  'Provisions',
-  'Immobilisations',
-  'Fiscalité',
-  'Révision comptable',
-  'Écritures',
-  'Grand livre',
-  'Balance',
-  'Lettrage',
-  'Copilote comptable',
-];
+const ERP_CONTEXT: ErpContext = {
+  societeId: '89c90690-4f4a-4f2e-91ce-3700f16a8ca1',
+  twentyUserId: 'twenty-user-1',
+  timezone: 'Africa/Casablanca',
+  role: 'ADMIN',
+  capabilities: {
+    manageCatalog: true,
+    manageTiers: true,
+    manageSalesDocuments: true,
+    createPendingPayment: true,
+    postPayment: true,
+    terminateOwnPendingPayment: true,
+    terminateAnyPayment: true,
+    manageReminders: true,
+    manageCreditNotes: true,
+    allocateCustomerCredit: true,
+    manageSupplierAccounting: true,
+    manageInventory: true,
+    manageMarketing: true,
+  },
+  features: {
+    salesUi: true,
+    pdfGeneration: true,
+    invoiceValidation: true,
+    invoiceEmail: true,
+    reminderManagement: true,
+    reminderDelivery: true,
+    marketingAutomation: true,
+    whatsappDelivery: false,
+  },
+};
+
+const mockedUseErpMarocContext = jest.mocked(useErpMarocContext);
+
+const setReadyContext = ({
+  context = ERP_CONTEXT,
+  hr = true,
+}: {
+  context?: ErpContext;
+  hr?: boolean;
+} = {}) => {
+  mockedUseErpMarocContext.mockReturnValue({
+    status: 'ready',
+    context,
+    spaceAccess: { crm: true, finance: true, hr },
+    error: null,
+    refetch: jest.fn(),
+    client: {} as ErpMarocClient,
+  });
+};
 
 const renderWithNavigation = ({
   path = erpMarocPaths.cockpit,
@@ -161,153 +196,140 @@ const renderWithNavigation = ({
 };
 
 describe('NavigationDrawerErpMarocSection', () => {
-  it('defines the canonical ERP Maroc paths', () => {
-    expect(erpMarocPaths).toEqual({
-      cockpit: '/erp-maroc',
-      onboarding: '/erp-maroc/onboarding',
-      products: '/erp-maroc/products',
-      inventory: '/erp-maroc/inventory',
-      salesOperations: '/erp-maroc/sales-operations',
-      tiers: '/erp-maroc/tiers',
-      clientPortal: '/erp-maroc/client-portal',
-      quotes: '/erp-maroc/quotes',
-      quoteNew: '/erp-maroc/quotes/new',
-      quoteEdit: '/erp-maroc/quotes/:id/edit',
-      quoteDetail: '/erp-maroc/quotes/:id',
-      purchaseOrders: '/erp-maroc/purchase-orders',
-      purchaseOrderNew: '/erp-maroc/purchase-orders/new',
-      purchaseOrderDetail: '/erp-maroc/purchase-orders/:id',
-      invoices: '/erp-maroc/invoices',
-      invoiceNew: '/erp-maroc/invoices/new',
-      invoiceEdit: '/erp-maroc/invoices/:id/edit',
-      invoiceDetail: '/erp-maroc/invoices/:id',
-      payments: '/erp-maroc/payments',
-      paymentNew: '/erp-maroc/payments/new',
-      paymentDetail: '/erp-maroc/payments/:id',
-      cheques: '/erp-maroc/cheques',
-      chequeDetail: '/erp-maroc/cheques/:id',
-      chequeDepositSlipDetail: '/erp-maroc/cheques/deposit-slips/:id',
-      creditNotes: '/erp-maroc/credit-notes',
-      creditNoteNew: '/erp-maroc/credit-notes/new',
-      creditNoteEdit: '/erp-maroc/credit-notes/:id/edit',
-      creditNoteDetail: '/erp-maroc/credit-notes/:id',
-      reminders: '/erp-maroc/reminders',
-      marketing: '/erp-maroc/marketing',
-      documents: '/erp-maroc/documents',
-      expenseNotes: '/erp-maroc/expense-notes',
-      financialPlanning: '/erp-maroc/financial-planning',
-      hrCore: '/erp-maroc/hr',
-      hrEmployeeDetail: '/erp-maroc/hr/employees/:id',
-      timeAttendance: '/erp-maroc/hr/time-attendance',
-      talent: '/erp-maroc/hr/talent',
-      employeePortal: '/erp-maroc/hr/employee-portal',
-      payrollRegulatory: '/erp-maroc/hr/payroll-regulatory',
-      hrOperations: '/erp-maroc/hr/operations',
-      accountingEntries: '/erp-maroc/accounting/entries',
-      accountingEntryNew: '/erp-maroc/accounting/entries/new',
-      accountingEntryEdit: '/erp-maroc/accounting/entries/:id/edit',
-      accountingEntryDetail: '/erp-maroc/accounting/entries/:id',
-      accountingProvisions: '/erp-maroc/accounting/provisions',
-      fixedAssets: '/erp-maroc/accounting/fixed-assets',
-      fiscal: '/erp-maroc/accounting/fiscal',
-      accountingReferences: '/erp-maroc/accounting/references',
-      accountingReview: '/erp-maroc/accounting/review',
-      accountingClosing: '/erp-maroc/accounting/closing',
-      accountingGrandLivre: '/erp-maroc/accounting/grand-livre',
-      accountingBalance: '/erp-maroc/accounting/balance',
-      accountingLettrage: '/erp-maroc/accounting/lettrage',
-      accountingCopilot: '/erp-maroc/accounting/copilot',
-    });
+  beforeEach(() => {
+    window.localStorage.clear();
+    setReadyContext();
   });
 
-  it('renders all ERP labels with existing Twenty icons', () => {
+  it('defines the three stable entry routes and bank statements route', () => {
+    expect(erpMarocPaths.crm).toBe('/crm');
+    expect(erpMarocPaths.finance).toBe('/finance');
+    expect(erpMarocPaths.hr).toBe('/rh');
+    expect(erpMarocPaths.bankStatements).toBe('/erp-maroc/bank-statements');
+  });
+
+  it('renders a compact CRM navigation and opens groups on demand', () => {
     renderWithNavigation();
 
-    for (const label of labels) {
-      const link = screen.getByRole('link', { name: label });
-      expect(link).toHaveAttribute('href');
-      expect(link.querySelector('svg')).toBeInTheDocument();
-    }
+    expect(screen.getByRole('heading', { name: 'Espace CRM' })).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Vue commerciale' }),
+    ).toHaveAttribute('aria-selected', 'true');
+    expect(
+      screen.getByRole('link', { name: 'Tiers synchronisés' }),
+    ).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'Devis' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Vente' }));
+
+    expect(screen.getByRole('link', { name: 'Devis' })).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Commandes et livraisons' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('link', { name: 'Tiers synchronisés' }),
+    ).toBeNull();
   });
 
-  it.each([
-    [erpMarocPaths.cockpit, 'Vue ventes'],
-    [erpMarocPaths.onboarding, 'Mise en service'],
-    [erpMarocPaths.products, 'Produits'],
-    [erpMarocPaths.inventory, 'Stocks'],
-    [erpMarocPaths.tiers, 'Tiers'],
-    [erpMarocPaths.clientPortal, 'Portail clients'],
-    [erpMarocPaths.quotes, 'Devis'],
-    [erpMarocPaths.salesOperations, 'Commandes et livraisons'],
-    [erpMarocPaths.quoteNew, 'Devis'],
-    ['/erp-maroc/quotes/quote-123', 'Devis'],
-    ['/erp-maroc/quotes/quote-123/edit', 'Devis'],
-    [erpMarocPaths.invoices, 'Factures'],
-    [erpMarocPaths.invoiceNew, 'Factures'],
-    ['/erp-maroc/invoices/invoice-123/edit', 'Factures'],
-    ['/erp-maroc/invoices/invoice-123', 'Factures'],
-    [erpMarocPaths.purchaseOrders, 'Achats'],
-    [erpMarocPaths.purchaseOrderNew, 'Achats'],
-    ['/erp-maroc/purchase-orders/order-123', 'Achats'],
-    [erpMarocPaths.payments, 'Paiements'],
-    [erpMarocPaths.paymentNew, 'Paiements'],
-    ['/erp-maroc/payments/payment-123', 'Paiements'],
-    [erpMarocPaths.cheques, 'Chèques'],
-    ['/erp-maroc/cheques/cheque-123', 'Chèques'],
-    [erpMarocPaths.creditNotes, 'Avoirs'],
-    [erpMarocPaths.creditNoteNew, 'Avoirs'],
-    ['/erp-maroc/credit-notes/credit-note-123/edit', 'Avoirs'],
-    ['/erp-maroc/credit-notes/credit-note-123', 'Avoirs'],
-    [erpMarocPaths.reminders, 'Relances'],
-    [erpMarocPaths.marketing, 'Marketing'],
-    [erpMarocPaths.documents, 'GED / OCR'],
-    [erpMarocPaths.expenseNotes, 'Notes de frais'],
-    [erpMarocPaths.financialPlanning, 'Pilotage financier'],
-    [erpMarocPaths.hrCore, 'Ressources humaines'],
-    ['/erp-maroc/hr/employees/employee-123', 'Ressources humaines'],
-    [erpMarocPaths.timeAttendance, 'Temps & paie'],
-    [erpMarocPaths.talent, 'Talents'],
-    [erpMarocPaths.payrollRegulatory, 'Référentiel paie'],
-    [erpMarocPaths.hrOperations, 'Pilotage RH'],
-    [erpMarocPaths.accountingEntries, 'Écritures'],
-    ['/erp-maroc/accounting/entries/entry-123/edit', 'Écritures'],
-    ['/erp-maroc/accounting/entries/entry-123', 'Écritures'],
-    [erpMarocPaths.accountingProvisions, 'Provisions'],
-    [erpMarocPaths.fixedAssets, 'Immobilisations'],
-    [erpMarocPaths.fiscal, 'Fiscalité'],
-    [erpMarocPaths.accountingReview, 'Révision comptable'],
-    [erpMarocPaths.accountingGrandLivre, 'Grand livre'],
-    [erpMarocPaths.accountingBalance, 'Balance'],
-    [erpMarocPaths.accountingLettrage, 'Lettrage'],
-    [erpMarocPaths.accountingCopilot, 'Copilote comptable'],
-  ])('marks only the exact item active at %s', (path, activeLabel) => {
-    renderWithNavigation({ path });
+  it('opens the active Finance group and marks the exact item active', () => {
+    renderWithNavigation({ path: erpMarocPaths.invoices });
 
-    for (const label of labels) {
-      expect(screen.getByRole('link', { name: label })).toHaveAttribute(
-        'aria-selected',
-        String(label === activeLabel),
-      );
-    }
+    expect(
+      screen.getByRole('heading', { name: 'Espace Finance' }),
+    ).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Factures' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Dossiers salariés' }),
+    ).toBeNull();
   });
 
-  it('does not prefix-match an unsupported nested ERP path', () => {
-    renderWithNavigation({ path: '/erp-maroc/quotes/quote-123/history' });
+  it('keeps the detailed Finance and RH tools available below their dashboards', () => {
+    const { unmount } = renderWithNavigation({
+      path: erpMarocPaths.financialPlanning,
+    });
 
-    for (const label of labels) {
-      expect(screen.getByRole('link', { name: label })).toHaveAttribute(
-        'aria-selected',
-        'false',
-      );
-    }
+    expect(
+      screen.getByRole('link', { name: 'Budgets, analytique et devises' }),
+    ).toHaveAttribute('aria-selected', 'true');
+
+    unmount();
+    renderWithNavigation({ path: erpMarocPaths.hrOperations });
+
+    expect(
+      screen.getByRole('link', { name: 'Opérations et campagnes RH' }),
+    ).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('retains accessible link labels when the drawer is collapsed', () => {
-    renderWithNavigation({ isExpanded: false });
+  it('filters accounting and RH access for a commercial user', () => {
+    setReadyContext({
+      context: {
+        ...ERP_CONTEXT,
+        role: 'COMMERCIAL',
+        capabilities: {
+          ...ERP_CONTEXT.capabilities,
+          manageSupplierAccounting: false,
+          manageInventory: false,
+        },
+      },
+      hr: false,
+    });
 
-    for (const label of labels) {
-      expect(screen.getByRole('link', { name: label })).toBeInTheDocument();
-    }
+    renderWithNavigation({
+      path: erpMarocPaths.finance,
+      component: <MainNavigationDrawerScrollableItems />,
+    });
+
+    expect(screen.queryByRole('tab', { name: 'RH' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Comptabilité' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Ventes' })).toBeVisible();
+  });
+});
+
+describe('MainNavigationDrawerScrollableItems spaces', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    setReadyContext();
+  });
+
+  it('keeps native objects in CRM', async () => {
+    renderWithNavigation({
+      component: <MainNavigationDrawerScrollableItems />,
+    });
+
+    expect(await screen.findByTestId('workspace-section')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'CRM' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
+  it('hides native CRM objects in Finance', async () => {
+    renderWithNavigation({
+      path: erpMarocPaths.invoices,
+      component: <MainNavigationDrawerScrollableItems />,
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('other-section')).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId('workspace-section')).toBeNull();
+    expect(screen.getByRole('tab', { name: 'Finance' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
+  it('keeps the standard workspace navigation when ERP is disabled', async () => {
+    renderWithNavigation({
+      isEnabled: false,
+      component: <MainNavigationDrawerScrollableItems />,
+    });
+
+    expect(await screen.findByTestId('workspace-section')).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'CRM' })).toBeNull();
   });
 });
 
@@ -337,30 +359,5 @@ describe('NavigationDrawerItem accessibility', () => {
     } finally {
       consoleErrorSpy.mockRestore();
     }
-  });
-});
-
-describe('MainNavigationDrawerScrollableItems ERP Maroc registration', () => {
-  it('does not render the ERP section when the feature flag is disabled', async () => {
-    renderWithNavigation({
-      isEnabled: false,
-      component: <MainNavigationDrawerScrollableItems />,
-    });
-
-    await waitFor(() =>
-      expect(screen.getByTestId('workspace-section')).toBeInTheDocument(),
-    );
-    expect(screen.queryByRole('link', { name: 'Vue ventes' })).toBeNull();
-  });
-
-  it('renders the ERP section immediately before Other when enabled', async () => {
-    renderWithNavigation({
-      component: <MainNavigationDrawerScrollableItems />,
-    });
-
-    const otherSection = await screen.findByTestId('other-section');
-    expect(otherSection.previousElementSibling).toContainElement(
-      screen.getByRole('link', { name: 'Vue ventes' }),
-    );
   });
 });

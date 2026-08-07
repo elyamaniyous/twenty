@@ -11,6 +11,15 @@ import {
   formatPurchaseOrderDate,
   purchaseOrderStatusAppearance,
 } from '@/erp-maroc/purchase-orders/purchaseOrderUi';
+import {
+  findApplicablePurchaseApprovalMatrix,
+  getCurrentPurchaseApprovalStep,
+  purchaseApprovalMatrixListSchema,
+  purchaseApprovalRequestListSchema,
+  purchaseApprovalRequestSchema,
+  type PurchaseApprovalMatrix,
+  type PurchaseApprovalRequest,
+} from '@/erp-maroc/purchase-orders/purchaseOrderApproval';
 import { ErpPurchaseReceiptPanel } from '@/erp-maroc/purchase-orders/ErpPurchaseReceiptPanel';
 import { ErpSupplierInvoicePanel } from '@/erp-maroc/purchase-orders/ErpSupplierInvoicePanel';
 import { ErpSupplierInvoiceReview } from '@/erp-maroc/purchase-orders/ErpSupplierInvoiceReview';
@@ -27,6 +36,7 @@ import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 
 type PurchaseOrderAction = 'confirm' | 'cancel';
+type PurchaseApprovalAction = 'submit' | 'approve' | 'reject';
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -103,6 +113,25 @@ const actionCopy = {
   },
 } as const;
 
+const approvalActionCopy = {
+  submit: {
+    title: 'Soumettre la commande pour validation',
+    message: "Le circuit d'approbation correspondant au montant sera démarré.",
+    confirm: 'Soumettre',
+  },
+  approve: {
+    title: "Approuver l'achat",
+    message: "Votre décision fera avancer le circuit d'approbation.",
+    confirm: 'Approuver',
+  },
+  reject: {
+    title: "Rejeter l'achat",
+    message:
+      'La commande devra être soumise à nouveau avant de pouvoir être confirmée.',
+    confirm: 'Rejeter',
+  },
+} as const;
+
 export const ErpPurchaseOrderDetailPage = () => {
   const { client, context } = useErpMarocContext();
   const { id } = useParams<{ id: string }>();
@@ -113,6 +142,16 @@ export const ErpPurchaseOrderDetailPage = () => {
   >('loading');
   const [generation, setGeneration] = useState(0);
   const [action, setAction] = useState<PurchaseOrderAction | null>(null);
+  const [approvalAction, setApprovalAction] =
+    useState<PurchaseApprovalAction | null>(null);
+  const [approvalMatrices, setApprovalMatrices] = useState<
+    PurchaseApprovalMatrix[]
+  >([]);
+  const [approvalRequest, setApprovalRequest] =
+    useState<PurchaseApprovalRequest | null>(null);
+  const [approvalLoadState, setApprovalLoadState] = useState<
+    'loading' | 'ready' | 'error'
+  >('loading');
   const [isMutating, setIsMutating] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [isSupplierInvoiceOpen, setIsSupplierInvoiceOpen] = useState(false);
@@ -120,7 +159,7 @@ export const ErpPurchaseOrderDetailPage = () => {
     string | null
   >(null);
   const [message, setMessage] = useState<string | null>(null);
-  const canManage = context?.capabilities.manageSalesDocuments === true;
+  const canManage = context?.capabilities.manageSupplierAccounting === true;
 
   useEffect(() => {
     if (orderId === null) return;
@@ -150,6 +189,44 @@ export const ErpPurchaseOrderDetailPage = () => {
 
     return () => abortController.abort();
   }, [client, generation, orderId]);
+
+  useEffect(() => {
+    if (orderId === null || !canManage) return;
+    const abortController = new AbortController();
+    setApprovalLoadState('loading');
+
+    void Promise.all([
+      client.request({
+        method: 'GET',
+        path: '/approvals/matrices',
+        schema: purchaseApprovalMatrixListSchema,
+        signal: abortController.signal,
+      }),
+      client.request({
+        method: 'GET',
+        path: '/approvals/requests',
+        schema: purchaseApprovalRequestListSchema,
+        signal: abortController.signal,
+      }),
+    ])
+      .then(([matrices, requests]) => {
+        if (abortController.signal.aborted) return;
+        setApprovalMatrices(matrices);
+        setApprovalRequest(
+          requests.find(
+            (request) =>
+              request.entityType === 'PURCHASE_ORDER' &&
+              request.entityId === orderId,
+          ) ?? null,
+        );
+        setApprovalLoadState('ready');
+      })
+      .catch(() => {
+        if (!abortController.signal.aborted) setApprovalLoadState('error');
+      });
+
+    return () => abortController.abort();
+  }, [canManage, client, generation, orderId]);
 
   const columns = useMemo<ErpOperationalTableColumn<ErpPurchaseOrderLine>[]>(
     () => [
@@ -223,6 +300,60 @@ export const ErpPurchaseOrderDetailPage = () => {
     }
   };
 
+  const runApprovalAction = async () => {
+    if (approvalAction === null || order === null || !canManage || isMutating) {
+      return;
+    }
+
+    setIsMutating(true);
+    setMessage(null);
+    try {
+      const intent =
+        approvalAction === 'submit'
+          ? client.createMutationIntent(
+              {
+                method: 'POST',
+                path: '/approvals/requests',
+                schema: purchaseApprovalRequestSchema,
+                body: {
+                  entityType: 'PURCHASE_ORDER',
+                  entityId: order.id,
+                },
+              },
+              { idempotency: 'forbidden' },
+            )
+          : client.createMutationIntent(
+              {
+                method: 'POST',
+                path: `/approvals/requests/${approvalRequest?.id ?? ''}/decision`,
+                schema: purchaseApprovalRequestSchema,
+                body: {
+                  decision:
+                    approvalAction === 'approve' ? 'APPROVED' : 'REJECTED',
+                },
+              },
+              { idempotency: 'forbidden' },
+            );
+      const result = await intent.execute();
+      setApprovalRequest(result);
+      setMessage(
+        approvalAction === 'submit'
+          ? 'Commande transmise pour validation.'
+          : approvalAction === 'approve'
+            ? "Décision enregistrée. Le circuit d'approbation a avancé."
+            : 'Commande rejetée par le circuit de validation.',
+      );
+      setApprovalAction(null);
+    } catch {
+      setApprovalAction(null);
+      setMessage(
+        "L'action d'approbation n'a pas pu être enregistrée. Actualisez le dossier avant de réessayer.",
+      );
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
   if (orderId === null || state === 'not-found') {
     return (
       <ErpPageShell
@@ -246,7 +377,31 @@ export const ErpPurchaseOrderDetailPage = () => {
   }
 
   const appearance = purchaseOrderStatusAppearance[order.status];
-  const canConfirm = canManage && order.status === 'DRAFT';
+  const applicableApprovalMatrix = findApplicablePurchaseApprovalMatrix(
+    approvalMatrices,
+    order.totalTtcCents,
+  );
+  const approvalRequired =
+    approvalLoadState === 'ready' && applicableApprovalMatrix !== null;
+  const currentApprovalStep = getCurrentPurchaseApprovalStep(
+    applicableApprovalMatrix,
+    approvalRequest,
+  );
+  const canSubmitApproval =
+    canManage &&
+    order.status === 'DRAFT' &&
+    approvalRequired &&
+    (approvalRequest === null || approvalRequest.status === 'REJECTED');
+  const canDecideApproval =
+    canManage &&
+    order.status === 'DRAFT' &&
+    approvalRequest?.status === 'PENDING' &&
+    currentApprovalStep?.role === context?.role;
+  const canConfirm =
+    canManage &&
+    order.status === 'DRAFT' &&
+    approvalLoadState !== 'loading' &&
+    (!approvalRequired || approvalRequest?.status === 'APPROVED');
   const canCancel =
     canManage && (order.status === 'DRAFT' || order.status === 'CONFIRMED');
   const canReceive =
@@ -258,6 +413,20 @@ export const ErpPurchaseOrderDetailPage = () => {
       order.status === 'PARTIALLY_RECEIVED' ||
       order.status === 'RECEIVED');
   const copy = action === null ? null : actionCopy[action];
+  const approvalCopy =
+    approvalAction === null ? null : approvalActionCopy[approvalAction];
+  const approvalAppearance = !approvalRequired
+    ? null
+    : approvalRequest === null
+      ? { label: 'Validation requise', tone: 'warning' as const }
+      : approvalRequest.status === 'PENDING'
+        ? {
+            label: currentApprovalStep?.label ?? 'Validation en attente',
+            tone: 'warning' as const,
+          }
+        : approvalRequest.status === 'APPROVED'
+          ? { label: 'Achat approuvé', tone: 'success' as const }
+          : { label: 'Achat rejeté', tone: 'danger' as const };
 
   return (
     <ErpPageShell
@@ -268,6 +437,37 @@ export const ErpPurchaseOrderDetailPage = () => {
       actions={
         <StyledActions>
           <ErpStatusBadge label={appearance.label} tone={appearance.tone} />
+          {approvalAppearance === null ? null : (
+            <ErpStatusBadge
+              label={approvalAppearance.label}
+              tone={approvalAppearance.tone}
+            />
+          )}
+          {canSubmitApproval ? (
+            <Button
+              title="Soumettre validation"
+              ariaLabel="Soumettre le bon de commande pour validation"
+              accent="blue"
+              onClick={() => setApprovalAction('submit')}
+            />
+          ) : null}
+          {canDecideApproval ? (
+            <>
+              <Button
+                title="Approuver"
+                ariaLabel="Approuver le bon de commande"
+                accent="blue"
+                onClick={() => setApprovalAction('approve')}
+              />
+              <Button
+                title="Rejeter"
+                ariaLabel="Rejeter le bon de commande"
+                variant="secondary"
+                accent="danger"
+                onClick={() => setApprovalAction('reject')}
+              />
+            </>
+          ) : null}
           {canConfirm ? (
             <Button
               title="Confirmer"
@@ -401,6 +601,19 @@ export const ErpPurchaseOrderDetailPage = () => {
           if (!isMutating) setAction(null);
         }}
         onConfirm={() => void runAction()}
+      />
+      <ErpConfirmDialog
+        isOpen={approvalAction !== null}
+        title={approvalCopy?.title ?? 'Confirmer'}
+        message={approvalCopy?.message ?? ''}
+        confirmLabel={approvalCopy?.confirm}
+        destructive={approvalAction === 'reject'}
+        confirmDisabled={isMutating}
+        isConfirming={isMutating}
+        onCancel={() => {
+          if (!isMutating) setApprovalAction(null);
+        }}
+        onConfirm={() => void runApprovalAction()}
       />
     </ErpPageShell>
   );

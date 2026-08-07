@@ -39,7 +39,7 @@ export const ErpPurchaseOrderEditorPage = () => {
   const [errors, setErrors] = useState<PurchaseOrderFormError[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const canManage = context?.capabilities.manageSalesDocuments === true;
+  const canManage = context?.capabilities.manageSupplierAccounting === true;
 
   useEffect(() => {
     const abortController = new AbortController();

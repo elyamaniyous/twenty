@@ -707,6 +707,202 @@ export const erpPurchaseOrderSchema = z.object({
 
 export const erpPurchaseOrderListSchema = z.array(erpPurchaseOrderSchema);
 
+export const erpPurchaseRequestStatusSchema = z.enum([
+  'DRAFT',
+  'SUBMITTED',
+  'APPROVED',
+  'SOURCING',
+  'ORDERED',
+  'CANCELLED',
+]);
+
+export const erpSourcingEventTypeSchema = z.enum([
+  'REQUEST_FOR_QUOTATION',
+  'PRIVATE_TENDER',
+]);
+
+export const erpSourcingEventStatusSchema = z.enum([
+  'DRAFT',
+  'OPEN',
+  'CLOSED',
+  'AWARDED',
+  'CANCELLED',
+]);
+
+export const erpSupplierBidStatusSchema = z.enum([
+  'DRAFT',
+  'SUBMITTED',
+  'WITHDRAWN',
+]);
+
+const erpProcurementProductSummarySchema = z
+  .object({
+    id: uuidSchema,
+    code: nonBlankStringSchema,
+    name: nonBlankStringSchema,
+  })
+  .nullable();
+
+export const erpPurchaseRequestLineSchema = z.object({
+  id: uuidSchema,
+  purchaseRequestId: uuidSchema,
+  productId: nullableUuidSchema,
+  description: nonBlankStringSchema,
+  unit: nullableStringSchema,
+  quantity: z.number().finite().positive(),
+  estimatedUnitPriceHtCents: centsSchema.nullable(),
+  tvaRate: nonNegativeIntegerSchema,
+  position: nonNegativeIntegerSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  product: erpProcurementProductSummarySchema,
+});
+
+const erpPurchaseRequestSourcingSummarySchema = z.object({
+  id: uuidSchema,
+  type: erpSourcingEventTypeSchema,
+  status: erpSourcingEventStatusSchema,
+  responseDeadline: instantSchema,
+  generatedPurchaseOrderId: nullableUuidSchema,
+});
+
+const erpPurchaseRequestBaseSchema = z.object({
+  id: uuidSchema,
+  societeId: uuidSchema,
+  number: nonBlankStringSchema,
+  year: nonNegativeIntegerSchema,
+  title: nonBlankStringSchema,
+  department: nullableStringSchema,
+  status: erpPurchaseRequestStatusSchema,
+  requestDate: civilDateHttpSchema,
+  desiredDeliveryDate: nullableCivilDateHttpSchema,
+  estimatedBudgetCents: centsSchema.nullable(),
+  notes: nullableStringSchema,
+  requestedByTwentyUserId: nonBlankStringSchema,
+  submittedAt: nullableInstantSchema,
+  approvedAt: nullableInstantSchema,
+  approvedByTwentyUserId: nullableStringSchema,
+  cancelledAt: nullableInstantSchema,
+  cancelledByTwentyUserId: nullableStringSchema,
+  cancellationReason: nullableStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  lines: z.array(erpPurchaseRequestLineSchema).min(1),
+});
+
+export const erpPurchaseRequestSchema = erpPurchaseRequestBaseSchema.extend({
+  sourcingEvents: z.array(erpPurchaseRequestSourcingSummarySchema),
+});
+
+export const erpPurchaseRequestListSchema = z.array(erpPurchaseRequestSchema);
+
+export const erpSourcingSupplierSchema = z.object({
+  id: uuidSchema,
+  name: nonBlankStringSchema,
+  type: erpTierTypeSchema,
+  email: nullableStringSchema,
+  ice: nullableStringSchema,
+});
+
+export const erpSourcingInvitationSchema = z.object({
+  id: uuidSchema,
+  sourcingEventId: uuidSchema,
+  supplierId: uuidSchema,
+  invitedAt: nullableInstantSchema,
+  respondedAt: nullableInstantSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  supplier: erpSourcingSupplierSchema,
+});
+
+export const erpSupplierBidLineSchema = z.object({
+  id: uuidSchema,
+  supplierBidId: uuidSchema,
+  purchaseRequestLineId: uuidSchema,
+  quantity: z.number().finite().positive(),
+  unitPriceHtCents: centsSchema,
+  tvaRate: nonNegativeIntegerSchema,
+  totalHtCents: centsSchema,
+  totalTvaCents: centsSchema,
+  totalTtcCents: centsSchema,
+  position: nonNegativeIntegerSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  purchaseRequestLine: z.object({
+    id: uuidSchema,
+    productId: nullableUuidSchema,
+    description: nonBlankStringSchema,
+    unit: nullableStringSchema,
+    quantity: z.number().finite().positive(),
+    position: nonNegativeIntegerSchema,
+  }),
+});
+
+export const erpSupplierBidSchema = z.object({
+  id: uuidSchema,
+  societeId: uuidSchema,
+  sourcingEventId: uuidSchema,
+  supplierId: uuidSchema,
+  externalReference: nonBlankStringSchema,
+  status: erpSupplierBidStatusSchema,
+  issueDate: civilDateHttpSchema,
+  validityDate: nullableCivilDateHttpSchema,
+  currency: z.literal('MAD'),
+  deliveryDays: nonNegativeIntegerSchema,
+  paymentTermsDays: nonNegativeIntegerSchema,
+  warranty: nullableStringSchema,
+  notes: nullableStringSchema,
+  totalHtCents: centsSchema,
+  totalTvaCents: centsSchema,
+  totalTtcCents: centsSchema,
+  receivedAt: instantSchema,
+  recordedByTwentyUserId: nonBlankStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  supplier: erpSourcingSupplierSchema,
+  lines: z.array(erpSupplierBidLineSchema).min(1),
+  evaluationScore: z.number().finite().min(0).max(100),
+  evaluationRank: positiveIntegerSchema,
+});
+
+export const erpSourcingEventSchema = z.object({
+  id: uuidSchema,
+  societeId: uuidSchema,
+  purchaseRequestId: uuidSchema,
+  type: erpSourcingEventTypeSchema,
+  status: erpSourcingEventStatusSchema,
+  title: nonBlankStringSchema,
+  responseDeadline: instantSchema,
+  priceWeight: nonNegativeIntegerSchema.max(100),
+  deliveryWeight: nonNegativeIntegerSchema.max(100),
+  paymentTermsWeight: nonNegativeIntegerSchema.max(100),
+  notes: nullableStringSchema,
+  openedAt: nullableInstantSchema,
+  closedAt: nullableInstantSchema,
+  awardedAt: nullableInstantSchema,
+  awardedByTwentyUserId: nullableStringSchema,
+  selectedBidId: nullableUuidSchema,
+  generatedPurchaseOrderId: nullableUuidSchema,
+  createdByTwentyUserId: nonBlankStringSchema,
+  createdAt: instantSchema,
+  updatedAt: instantSchema,
+  purchaseRequest: erpPurchaseRequestBaseSchema,
+  invitedSuppliers: z.array(erpSourcingInvitationSchema).min(1),
+  bids: z.array(erpSupplierBidSchema),
+  generatedPurchaseOrder: z
+    .object({
+      id: uuidSchema,
+      number: nonBlankStringSchema,
+      status: erpPurchaseOrderStatusSchema,
+      totalHtCents: centsSchema,
+      totalTvaCents: centsSchema,
+      totalTtcCents: centsSchema,
+    })
+    .nullable(),
+});
+
+export const erpSourcingEventListSchema = z.array(erpSourcingEventSchema);
+
 export const erpPurchaseReceiptOrderLineSchema = z.object({
   id: uuidSchema,
   productId: nullableUuidSchema,
@@ -4951,6 +5147,17 @@ export const erpMarocRouteIds = {
   purchaseOrderCancel: 'purchase-orders.cancel',
   purchaseOrderReceipts: 'purchase-orders.receipts',
   purchaseOrderSupplierInvoices: 'purchase-orders.supplierInvoices',
+  procurementRequests: 'procurement.requests',
+  procurementRequestSubmit: 'procurement.request.submit',
+  procurementRequestApprove: 'procurement.request.approve',
+  procurementRequestCancel: 'procurement.request.cancel',
+  procurementRequestCreateEvent: 'procurement.request.createEvent',
+  procurementEvents: 'procurement.events',
+  procurementEventDetail: 'procurement.event.detail',
+  procurementEventOpen: 'procurement.event.open',
+  procurementEventBids: 'procurement.event.bids',
+  procurementEventClose: 'procurement.event.close',
+  procurementEventAward: 'procurement.event.award',
   supplierInvoiceDetail: 'supplier-invoices.detail',
   supplierInvoiceApprove: 'supplier-invoices.approve',
   supplierInvoiceCancel: 'supplier-invoices.cancel',
@@ -5338,6 +5545,27 @@ export const erpMarocUpstreamRoutes = {
     receipts: (id: string) => `/purchase-orders/${encodeRouteId(id)}/receipts`,
     supplierInvoices: (id: string) =>
       `/purchase-orders/${encodeRouteId(id)}/supplier-invoices`,
+  },
+  procurement: {
+    requests: '/procurement/requests',
+    submitRequest: (id: string) =>
+      `/procurement/requests/${encodeRouteId(id)}/submit`,
+    approveRequest: (id: string) =>
+      `/procurement/requests/${encodeRouteId(id)}/approve`,
+    cancelRequest: (id: string) =>
+      `/procurement/requests/${encodeRouteId(id)}/cancel`,
+    createEvent: (requestId: string) =>
+      `/procurement/requests/${encodeRouteId(requestId)}/sourcing-events`,
+    events: '/procurement/sourcing-events',
+    event: (id: string) => `/procurement/sourcing-events/${encodeRouteId(id)}`,
+    openEvent: (id: string) =>
+      `/procurement/sourcing-events/${encodeRouteId(id)}/open`,
+    bids: (id: string) =>
+      `/procurement/sourcing-events/${encodeRouteId(id)}/bids`,
+    closeEvent: (id: string) =>
+      `/procurement/sourcing-events/${encodeRouteId(id)}/close`,
+    awardEvent: (id: string) =>
+      `/procurement/sourcing-events/${encodeRouteId(id)}/award`,
   },
   supplierInvoices: {
     detail: (id: string) => `/supplier-invoices/${encodeRouteId(id)}`,
@@ -5897,6 +6125,18 @@ export type ErpDeliveryNoteList = z.infer<typeof erpDeliveryNoteListSchema>;
 export type ErpPurchaseOrderLine = z.infer<typeof erpPurchaseOrderLineSchema>;
 export type ErpPurchaseOrder = z.infer<typeof erpPurchaseOrderSchema>;
 export type ErpPurchaseOrderList = z.infer<typeof erpPurchaseOrderListSchema>;
+export type ErpPurchaseRequestLine = z.infer<
+  typeof erpPurchaseRequestLineSchema
+>;
+export type ErpPurchaseRequest = z.infer<typeof erpPurchaseRequestSchema>;
+export type ErpPurchaseRequestList = z.infer<
+  typeof erpPurchaseRequestListSchema
+>;
+export type ErpSourcingInvitation = z.infer<typeof erpSourcingInvitationSchema>;
+export type ErpSupplierBidLine = z.infer<typeof erpSupplierBidLineSchema>;
+export type ErpSupplierBid = z.infer<typeof erpSupplierBidSchema>;
+export type ErpSourcingEvent = z.infer<typeof erpSourcingEventSchema>;
+export type ErpSourcingEventList = z.infer<typeof erpSourcingEventListSchema>;
 export type ErpPurchaseReceiptLine = z.infer<
   typeof erpPurchaseReceiptLineSchema
 >;
