@@ -40,6 +40,7 @@ import {
 import { Button } from 'twenty-ui/input';
 import { themeCssVariables } from 'twenty-ui/theme-constants';
 import { read, utils, write } from 'xlsx-ugnis';
+import { HrEmployeeImportPanel } from '../hr/HrEmployeeImportPanel';
 
 type LoadState = 'loading' | 'ready' | 'error';
 type SpreadsheetRow = Record<string, unknown>;
@@ -683,6 +684,7 @@ export const ErpOnboardingPage = () => {
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isEmployeeImportOpen, setIsEmployeeImportOpen] = useState(false);
 
   const definition = useMemo(
     () => importDefinitions.find((item) => item.kind === kind)!,
@@ -1353,7 +1355,10 @@ export const ErpOnboardingPage = () => {
             </StyledSectionHeader>
             <StyledChecks>
               {readiness.checks.map((check) => {
+                const canImportEmployees =
+                  !check.complete && check.key === 'EMPLOYEES';
                 const canNavigate =
+                  !canImportEmployees &&
                   !check.complete &&
                   check.actionPath !== erpMarocPaths.onboarding;
                 return (
@@ -1369,7 +1374,15 @@ export const ErpOnboardingPage = () => {
                       <StyledCheckTitle>{check.label}</StyledCheckTitle>
                       <StyledSecondary>{check.detail}</StyledSecondary>
                     </StyledCheckCopy>
-                    {canNavigate ? (
+                    {canImportEmployees ? (
+                      <Button
+                        title="Importer"
+                        ariaLabel="Importer les salariés"
+                        Icon={IconUpload}
+                        variant="secondary"
+                        onClick={() => setIsEmployeeImportOpen(true)}
+                      />
+                    ) : canNavigate ? (
                       <Button
                         title="Ouvrir"
                         ariaLabel={`Ouvrir ${check.label}`}
@@ -1438,8 +1451,15 @@ export const ErpOnboardingPage = () => {
               </StyledLaunchCopy>
               <StyledLaunchActions>
                 <Button
-                  title="Salariés"
-                  ariaLabel="Ouvrir les salariés et leur import"
+                  title="Importer salariés"
+                  ariaLabel="Importer les salariés depuis Excel"
+                  Icon={IconUpload}
+                  variant="secondary"
+                  onClick={() => setIsEmployeeImportOpen(true)}
+                />
+                <Button
+                  title="Dossiers RH"
+                  ariaLabel="Ouvrir les dossiers salariés"
                   Icon={IconUsers}
                   variant="secondary"
                   onClick={() => navigate(erpMarocPaths.hrCore)}
@@ -1679,6 +1699,11 @@ export const ErpOnboardingPage = () => {
               )}
             </StyledImportWorkspace>
           </StyledSection>
+          <HrEmployeeImportPanel
+            isOpen={isEmployeeImportOpen}
+            onClose={() => setIsEmployeeImportOpen(false)}
+            onImported={loadReadiness}
+          />
         </StyledWorkspace>
       )}
     </ErpPageShell>
