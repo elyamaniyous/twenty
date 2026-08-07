@@ -22,11 +22,10 @@ import {
 import {
   IconBook,
   IconBox,
-  IconBuildingBank,
+  IconBuildingSkyscraper,
   IconFileText,
   IconListCheck,
   IconPercentage,
-  IconReceipt,
 } from 'twenty-ui/display';
 
 type FinanceData = {
@@ -281,7 +280,7 @@ export const ErpFinanceDashboardPage = () => {
                 {
                   label: 'Paiements et affectations',
                   to: erpMarocPaths.payments,
-                  Icon: IconReceipt,
+                  Icon: IconFileText,
                 },
               ]
             : []),
@@ -320,7 +319,7 @@ export const ErpFinanceDashboardPage = () => {
           {
             label: 'Notes de frais',
             to: erpMarocPaths.expenseNotes,
-            Icon: IconReceipt,
+            Icon: IconFileText,
           },
         ],
       });
@@ -335,7 +334,7 @@ export const ErpFinanceDashboardPage = () => {
             {
               label: 'Relevés et rapprochement',
               to: erpMarocPaths.bankStatements,
-              Icon: IconBuildingBank,
+              Icon: IconBuildingSkyscraper,
             },
             {
               label: 'Chèques et LCN',

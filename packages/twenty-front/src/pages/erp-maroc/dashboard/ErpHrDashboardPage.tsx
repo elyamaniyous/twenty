@@ -17,7 +17,6 @@ import {
   IconCreditCard,
   IconSettings,
   IconUsers,
-  IconUsersGroup,
 } from 'twenty-ui/display';
 
 const formatPercent = (basisPoints: number) =>
@@ -120,7 +119,7 @@ export const ErpHrDashboardPage = () => {
         {
           label: 'Portail salarié',
           to: erpMarocPaths.employeePortal,
-          Icon: IconUsersGroup,
+          Icon: IconUsers,
         },
       ],
     },
@@ -147,7 +146,7 @@ export const ErpHrDashboardPage = () => {
         {
           label: 'Recrutement, formation et évaluations',
           to: erpMarocPaths.talent,
-          Icon: IconUsersGroup,
+          Icon: IconUsers,
         },
         {
           label: 'Indicateurs RH détaillés',

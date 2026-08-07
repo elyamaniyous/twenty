@@ -23,7 +23,6 @@ import {
   IconSettings,
   IconSparkles,
   IconUsers,
-  IconUsersGroup,
   type IconComponent,
 } from 'twenty-ui/display';
 
@@ -446,7 +445,7 @@ export const zowkaSpaceDefinitions: Record<ZowkaSpaceId, ZowkaSpaceDefinition> =
       id: 'hr',
       label: msg`RH`,
       navigationLabel: msg`Espace RH`,
-      Icon: IconUsersGroup,
+      Icon: IconUsers,
       entryPath: erpMarocPaths.hr,
       defaultHomePath: erpMarocPaths.hr,
       homeItem: {
@@ -521,7 +520,7 @@ export const zowkaSpaceDefinitions: Record<ZowkaSpaceId, ZowkaSpaceDefinition> =
               label: msg`Recrutement et développement`,
               path: erpMarocPaths.talent,
               activePaths: [erpMarocPaths.talent],
-              Icon: IconUsersGroup,
+              Icon: IconUsers,
             },
           ],
         },
