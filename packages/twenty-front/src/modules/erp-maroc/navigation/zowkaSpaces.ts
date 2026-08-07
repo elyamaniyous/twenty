@@ -7,7 +7,7 @@ import {
   IconBook,
   IconBox,
   IconBriefcase,
-  IconBuildingBank,
+  IconBuildingSkyscraper,
   IconChartBar,
   IconClock,
   IconCoins,
@@ -167,7 +167,7 @@ export const zowkaSpaceDefinitions: Record<ZowkaSpaceId, ZowkaSpaceDefinition> =
       id: 'finance',
       label: msg`Finance`,
       navigationLabel: msg`Espace Finance`,
-      Icon: IconBuildingBank,
+      Icon: IconBuildingSkyscraper,
       entryPath: erpMarocPaths.finance,
       defaultHomePath: erpMarocPaths.finance,
       homeItem: {
@@ -290,7 +290,7 @@ export const zowkaSpaceDefinitions: Record<ZowkaSpaceId, ZowkaSpaceDefinition> =
               label: msg`Relevés bancaires`,
               path: erpMarocPaths.bankStatements,
               activePaths: [erpMarocPaths.bankStatements],
-              Icon: IconBuildingBank,
+              Icon: IconBuildingSkyscraper,
               isVisible: canUseAccounting,
             },
             {
